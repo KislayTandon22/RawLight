@@ -18,6 +18,14 @@
   - `ios/target/aarch64-apple-ios-sim/debug/liblightcraft_ios.a` (1.4 GB)
   - `ios/target/aarch64-apple-ios/debug/liblightcraft_ios.a` (1.4 GB)
 - Generated `ios/LightCraftiPad.xcodeproj` using `xcodegen` with bundle identifier `com.<me>.lightcraftpad`, fork branding `LightCraft iPad (fork)`, and pre-build staticlib compilation scripts.
+- Resolved `rust-lld` dynamic linker dependency on macOS by symlinking `libLLVM.dylib` into the target sysroot lib directory.
+- Successfully compiled full WASM package via `cargo xtask web --dev` (40.8 MB wasm binary + JS + PWA assets).
+- Served build locally via `xtask web --serve 8080` with COOP/COEP isolation headers and executed headless iPad browser testing:
+  - WebGL2 rendering confirmed active (`WebKit WebGL`, 2560x1600 canvas resolution).
+  - Service worker registered and shell assets cached (`lightcraft-ipad-shell-v1`).
+  - Origin Private File System (`navigator.storage.getDirectory()`) verified operational.
+  - Multi-touch pinch-to-zoom touch events (`touchstart`, `touchmove`, `touchend`) simulated and confirmed responsive.
+  - Rendered canvas snapshots saved to `docs/ios/shots/ipad_pwa_running.png` and `docs/ios/shots/ipad_pwa_post_touch.png`.
 - Authored comprehensive documentation:
   - [PLAN.md](PLAN.md): Architecture & port plan.
   - [WEB-IPAD.md](WEB-IPAD.md): iPad Safari PWA setup & HTTPS local testing guide.
@@ -40,5 +48,4 @@
 ## Next steps
 
 - Run `cargo xtask ci` milestone checks and confirm clean pass.
-- Package final PWA web site via `cargo xtask web`.
 - Review testing instructions in `docs/ios/RUN-ON-IPAD.md` and `docs/ios/TESTING.md`.
