@@ -546,12 +546,14 @@ pub fn show_survey(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let _ = app.run("library.select", json!({"ids": [id.0]}));
             app.ui.view = ViewMode::Detail;
         }
-        // remove from the survey (deselect) on hover
-        if resp.hovered() && photos.len() > 1 {
-            let xr = Rect::from_min_size(pos2(img.right() - 26.0, img.top() + 6.0), vec2(20.0, 20.0));
+        // remove from the survey (deselect) on hover or on touch devices
+        let touch = crate::theme::touch_ui(ui.ctx());
+        if (resp.hovered() || touch) && photos.len() > 1 {
+            let x_size = if touch { vec2(30.0, 30.0) } else { vec2(20.0, 20.0) };
+            let xr = Rect::from_min_size(pos2(img.right() - x_size.x - 6.0, img.top() + 6.0), x_size);
             let xresp = ui.interact(xr, egui::Id::new(("survey-x", id.0)), Sense::click()).on_hover_text(crate::i18n::tr("Remove from survey"));
-            ui.painter().circle_filled(xr.center(), 10.0, Color32::from_black_alpha(if xresp.hovered() { 230 } else { 160 }));
-            paint(ui.painter(), xr.shrink(4.0), Icon::Close, t.text);
+            ui.painter().circle_filled(xr.center(), x_size.x * 0.5, Color32::from_black_alpha(if xresp.hovered() || touch { 230 } else { 160 }));
+            paint(ui.painter(), xr.shrink(if touch { 6.0 } else { 4.0 }), Icon::Close, t.text);
             if xresp.clicked() {
                 let _ = app.run("library.select", json!({"ids": [id.0], "mode": "toggle"}));
             }

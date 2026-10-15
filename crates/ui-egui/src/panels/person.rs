@@ -234,7 +234,8 @@ fn tile(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect, f: &Face, ppp: f32,
     // the × is added after the tile, so it wins where they overlap
     let x_rect = Rect::from_min_size(pos2(r.right() - 24.0, r.top() + 4.0), vec2(20.0, 20.0));
     let x_resp = more.then(|| ui.interact(x_rect, egui::Id::new(("more-face-x", f.photo, f.index)), Sense::click()));
-    let hovered = resp.hovered() || x_resp.as_ref().is_some_and(|x| x.hovered());
+    let touch = crate::theme::touch_ui(ui.ctx());
+    let hovered = resp.hovered() || x_resp.as_ref().is_some_and(|x| x.hovered()) || touch;
     let p = ui.painter();
     p.rect_filled(r, 3.0, t.canvas);
     if let Some(job) = app.session.face_job(lightcraft_catalog::PhotoId(f.photo), f.rect, (r.width() * ppp).ceil() as usize)

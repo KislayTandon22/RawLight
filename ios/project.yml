@@ -1,0 +1,66 @@
+name: LightCraftiPad
+options:
+  bundleIdPrefix: com
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+targets:
+  LightCraftiPad:
+    type: application
+    platform: iOS
+    sources:
+      - path: LightCraft
+    settings:
+      base:
+        PRODUCT_NAME: "LightCraft iPad (fork)"
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.lightcraftpad
+        TARGETED_DEVICE_FAMILY: "2"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: LightCraft/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/build"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-force_load"
+          - "$(PROJECT_DIR)/build/liblightcraft_ios.a"
+          - "-framework"
+          - Metal
+          - "-framework"
+          - UIKit
+          - "-framework"
+          - Foundation
+          - "-framework"
+          - QuartzCore
+          - "-framework"
+          - CoreGraphics
+          - "-framework"
+          - CoreFoundation
+          - "-framework"
+          - ImageIO
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        Release:
+          SWIFT_COMPILATION_MODE: wholemodule
+    preBuildScripts:
+      - name: Build Rust static library
+        script: |
+          set -euo pipefail
+          export PATH="/opt/homebrew/bin:$PATH"
+          TOOLCHAIN_BIN="$(dirname "$(rustup which cargo)")"
+          export PATH="$TOOLCHAIN_BIN:$PATH"
+          if [[ "$SDK_NAME" == *simulator* ]]; then
+            export RUST_TARGET=aarch64-apple-ios-sim
+          else
+            export RUST_TARGET=aarch64-apple-ios
+          fi
+          export CARGO_BUILD_JOBS=2
+          export CARGO_TARGET_DIR="$PROJECT_DIR/build"
+          cargo build --manifest-path "$PROJECT_DIR/Cargo.toml" -p lightcraft-ios --release --target "$RUST_TARGET"
+          cp "$CARGO_TARGET_DIR/$RUST_TARGET/release/liblightcraft_ios.a" "$PROJECT_DIR/build/liblightcraft_ios.a"
+    dependencies: []

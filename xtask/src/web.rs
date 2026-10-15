@@ -24,7 +24,16 @@ const CHINESE_FONT_FILE: &str = "lightcraft_zh_hans.otf";
 const CHINESE_FONT_LICENSE_FILE: &str = "OFL-noto-sans-cjk-sc.txt";
 
 /// Files copied from `apps/lightcraft-web/` into the bundle as they are.
-const STATIC_FILES: [&str; 2] = ["index.html", "worker.js"];
+const STATIC_FILES: [&str; 8] = [
+    "index.html",
+    "worker.js",
+    "manifest.webmanifest",
+    "service-worker.js",
+    "lightcraft-icon.svg",
+    "icons/lightcraft-192.png",
+    "icons/lightcraft-512.png",
+    "icons/apple-touch-icon.png",
+];
 
 /// Bundle files that get precompressed copies.
 const COMPRESSED: [&str; 4] = ["index.html", "worker.js", "lightcraft_web.js", "lightcraft_web_bg.wasm"];
@@ -136,7 +145,11 @@ pub fn run(args: &[&str]) -> Result<(), String> {
         }
     }
     for f in STATIC_FILES {
-        std::fs::copy(root().join("apps/lightcraft-web").join(f), out.join(f)).map_err(|e| format!("copy {f}: {e}"))?;
+        let target = out.join(f);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        std::fs::copy(root().join("apps/lightcraft-web").join(f), &target).map_err(|e| format!("copy {f}: {e}"))?;
     }
     let chinese_font = copy_chinese_font(&out)?;
 
@@ -191,6 +204,7 @@ fn mime(path: &Path) -> &'static str {
         "wasm" => "application/wasm",
         "css" => "text/css; charset=utf-8",
         "json" => "application/json",
+        "webmanifest" => "application/manifest+json; charset=utf-8",
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "otf" => "font/otf",

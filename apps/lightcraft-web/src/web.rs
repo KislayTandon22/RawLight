@@ -388,6 +388,8 @@ struct WebApp {
 impl WebApp {
     fn new(cc: &eframe::CreationContext<'_>, boot: Boot, chinese_font: Vec<u8>) -> Self {
         let Boot { opts, backend, files, index, lib_dir } = boot;
+        let touch_ui = window().is_some_and(|w| w.navigator().max_touch_points() > 0);
+        lightcraft_ui_egui::theme::set_touch_ui(&cc.egui_ctx, touch_ui);
         let originals = Originals::default();
         let t = perf_now();
         let mut session = Session::new();
@@ -429,7 +431,7 @@ impl WebApp {
             );
         }
         // previews are large (≤ 2560 px, f32): keep few in a 32-bit address space
-        session.media.preview_capacity = 3;
+        session.media.preview_capacity = if touch_ui { 2 } else { 3 };
         let frozen = Rc::new(Cell::new(false));
         let mut app = LightcraftApp::new(session, services(originals.clone(), backend.clone(), files.clone(), frozen.clone(), cc.egui_ctx.clone()))
             .with_chinese_font(chinese_font);
@@ -439,10 +441,13 @@ impl WebApp {
         }
         app.ui = app.ui.sanitized();
         app.library_problem = problem;
-        let n = opts.workers.unwrap_or_else(|| {
+        let workers_requested = opts.workers.unwrap_or_else(|| {
             let cores = window().map_or(1, |w| w.navigator().hardware_concurrency() as usize);
             cores.saturating_sub(1).clamp(1, 4)
         });
+        // On touch devices each worker owns another WASM instance and decode/render caches. Keep
+        // the simultaneous high-memory jobs bounded on iPad-class shared-memory devices.
+        let n = workers_requested.min(if touch_ui { 2 } else { 4 });
         let cache = app.session.media.rendered.clone();
         let workers = (n > 0).then(|| {
             Workers::start(

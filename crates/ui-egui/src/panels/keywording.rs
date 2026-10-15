@@ -58,10 +58,11 @@ pub fn names_row(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 /// and the ×'s.
 fn chip(ui: &mut egui::Ui, path: &str, partial: bool, cross: bool) -> (egui::Response, Option<egui::Response>) {
     use egui::{Align2, Rect, Sense, pos2, vec2};
+    let touch = crate::theme::touch_ui(ui.ctx());
     let t = Tokens::get(ui.ctx());
     let font = t.font(13.0);
     let color = if partial { t.text_dim } else { t.text_label };
-    let cross_w = if cross { 18.0 } else { 0.0 };
+    let cross_w = if cross { if touch { 24.0 } else { 18.0 } } else { 0.0 };
     // at most the row's width
     let room = (ui.max_rect().width() - 16.0 - cross_w).max(24.0);
     let measure = |s: &str| ui.painter().layout_no_wrap(s.to_string(), font.clone(), color).size().x;
@@ -69,14 +70,16 @@ fn chip(ui: &mut egui::Ui, path: &str, partial: bool, cross: bool) -> (egui::Res
     let w = measure(&shown) + 16.0 + cross_w;
     // the row places it; its name and × answer under ids of their own keyword, so an open menu
     // stays with its keyword when the chips change
-    let (rect, _) = ui.allocate_exact_size(vec2(w, 22.0), Sense::hover());
+    let chip_h = if touch { 28.0 } else { 22.0 };
+    let (rect, _) = ui.allocate_exact_size(vec2(w, chip_h), Sense::hover());
     let id = egui::Id::new(("keyword-chip", path.to_lowercase(), cross));
     let body = Rect::from_min_max(rect.min, pos2(rect.right() - cross_w, rect.bottom()));
     let full = path.replace('|', " › ");
     let resp = ui.interact(body, id, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &full));
     let x = cross.then(|| {
-        let xr = Rect::from_center_size(pos2(rect.right() - 11.0, rect.center().y), vec2(14.0, 14.0));
+        let xr_size = if touch { vec2(20.0, 20.0) } else { vec2(14.0, 14.0) };
+        let xr = Rect::from_center_size(pos2(rect.right() - cross_w * 0.5, rect.center().y), xr_size);
         let xresp = ui.interact(xr, id.with("remove"), Sense::click());
         let said = crate::i18n::tr_format!("Remove “{name}”", name = full);
         xresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &said));
@@ -88,7 +91,8 @@ fn chip(ui: &mut egui::Ui, path: &str, partial: bool, cross: bool) -> (egui::Res
     }
     ui.painter().text(pos2(rect.left() + 8.0, rect.center().y), Align2::LEFT_CENTER, &shown, font.clone(), color);
     if let Some(x) = &x {
-        ui.painter().text(x.rect.center(), Align2::CENTER_CENTER, "×", t.font(13.0), if x.hovered() { t.text } else { t.text_dim });
+        let lit = x.hovered() || touch;
+        ui.painter().text(x.rect.center(), Align2::CENTER_CENTER, "×", t.font(13.0), if lit { t.text } else { t.text_dim });
     }
     (resp, x)
 }

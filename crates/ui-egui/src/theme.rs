@@ -388,6 +388,16 @@ pub fn apply(ctx: &egui::Context) {
     apply_kind(ctx, ThemeKind::default());
 }
 
+/// Enable larger controls for touch-first hosts before the first frame.
+pub fn set_touch_ui(ctx: &egui::Context, enabled: bool) {
+    ctx.data_mut(|data| data.insert_persisted(egui::Id::new("lightcraft-touch-ui"), enabled));
+}
+
+/// Whether this host asks for touch-sized controls.
+pub fn touch_ui(ctx: &egui::Context) -> bool {
+    ctx.data_mut(|data| data.get_persisted::<bool>(egui::Id::new("lightcraft-touch-ui"))).unwrap_or(false)
+}
+
 /// Style `ctx` with `kind`. The visuals go to both of egui's styles, so egui following the
 /// system's dark/light setting on its own never swaps in its stock look.
 pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
@@ -402,6 +412,7 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
         o.input_options.scroll_zoom_speed = WHEEL_ZOOM_PER_POINT;
     });
     let t = Tokens::for_kind(kind);
+    let touch_ui = touch_ui(ctx);
     ctx.data_mut(|d| {
         d.insert_temp(egui::Id::NULL, t);
         d.insert_temp(theme_id(), kind);
@@ -434,8 +445,8 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
     ctx.set_theme(if dark { egui::Theme::Dark } else { egui::Theme::Light });
     ctx.all_styles_mut(|s| {
         s.spacing.item_spacing = egui::vec2(6.0, 4.0);
-        s.spacing.button_padding = egui::vec2(8.0, 3.0);
-        s.spacing.interact_size.y = 22.0;
+        s.spacing.button_padding = egui::vec2(8.0, if touch_ui { 8.0 } else { 3.0 });
+        s.spacing.interact_size.y = if touch_ui { 44.0 } else { 22.0 };
         s.text_styles.insert(egui::TextStyle::Body, FontId::proportional(13.0));
         s.text_styles.insert(egui::TextStyle::Button, FontId::proportional(13.0));
         s.text_styles.insert(egui::TextStyle::Small, FontId::proportional(11.0));

@@ -170,7 +170,8 @@ fn wheel_notches(events: &[egui::Event]) -> f32 {
 
 /// Native pinch (also modifier-wheel zoom) and two-finger scroll, scoped to this image view.
 pub(crate) fn navigate_gesture(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Response, area: Rect, img: Rect, native: [usize; 2]) -> bool {
-    if !resp.hovered() {
+    let touches_here = ui.input(|i| i.multi_touch().is_some_and(|touch| area.contains(touch.center_pos)));
+    if !resp.hovered() && !touches_here {
         return false;
     }
     let (mut factor, mut delta, anchor) =

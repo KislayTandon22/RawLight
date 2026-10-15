@@ -459,6 +459,10 @@ environment.systemPackages = [ pkgs.lightcraft ];           # home-manager: home
 <kbd>Shift</kbd>+<kbd>P</kbd> presets · <kbd>\\</kbd> original · <kbd>Y</kbd> before/after · <kbd>Z</kbd> zoom ·
 <kbd>J</kbd> clipping · <kbd>⌘Z</kbd> undo · <kbd>⌘/</kbd> all shortcuts.
 
+## iPad
+
+LightCraft can run as an installable Safari Home Screen app on iPad. Build it with `cargo xtask web`, serve it from a trusted HTTPS origin, then use **Share → Add to Home Screen** in Safari. Plain HTTP at a Mac LAN IP is not a secure context and may disable browser storage and GPU features. See [docs/ios/WEB-IPAD.md](docs/ios/WEB-IPAD.md) for exact setup and testing steps. The native iOS app is still in progress.
+
 ## How it's built
 
 An engine-first Cargo workspace of small, tested crates with enforced layering (`cargo xtask layers`): `geom`,
