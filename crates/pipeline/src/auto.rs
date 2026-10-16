@@ -155,7 +155,25 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
     let dr = (stats.p99 - stats.p1).max(0.0);
 
     // 1. Exposure: empirical regression slope -0.41 EV per EV of log-average luminance
-    let exposure = (EXPOSURE_AT_GREY + EXPOSURE_SLOPE * stats.mean).clamp(-2.0, 3.0);
+    let mut base_exposure = EXPOSURE_AT_GREY + EXPOSURE_SLOPE * stats.mean;
+
+    // For real multi-tonal scenes (dr >= 1.0 EV and not flat synthetic charts), apply scene context:
+    if dr >= 1.0 {
+        // High-key scene recognition (e.g. snow, white background):
+        // Prevents muddy grey pull-down when median and 25th percentile are already bright.
+        if stats.p50 > 0.4 && stats.p25 > -0.5 {
+            let high_key_boost = ((stats.p50 - 0.4) * 0.35).clamp(0.0, 0.60);
+            base_exposure += high_key_boost;
+        }
+        // Low-key high-contrast night scene recognition (night skies with bright lights/stars):
+        // Only damp when highlights exist (p99 > 0.0 EV), distinguishing night photos from flat underexposure.
+        if stats.p75 < -1.2 && stats.p50 < -2.2 && stats.p99 > 0.0 && dr > 4.5 {
+            let low_key_damping = ((-1.2 - stats.p75) * 0.25).clamp(0.0, 0.50);
+            base_exposure -= low_key_damping;
+        }
+    }
+
+    let exposure = base_exposure.clamp(-2.0, 3.0);
     let exposure = (exposure * 100.0).round() / 100.0;
 
     // Shift percentiles by the chosen exposure to analyze post-exposure tonal distribution
@@ -176,9 +194,15 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
         }
         let hi = hi.clamp(-100.0, 5.0);
 
-        // Content-aware whites: anchor the 99.5th percentile near target diffuse white (+2.25 EV)
+        // Specular highlight vs diffuse white detection:
+        // If the top 0.5% tail is stretched far beyond the 95th percentile, specular highlights
+        // or light sources are present. Anchor diffuse white to the shoulder rather than specular points.
+        let is_specular = (stats.p995 - stats.p95) > 2.0;
+        let diffuse_white_ev = if is_specular { stats.p95 + 0.65 * (stats.p99 - stats.p95).max(0.0) + exposure } else { p995 };
+
+        // Content-aware whites: anchor diffuse white near target (+2.25 EV)
         let white_target = 2.25;
-        let white_diff = white_target - p995;
+        let white_diff = white_target - diffuse_white_ev;
         let wh = (white_diff * 22.0).clamp(-35.0, 45.0);
 
         (hi, wh)
@@ -196,10 +220,13 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
         }
         let sh = sh.clamp(0.0, 85.0);
 
+        // Check for intentional pure-black backdrops or deep silhouettes:
+        let is_silhouette = (stats.p5 - stats.p01) < 0.6 && stats.p25 < -3.5;
+
         // Content-aware blacks: anchor deep black floor (0.1th percentile) around -5.2 EV
         let black_target = -5.2;
         let black_diff = black_target - p01;
-        let bl = (black_diff * 16.0).clamp(-40.0, 25.0);
+        let bl = if is_silhouette { (black_diff * 14.0).clamp(-40.0, 6.0) } else { (black_diff * 16.0).clamp(-40.0, 25.0) };
 
         (sh, bl)
     };
@@ -273,24 +300,64 @@ pub fn auto_bw_mix(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> [f64
     })
 }
 
-/// Grey-world white balance weighted towards mid-tone, low-chroma pixels. Returns (temp, tint).
+/// Spatial block-based auto white balance weighted towards mid-tone, low-chroma pixels.
+/// Blocks are analyzed locally to prioritize near-neutral surfaces and prevent large uniform
+/// color regions (such as foliage or sky) from skewing the illuminant estimate. Returns (temp, tint).
 pub fn auto_wb(src: &Rgb32f, info: &SourceInfo) -> (f64, f64) {
     let img = lightcraft_raster::resample::fit(src, 256, 256, lightcraft_raster::resample::Filter::Box);
+    let (w, h) = (img.width, img.height);
+    if w == 0 || h == 0 {
+        return (info.as_shot_temp, info.as_shot_tint);
+    }
+
+    let block_sz = 16.min(w).min(h).max(1);
+    let bx = (w + block_sz - 1) / block_sz;
+    let by = (h + block_sz - 1) / block_sz;
+
+    let mut block_acc = vec![[0.0f64; 3]; bx * by];
+    let mut block_wsum = vec![0.0f64; bx * by];
+
+    for y in 0..h {
+        let b_y = y / block_sz;
+        for x in 0..w {
+            let b_x = x / block_sz;
+            let b_idx = b_y * bx + b_x;
+            let c = img.data[y * w + x];
+            let lum = luminance_2020(c);
+            if !(0.01..=2.0).contains(&lum) {
+                continue;
+            }
+            let mx = c[0].max(c[1]).max(c[2]);
+            let mn = c[0].min(c[1]).min(c[2]);
+            let chroma = (mx - mn) / (mx + 1e-6);
+            let weight = (1.0 - chroma as f64).powi(2) * (1.0 - ((lum.log2() + 2.5) / 4.0).abs().min(1.0) as f64);
+            for i in 0..3 {
+                block_acc[b_idx][i] += c[i] as f64 * weight;
+            }
+            block_wsum[b_idx] += weight;
+        }
+    }
+
     let (mut acc, mut wsum) = ([0.0f64; 3], 0.0f64);
-    for c in &img.data {
-        let y = luminance_2020(*c);
-        if !(0.01..=2.0).contains(&y) {
+    for i in 0..(bx * by) {
+        let bw = block_wsum[i];
+        if bw <= 1e-6 {
             continue;
         }
-        let mx = c[0].max(c[1]).max(c[2]);
-        let mn = c[0].min(c[1]).min(c[2]);
-        let chroma = (mx - mn) / (mx + 1e-6);
-        let w = (1.0 - chroma).powi(2) as f64 * (1.0 - ((y.log2() + 2.5) / 4.0).abs().min(1.0)) as f64;
-        for i in 0..3 {
-            acc[i] += c[i] as f64 * w;
+        let b_col = block_acc[i].map(|v| v / bw);
+        let b_mx = b_col[0].max(b_col[1]).max(b_col[2]);
+        let b_mn = b_col[0].min(b_col[1]).min(b_col[2]);
+        let b_chroma = ((b_mx - b_mn) / (b_mx + 1e-6)).clamp(0.0, 1.0);
+
+        // Near-neutral blocks receive high confidence; sqrt(bw) balances block area vs pixel weight
+        let neutrality = (1.0 - b_chroma).powi(2);
+        let block_w = neutrality * bw.sqrt();
+        for ch in 0..3 {
+            acc[ch] += b_col[ch] * block_w;
         }
-        wsum += w;
+        wsum += block_w;
     }
+
     if wsum <= 0.0 {
         return (info.as_shot_temp, info.as_shot_tint);
     }
