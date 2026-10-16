@@ -40,7 +40,9 @@
     - Adaptive Highlights & Shadows: recovers blown skies and lifts deep shadows cleanly based on dynamic range.
     - Smart Vibrance: analyzes 90th-percentile chroma to protect vivid scenes from oversaturation while boosting flat RAW captures.
     - Spatial Patch-Based Auto White Balance (`auto_wb`): breaks proxy into spatial blocks and prioritizes low-chroma near-neutral patches with square-root area damping, preventing large uniform green fields or blue skies from inducing heavy magenta or orange color casts.
-  - Verified across 181 pipeline tests, 852 engine tests, and layering gates.
+  - Added 1-tap Auto White Balance button directly next to the White Balance dropdown in the Color edit section (`crates/ui-egui/src/panels/edit.rs`).
+  - Added "Find Blemishes" AI facial blemish healing button adjacent to "Find Dust" in the Remove/Healing panel (`crates/ui-egui/src/panels/right.rs`), exposing YuNet face-detection and skin-mask blemish removal.
+  - Verified across 181 pipeline tests, 41 ui-egui tests, 852 engine tests, and layering gates.
 - Authored comprehensive documentation:
   - [PLAN.md](PLAN.md): Architecture & port plan.
   - [WEB-IPAD.md](WEB-IPAD.md): iPad Safari PWA setup & HTTPS local testing guide.
