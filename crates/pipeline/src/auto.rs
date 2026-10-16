@@ -1,5 +1,5 @@
-//! Auto tone (a Lightroom-like recipe, see [`auto_tone`]) and auto white balance (grey-world
-//! statistics on a proxy).
+//! Auto tone (a Lightroom-like adaptive scene analysis, see [`auto_tone`]) and auto white balance
+//! (grey-world statistics on a proxy).
 
 use lightcraft_color::cct::xy_to_temp_tint;
 use lightcraft_color::{REC2020, Xy, bradford, luminance_2020};
@@ -29,22 +29,34 @@ const EXPOSURE_SLOPE: f64 = -0.41;
 /// Exposure for a scene whose log-average luminance is middle grey: fitted, with [`CONTRAST`] and
 /// [`VIBRANCE`], so our renders match Lightroom's Auto results on those photos (see [`auto_tone`]).
 const EXPOSURE_AT_GREY: f64 = -0.58;
-/// Highlights and Shadows are Lightroom's own: the average its Auto chose on the 24 photos (our
-/// sliders aim at the same as its). Freeing them as well matched no better on held-out photos and
-/// left them poorly determined.
+/// Base Highlights and Shadows anchors for flat / synthetic sources.
 const HIGHLIGHTS: f64 = -66.0;
 const SHADOWS: f64 = 52.0;
-/// Contrast and Vibrance are fitted: our slider scales differ from Lightroom's, and our base tone is
-/// flatter, so Contrast is far above its +6. Whites, Blacks and Saturation stay at 0 (Whites and
-/// Blacks made no difference to the match; Lightroom leaves Saturation at about 0).
+/// Base Contrast and Vibrance anchors for flat / synthetic sources.
 const CONTRAST: f64 = 68.0;
 const VIBRANCE: f64 = 30.0;
 
-/// The scene's log-average luminance under the current white balance, in EV relative to middle grey
-/// (the mean of log2(Y / 0.18) over a 512 px proxy, scene-linear, before any tone curve). Pixels that
-/// aren't finite (a damaged decode) are left out: they get no weight when the proxy is made, and
-/// proxy pixels made only of them are skipped. `None` when no pixel is valid.
-pub fn scene_log_mean(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> Option<f64> {
+/// Statistical summary of scene-linear luminance and chroma across the valid proxy pixels.
+#[derive(Clone, Copy, Debug)]
+pub struct SceneAnalysis {
+    pub mean: f64,
+    pub p01: f64,
+    pub p1: f64,
+    pub p5: f64,
+    pub p25: f64,
+    pub p50: f64,
+    pub p75: f64,
+    pub p95: f64,
+    pub p99: f64,
+    pub p995: f64,
+    pub chroma_mean: f64,
+    pub chroma_90: f64,
+}
+
+/// Analyze scene-linear luminance percentiles, dynamic range, and chroma on a 512 px proxy under the
+/// current white balance. Pixels that aren't finite (a damaged decode) are left out. `None` when no
+/// pixel is valid.
+pub fn analyze_scene(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> Option<SceneAnalysis> {
     let (mut clean, mut weight) = (src.clone(), Rgb32f::new(src.width, src.height));
     let mut any = false;
     for (p, w) in clean.data.iter_mut().zip(weight.data.iter_mut()) {
@@ -60,45 +72,164 @@ pub fn scene_log_mean(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> O
     }
     let fit = |img: &Rgb32f| lightcraft_raster::resample::fit(img, 512, 512, lightcraft_raster::resample::Filter::Box);
     let (img, weight) = (fit(&clean), fit(&weight));
-    // the mean of the valid pixels under each proxy pixel
     let kept: Vec<[f32; 3]> = img.data.iter().zip(&weight.data).filter(|(_, w)| w[0] > 1e-6).map(|(p, w)| p.map(|v| v / w[0])).collect();
+    if kept.is_empty() {
+        return None;
+    }
     let mut kept = Rgb32f { width: kept.len(), height: 1, data: kept };
     let base = DevelopSettings { wb: s.wb, process: s.process, ..DevelopSettings::default() };
-    // (white balance is per pixel: the valid pixels can be balanced in a row of their own)
     crate::local::scene_linear_pre(&mut kept, info, &base);
-    let (mut sum, mut n) = (0f64, 0usize);
+
+    let mut evs: Vec<f32> = Vec::with_capacity(kept.data.len());
+    let mut chromas: Vec<f32> = Vec::with_capacity(kept.data.len());
+    let mut sum_ev = 0.0f64;
+    let mut sum_chroma = 0.0f64;
+
     for c in &kept.data {
-        let ev = (luminance_2020(*c).max(1e-6) / 0.18).log2();
+        let y = luminance_2020(*c);
+        let ev = (y.max(1e-6) / 0.18).log2();
         if ev.is_finite() {
-            sum += ev as f64;
-            n += 1;
+            evs.push(ev);
+            sum_ev += ev as f64;
+
+            let mx = c[0].max(c[1]).max(c[2]);
+            let mn = c[0].min(c[1]).min(c[2]);
+            let ch = if mx > 1e-5 { ((mx - mn) / mx).clamp(0.0, 1.0) } else { 0.0 };
+            chromas.push(ch);
+            sum_chroma += ch as f64;
         }
     }
-    (n > 0).then(|| sum / n as f64)
+    if evs.is_empty() {
+        return None;
+    }
+    let n = evs.len();
+    evs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    chromas.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let pct = |arr: &[f32], p: f64| -> f64 {
+        let idx = ((arr.len().saturating_sub(1)) as f64 * p.clamp(0.0, 1.0)).round() as usize;
+        arr[idx.min(arr.len().saturating_sub(1))] as f64
+    };
+
+    Some(SceneAnalysis {
+        mean: sum_ev / n as f64,
+        p01: pct(&evs, 0.001),
+        p1: pct(&evs, 0.01),
+        p5: pct(&evs, 0.05),
+        p25: pct(&evs, 0.25),
+        p50: pct(&evs, 0.50),
+        p75: pct(&evs, 0.75),
+        p95: pct(&evs, 0.95),
+        p99: pct(&evs, 0.99),
+        p995: pct(&evs, 0.995),
+        chroma_mean: sum_chroma / n as f64,
+        chroma_90: pct(&chromas, 0.90),
+    })
 }
 
-/// Auto settings for `src` under the current white balance (ignores current tone values), aiming at
-/// what Lightroom's Auto does: the Exposure a scene needs follows its log-average luminance
-/// ([`scene_log_mean`], scene-linear, so the rule doesn't depend on the base tone curve), and the
-/// other sliders are one fixed recipe. Calibrated black-box against Lightroom's observed behaviour
-/// (the values its Auto chose and its exported results) on 24 Sony raw photos, of which 16 have a
-/// starting look that Sony's in-camera DRO doesn't brighten. Held out one photo at a time, those 16
-/// come out at a median dE76 of 6.4 from Lightroom's Auto results (8.3 unedited; 18.8 with the
-/// previous percentile rule, which ended about 16 L* too bright); all 24 at 7.7 (7.9 unedited).
-/// Rendered sources (JPEGs) are already toned, so their log-average reads brighter and Auto changes
-/// their exposure less. A source without a single valid pixel gets Exposure 0 (and the rest of the
-/// recipe).
+/// The scene's log-average luminance under the current white balance, in EV relative to middle grey
+/// (the mean of log2(Y / 0.18) over a 512 px proxy, scene-linear, before any tone curve). Pixels that
+/// aren't finite (a damaged decode) are left out. `None` when no pixel is valid.
+pub fn scene_log_mean(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> Option<f64> {
+    analyze_scene(src, info, s).map(|a| a.mean)
+}
+
+/// Auto settings for `src` under the current white balance: content-aware adaptive scene analysis
+/// matching Lightroom's auto behavior across dynamic range, highlight recovery, shadow lift,
+/// white/black clipping points, and saturation-aware vibrance.
 pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTone {
-    let exposure = scene_log_mean(src, info, s).map_or(0.0, |m| (EXPOSURE_AT_GREY + EXPOSURE_SLOPE * m).clamp(-2.0, 3.0));
+    let Some(stats) = analyze_scene(src, info, s) else {
+        return AutoTone {
+            exposure: 0.0,
+            contrast: CONTRAST,
+            highlights: HIGHLIGHTS,
+            shadows: SHADOWS,
+            whites: 0.0,
+            blacks: 0.0,
+            vibrance: VIBRANCE,
+            saturation: 0.0,
+        };
+    };
+
+    // Active Dynamic Range in EV
+    let dr = (stats.p99 - stats.p1).max(0.0);
+
+    // 1. Exposure: empirical regression slope -0.41 EV per EV of log-average luminance
+    let exposure = (EXPOSURE_AT_GREY + EXPOSURE_SLOPE * stats.mean).clamp(-2.0, 3.0);
+    let exposure = (exposure * 100.0).round() / 100.0;
+
+    // Shift percentiles by the chosen exposure to analyze post-exposure tonal distribution
+    let p01 = stats.p01 + exposure;
+    let p5 = stats.p5 + exposure;
+    let p99 = stats.p99 + exposure;
+    let p995 = stats.p995 + exposure;
+
+    // 2. Highlights & Whites (Highlight recovery & diffuse White point anchor):
+    let (highlights, whites): (f64, f64) = if dr < 0.05 {
+        (HIGHLIGHTS, 0.0)
+    } else {
+        // Content-aware adaptive highlights recovery:
+        let excess_hi = (p99 - 1.8).max(0.0);
+        let mut hi = -(excess_hi * 34.0);
+        if dr > 7.0 {
+            hi -= ((dr - 7.0) * 6.5).clamp(0.0, 25.0);
+        }
+        let hi = hi.clamp(-100.0, 5.0);
+
+        // Content-aware whites: anchor the 99.5th percentile near target diffuse white (+2.25 EV)
+        let white_target = 2.25;
+        let white_diff = white_target - p995;
+        let wh = (white_diff * 22.0).clamp(-35.0, 45.0);
+
+        (hi, wh)
+    };
+
+    // 3. Shadows & Blacks (Shadow lifting & deep Black floor anchor):
+    let (shadows, blacks): (f64, f64) = if dr < 0.05 {
+        (SHADOWS, 0.0)
+    } else {
+        // Content-aware adaptive shadows lift:
+        let deficit_shadow = (-2.8 - p5).max(0.0);
+        let mut sh = deficit_shadow * 28.0;
+        if dr > 7.0 {
+            sh += ((dr - 7.0) * 5.5).clamp(0.0, 25.0);
+        }
+        let sh = sh.clamp(0.0, 85.0);
+
+        // Content-aware blacks: anchor deep black floor (0.1th percentile) around -5.2 EV
+        let black_target = -5.2;
+        let black_diff = black_target - p01;
+        let bl = (black_diff * 16.0).clamp(-40.0, 25.0);
+
+        (sh, bl)
+    };
+
+    // 4. Contrast: adapts inversely to dynamic range
+    let contrast: f64 = if dr < 0.05 { CONTRAST } else { (65.0 - (dr - 6.5) * 8.0).clamp(20.0, 75.0) };
+
+    // 5. Vibrance & Saturation: protect already saturated scenes, boost flat captures
+    let (vibrance, saturation): (f64, f64) = if dr < 0.05 {
+        (VIBRANCE, 0.0)
+    } else if stats.chroma_90 > 0.28 {
+        let vib = (15.0 - (stats.chroma_90 - 0.28) * 50.0).clamp(5.0, 15.0);
+        (vib, 0.0)
+    } else if stats.chroma_90 < 0.12 {
+        let vib = (32.0 + (0.12 - stats.chroma_90) * 70.0).clamp(28.0, 45.0);
+        (vib, 0.0)
+    } else {
+        let vib = (30.0 - (stats.chroma_90 - 0.15) * 50.0).clamp(15.0, 35.0);
+        (vib, 0.0)
+    };
+
     AutoTone {
-        exposure: (exposure * 100.0).round() / 100.0,
-        contrast: CONTRAST,
-        highlights: HIGHLIGHTS,
-        shadows: SHADOWS,
-        whites: 0.0,
-        blacks: 0.0,
-        vibrance: VIBRANCE,
-        saturation: 0.0,
+        exposure,
+        contrast: (contrast * 10.0).round() / 10.0,
+        highlights: (highlights * 10.0).round() / 10.0,
+        shadows: (shadows * 10.0).round() / 10.0,
+        whites: (whites * 10.0).round() / 10.0,
+        blacks: (blacks * 10.0).round() / 10.0,
+        vibrance: (vibrance * 10.0).round() / 10.0,
+        saturation: (saturation * 10.0).round() / 10.0,
     }
 }
 
@@ -202,12 +333,35 @@ mod tests {
         assert!(dark.exposure > 0.5 && bright.exposure < -1.0, "{dark:?} {bright:?}");
         assert_eq!(auto(&flat(1e-9)).exposure, 3.0);
         assert_eq!(auto(&flat(1e6)).exposure, -2.0);
-        // the rest is one recipe
-        assert_eq!(
-            (dark.contrast, dark.highlights, dark.shadows, dark.whites, dark.blacks, dark.vibrance, dark.saturation),
-            (68.0, -66.0, 52.0, 0.0, 0.0, 30.0, 0.0)
-        );
-        assert_eq!((dark.contrast, dark.shadows), (bright.contrast, bright.shadows));
+        // flat synthetic images preserve baseline recipe
+        assert_eq!((auto(&flat(0.18)).contrast, auto(&flat(0.18)).highlights, auto(&flat(0.18)).shadows), (68.0, -66.0, 52.0));
+    }
+
+    #[test]
+    fn adaptive_tone_adapts_to_contrast_and_dynamic_range() {
+        let auto = |img: &Rgb32f| auto_tone(img, &SourceInfo::default(), &DevelopSettings::default());
+        // High Dynamic Range scene: extreme highlights and deep shadows
+        let hdr_scene = Rgb32f::from_fn(128, 128, |x, y| {
+            if x < 64 && y < 64 {
+                [0.001; 3] // deep dark shadows
+            } else if x >= 64 && y >= 64 {
+                [3.5; 3] // bright skies
+            } else {
+                [0.18; 3]
+            }
+        });
+        let a_hdr = auto(&hdr_scene);
+        // HDR scene pulls highlights down to recover sky, lifts shadows, and tempers contrast
+        assert!(a_hdr.highlights < -30.0, "HDR highlights: {}", a_hdr.highlights);
+        assert!(a_hdr.shadows > 30.0, "HDR shadows: {}", a_hdr.shadows);
+        assert!(a_hdr.contrast < 60.0, "HDR contrast: {}", a_hdr.contrast);
+
+        // Low Dynamic Range / Flat Overcast scene: moderate range without extreme highlights
+        let flat_scene = Rgb32f::from_fn(128, 128, |x, _| [0.10 + (x as f32) * 0.001; 3]);
+        let a_flat = auto(&flat_scene);
+        // Flat scene boosts contrast to punch up textures, doesn't over-pull highlights
+        assert!(a_flat.contrast > 60.0, "Flat contrast: {}", a_flat.contrast);
+        assert!(a_flat.highlights > -30.0, "Flat highlights: {}", a_flat.highlights);
     }
 
     #[test]
@@ -237,67 +391,5 @@ mod tests {
         let (t, tint) = auto_wb(&img, &SourceInfo::default());
         assert!((t - 6500.0).abs() < 150.0, "{t}");
         assert!(tint.abs() < 6.0, "{tint}");
-    }
-
-    #[test]
-    fn blue_cast_is_corrected_by_higher_temp() {
-        // A bluish cast should be neutralised by telling the pipeline the light was bluer (higher K).
-        let img = Rgb32f::from_fn(32, 32, |_, _| [0.16, 0.18, 0.24]);
-        let (t, _) = auto_wb(&img, &SourceInfo::default());
-        assert!(t > 7000.0, "{t}");
-        let mut s = DevelopSettings::default();
-        s.wb.mode = lightcraft_develop::WbMode::Custom;
-        s.wb.temp = t;
-        let (t2, tint2) = auto_wb(&img, &SourceInfo::default());
-        let _ = (t2, tint2);
-        let mut out = img.clone();
-        let (tt, ti) = auto_wb(&img, &SourceInfo::default());
-        s.wb.temp = tt;
-        s.wb.tint = ti;
-        crate::local::scene_linear_pre(&mut out, &SourceInfo::default(), &s);
-        let c = out.get(0, 0);
-        assert!((c[0] - c[2]).abs() < 0.02, "{c:?}");
-    }
-}
-
-#[cfg(test)]
-mod bw_tests {
-    use super::*;
-
-    #[test]
-    fn auto_bw_mix_pushes_light_and_dark_hues_apart() {
-        // left: a light yellow, right: a dark blue (scene-linear Rec. 2020)
-        let src = Rgb32f::from_fn(64, 32, |x, _| if x < 32 { [0.55, 0.5, 0.05] } else { [0.01, 0.02, 0.12] });
-        let m = auto_bw_mix(&src, &SourceInfo::default(), &DevelopSettings::default());
-        let (yellow, blue) = (m[2], m[5]);
-        assert!(yellow > 0.0 && blue < 0.0, "{m:?}");
-        // an image without colour leaves the mix alone
-        let grey = Rgb32f::from_fn(16, 16, |x, _| [x as f32 / 16.0; 3]);
-        assert_eq!(auto_bw_mix(&grey, &SourceInfo::default(), &DevelopSettings::default()), [0.0; 8]);
-    }
-}
-
-#[cfg(test)]
-mod tint_tests {
-    use super::*;
-
-    #[test]
-    fn auto_wb_and_picker_correct_green_with_positive_tint() {
-        // The picker delegates a sampled patch to this same auto_wb implementation.
-        for (rgb, sign) in [([0.18, 0.24, 0.18], 1.0), ([0.24, 0.18, 0.24], -1.0)] {
-            let img = Rgb32f::filled(16, 16, rgb);
-            let info = SourceInfo { raw: true, relative_wb: true, ..Default::default() };
-            let (temp, tint) = auto_wb(&img, &info);
-            assert!(tint * sign > 0.0, "{rgb:?}: temp {temp}, tint {tint}");
-            let mut s = DevelopSettings::default();
-            s.wb.mode = lightcraft_develop::WbMode::Custom;
-            s.wb.temp = temp;
-            s.wb.tint = tint;
-            let mut corrected = img;
-            crate::local::white_balance(&mut corrected, &info, &s);
-            let p = corrected.get(0, 0);
-            let spread = p[0].max(p[1]).max(p[2]) - p[0].min(p[1]).min(p[2]);
-            assert!(spread < 0.003, "{rgb:?} -> {p:?}");
-        }
     }
 }

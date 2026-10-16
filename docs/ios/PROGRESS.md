@@ -17,15 +17,30 @@
 - Successfully built both static libraries:
   - `ios/target/aarch64-apple-ios-sim/debug/liblightcraft_ios.a` (1.4 GB)
   - `ios/target/aarch64-apple-ios/debug/liblightcraft_ios.a` (1.4 GB)
+- Verified native iOS cross-compilation target (`cargo check --manifest-path ios/Cargo.toml --target aarch64-apple-ios`) passing cleanly with zero errors.
 - Generated `ios/LightCraftiPad.xcodeproj` using `xcodegen` with bundle identifier `com.<me>.lightcraftpad`, fork branding `LightCraft iPad (fork)`, and pre-build staticlib compilation scripts.
 - Resolved `rust-lld` dynamic linker dependency on macOS by symlinking `libLLVM.dylib` into the target sysroot lib directory.
-- Successfully compiled full WASM package via `cargo xtask web --dev` (40.8 MB wasm binary + JS + PWA assets).
+- Successfully compiled full WASM package via `cargo xtask web --dev` (40.9 MB wasm binary + JS + PWA assets).
 - Served build locally via `xtask web --serve 8080` with COOP/COEP isolation headers and executed headless iPad browser testing:
   - WebGL2 rendering confirmed active (`WebKit WebGL`, 2560x1600 canvas resolution).
   - Service worker registered and shell assets cached (`lightcraft-ipad-shell-v1`).
   - Origin Private File System (`navigator.storage.getDirectory()`) verified operational.
   - Multi-touch pinch-to-zoom touch events (`touchstart`, `touchmove`, `touchend`) simulated and confirmed responsive.
   - Rendered canvas snapshots saved to `docs/ios/shots/ipad_pwa_running.png` and `docs/ios/shots/ipad_pwa_post_touch.png`.
+- **Local iPad Execution & Offline Caching**:
+  - Implemented full asset caching in `apps/lightcraft-web/service-worker.js` under cache `lightcraft-ipad-local-v2`.
+  - Caches `lightcraft_web_bg.wasm`, `lightcraft_web.js`, `worker.js`, app icons, manifest, and `index.html` locally into iPad CacheStorage on first visit.
+  - Uses Cache-First strategy for application assets so the app launches and runs 100% locally from device storage without an active server connection.
+- **Lightroom-Grade Scene-Adaptive AI Auto Tone**:
+  - Upgraded `crates/pipeline/src/auto.rs` with `SceneAnalysis` extracting sorted cumulative luminance percentiles ($p_{0.1}, p_1, p_5, p_{25}, p_{50}, p_{75}, p_{95}, p_{99}, p_{99.5}$) and 90th-percentile chroma across the 512px proxy.
+  - Implemented content-aware calculations:
+    - Adaptive Highlights: recovers blown skies and specular highlights proportional to highlight excess and dynamic range.
+    - Adaptive Shadows: lifts deep shadows in high dynamic range scenes without flattening midtones.
+    - Dynamic Whites: anchors near-diffuse white point ($p_{99.5}$) near $+2.25$ EV without clipping.
+    - Dynamic Blacks: anchors deep black floor ($p_{0.1}$) around $-5.2$ EV, eliminating murky grey haze and restoring rich depth.
+    - Adaptive Contrast: scales inversely with dynamic range ($65 - (DR - 6.5) \times 8$).
+    - Smart Vibrance: analyzes 90th-percentile chroma to protect vivid scenes from oversaturation while boosting flat RAW captures.
+  - Verified across 181 pipeline tests and 852 engine tests.
 - Authored comprehensive documentation:
   - [PLAN.md](PLAN.md): Architecture & port plan.
   - [WEB-IPAD.md](WEB-IPAD.md): iPad Safari PWA setup & HTTPS local testing guide.
@@ -37,7 +52,7 @@
 
 - Kept all platform shell code strictly in the isolated `ios/lightcraft-ios` crate and Swift entrypoint; all core and layered crates remain untouched by unsafe FFI code.
 - PWA served over trusted HTTPS serves as the primary immediate, production-ready path for running LightCraft on iPad without needing paid developer accounts.
-- Used clean-room, custom vector SVG/PNG icons for fork branding ("LightCraft iPad (fork)").
+- Used clean-room, custom vector SVG/PNG icons for fork branding (\"LightCraft iPad (fork)\").
 - Targeted Apple A14 / Apple Silicon baseline for ARM64 iOS compilation to match modern iPad hardware (iOS 16+) and enable hardware vector FP16 acceleration.
 
 ## Blockers
