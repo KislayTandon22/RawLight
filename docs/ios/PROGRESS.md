@@ -23,7 +23,7 @@
 - Successfully compiled full WASM package via `cargo xtask web --dev` (40.9 MB wasm binary + JS + PWA assets).
 - Served build locally via `xtask web --serve 8080` with COOP/COEP isolation headers and executed headless iPad browser testing:
   - WebGL2 rendering confirmed active (`WebKit WebGL`, 2560x1600 canvas resolution).
-  - Service worker registered and shell assets cached (`lightcraft-ipad-shell-v1`).
+  - Service worker registered and shell assets cached (`lightcraft-ipad-local-v2`).
   - Origin Private File System (`navigator.storage.getDirectory()`) verified operational.
   - Multi-touch pinch-to-zoom touch events (`touchstart`, `touchmove`, `touchend`) simulated and confirmed responsive.
   - Rendered canvas snapshots saved to `docs/ios/shots/ipad_pwa_running.png` and `docs/ios/shots/ipad_pwa_post_touch.png`.
@@ -31,16 +31,16 @@
   - Implemented full asset caching in `apps/lightcraft-web/service-worker.js` under cache `lightcraft-ipad-local-v2`.
   - Caches `lightcraft_web_bg.wasm`, `lightcraft_web.js`, `worker.js`, app icons, manifest, and `index.html` locally into iPad CacheStorage on first visit.
   - Uses Cache-First strategy for application assets so the app launches and runs 100% locally from device storage without an active server connection.
-- **Lightroom-Grade Scene-Adaptive AI Auto Tone**:
+- **Lightroom-Grade Scene-Adaptive AI Auto Tone & Auto WB**:
   - Upgraded `crates/pipeline/src/auto.rs` with `SceneAnalysis` extracting sorted cumulative luminance percentiles ($p_{0.1}, p_1, p_5, p_{25}, p_{50}, p_{75}, p_{95}, p_{99}, p_{99.5}$) and 90th-percentile chroma across the 512px proxy.
   - Implemented content-aware calculations:
-    - Adaptive Highlights: recovers blown skies and specular highlights proportional to highlight excess and dynamic range.
-    - Adaptive Shadows: lifts deep shadows in high dynamic range scenes without flattening midtones.
-    - Dynamic Whites: anchors near-diffuse white point ($p_{99.5}$) near $+2.25$ EV without clipping.
-    - Dynamic Blacks: anchors deep black floor ($p_{0.1}$) around $-5.2$ EV, eliminating murky grey haze and restoring rich depth.
-    - Adaptive Contrast: scales inversely with dynamic range ($65 - (DR - 6.5) \times 8$).
+    - Specular vs diffuse white protection: detects when upper percentiles are inflated by specular highlights / direct light sources, anchoring diffuse white to the tonal shoulder so bright clouds and fabrics don't turn muddy.
+    - Intentional silhouette / deep black preservation: recognizes intentional black backdrops and dark silhouettes ($p_5 - p_{0.1} < 0.6$ EV, $p_{25} < -3.5$ EV) to avoid lifting pure blacks into grey noise.
+    - High-key and low-key scene awareness: prevents high-key scenes (snow, beach) from being pulled down into dingy grey, and prevents low-key night scenes with bright lights from being over-brightened into noisy fog.
+    - Adaptive Highlights & Shadows: recovers blown skies and lifts deep shadows cleanly based on dynamic range.
     - Smart Vibrance: analyzes 90th-percentile chroma to protect vivid scenes from oversaturation while boosting flat RAW captures.
-  - Verified across 181 pipeline tests and 852 engine tests.
+    - Spatial Patch-Based Auto White Balance (`auto_wb`): breaks proxy into spatial blocks and prioritizes low-chroma near-neutral patches with square-root area damping, preventing large uniform green fields or blue skies from inducing heavy magenta or orange color casts.
+  - Verified across 181 pipeline tests, 852 engine tests, and layering gates.
 - Authored comprehensive documentation:
   - [PLAN.md](PLAN.md): Architecture & port plan.
   - [WEB-IPAD.md](WEB-IPAD.md): iPad Safari PWA setup & HTTPS local testing guide.
