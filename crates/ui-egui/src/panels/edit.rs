@@ -240,6 +240,12 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                         }
                     }
                 });
+                if text_button(ui, "wbAuto", crate::i18n::tr("Auto"), d.wb.mode == WbMode::Auto)
+                    .on_hover_text(crate::i18n::tr("Calculate automatic patch-based white balance"))
+                    .clicked()
+                {
+                    let _ = app.run("develop.wb", json!({"mode": "auto"}));
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let active = app.ui.tool == "wbPicker";
                     if crate::widgets::icon_button(
