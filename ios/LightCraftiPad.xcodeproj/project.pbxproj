@@ -80,7 +80,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					FD7EDB7A2E13E6F68C6A8C56 = {
-						DevelopmentTeam = 7TCATBNU62;
+						DevelopmentTeam = ZW9T4T3ZDY;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -155,7 +155,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7TCATBNU62;
+				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LightCraft/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -256,7 +256,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7TCATBNU62;
+				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LightCraft/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
