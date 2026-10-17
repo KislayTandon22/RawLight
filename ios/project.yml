@@ -15,7 +15,9 @@ targets:
     settings:
       base:
         PRODUCT_NAME: "LightCraft iPad (fork)"
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.lightcraftpad
+        PRODUCT_BUNDLE_IDENTIFIER: com.kislay.lightcraftpad
+        DEVELOPMENT_TEAM: 7TCATBNU62
+        CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "2"
         IPHONEOS_DEPLOYMENT_TARGET: "16.0"
         GENERATE_INFOPLIST_FILE: NO
