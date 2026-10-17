@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		51C2D593D3D20BDD9276CB50 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D06A0C46339D0E8848D960 /* main.swift */; };
 		6164197B175636C1A71799AF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0F19600327560EABFC7D6A5E /* Assets.xcassets */; };
+		69EAE00B6D5782368C78A7CA /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -16,6 +17,7 @@
 		4CF7E954CDDA2B9226DAC442 /* LightCraftiPad.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LightCraftiPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F4ABFADA8E18DDA5F214D69 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0D06A0C46339D0E8848D960 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -41,6 +43,7 @@
 				0F19600327560EABFC7D6A5E /* Assets.xcassets */,
 				9F4ABFADA8E18DDA5F214D69 /* Info.plist */,
 				B0D06A0C46339D0E8848D960 /* main.swift */,
+				EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */,
 			);
 			path = LightCraft;
 			sourceTree = "<group>";
@@ -76,6 +79,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					FD7EDB7A2E13E6F68C6A8C56 = {
+						DevelopmentTeam = 7TCATBNU62;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 5BFED10D41131292343CA8AF /* Build configuration list for PBXProject "LightCraftiPad" */;
@@ -134,6 +141,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				69EAE00B6D5782368C78A7CA /* SceneDelegate.swift in Sources */,
 				51C2D593D3D20BDD9276CB50 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -146,6 +154,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7TCATBNU62;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LightCraft/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -176,7 +186,7 @@
 					"-framework",
 					ImageIO,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.lightcraftpad;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
 				PRODUCT_NAME = "LightCraft iPad (fork)";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -245,6 +255,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7TCATBNU62;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LightCraft/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -275,7 +287,7 @@
 					"-framework",
 					ImageIO,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.lightcraftpad;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
 				PRODUCT_NAME = "LightCraft iPad (fork)";
 				SDKROOT = iphoneos;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
