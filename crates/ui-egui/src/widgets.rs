@@ -504,7 +504,11 @@ pub fn text_button(ui: &mut Ui, id: &str, label: &str, active: bool) -> Response
     let t = Tokens::get(ui.ctx());
     let font = t.semibold(11.5);
     let galley = ui.painter().layout_no_wrap(label.to_string(), font, t.text);
-    let size = vec2((galley.size().x + 18.0).max(37.0), 24.0);
+    let touch = crate::theme::touch_ui(ui.ctx());
+    let h = if touch { 36.0 } else { 24.0 };
+    let pad_x = if touch { 24.0 } else { 18.0 };
+    let min_w = if touch { 44.0 } else { 37.0 };
+    let size = vec2((galley.size().x + pad_x).max(min_w), h);
     let (r, resp) = ui.allocate_exact_size(size, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, active, label));
     register(ui.ctx(), format!("button:{id}"), r);
@@ -516,7 +520,7 @@ pub fn text_button(ui: &mut Ui, id: &str, label: &str, active: bool) -> Response
         t.button
     };
     let p = ui.painter();
-    p.rect(r, CornerRadius::same(4), fill, Stroke::new(1.0, t.button_border), StrokeKind::Inside);
+    p.rect(r, CornerRadius::same(if touch { 6 } else { 4 }), fill, Stroke::new(1.0, t.button_border), StrokeKind::Inside);
     p.galley(r.center() - galley.size() / 2.0, galley, t.text);
     resp
 }
@@ -529,6 +533,8 @@ pub fn segmented(ui: &mut Ui, id: &str, items: &[(&str, &str)], active: Option<u
     let gap = 4.0;
     let w = ui.available_width();
     let seg_w = ((w - gap * (per_row as f32 - 1.0)) / per_row as f32).max(24.0);
+    let touch = crate::theme::touch_ui(ui.ctx());
+    let seg_h = if touch { 36.0 } else { 24.0 };
     let mut clicked = None;
     for (row_i, row) in items.chunks(per_row).enumerate() {
         ui.horizontal(|ui| {
@@ -536,7 +542,7 @@ pub fn segmented(ui: &mut Ui, id: &str, items: &[(&str, &str)], active: Option<u
             for (j, (label, key)) in row.iter().enumerate() {
                 let label = crate::i18n::tr(label);
                 let i = row_i * per_row + j;
-                let (r, resp) = ui.allocate_exact_size(vec2(seg_w, 24.0), Sense::click());
+                let (r, resp) = ui.allocate_exact_size(vec2(seg_w, seg_h), Sense::click());
                 register(ui.ctx(), format!("button:{id}-{key}"), r);
                 let fill = if active == Some(i) {
                     t.pressed
@@ -546,7 +552,7 @@ pub fn segmented(ui: &mut Ui, id: &str, items: &[(&str, &str)], active: Option<u
                     t.button
                 };
                 let p = ui.painter();
-                p.rect(r, CornerRadius::same(4), fill, Stroke::new(1.0, t.button_border), StrokeKind::Inside);
+                p.rect(r, CornerRadius::same(if touch { 6 } else { 4 }), fill, Stroke::new(1.0, t.button_border), StrokeKind::Inside);
                 p.text(r.center(), Align2::CENTER_CENTER, label, t.semibold(11.5), t.text);
                 if resp.clicked() {
                     clicked = Some(i);
