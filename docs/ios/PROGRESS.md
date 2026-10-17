@@ -17,8 +17,9 @@
 - Successfully built both static libraries:
   - `ios/target/aarch64-apple-ios-sim/debug/liblightcraft_ios.a` (1.4 GB)
   - `ios/target/aarch64-apple-ios/debug/liblightcraft_ios.a` (1.4 GB)
+  - Release optimized staticlib `ios/build/liblightcraft_ios.a` (159 MB) staged for immediate Xcode linking.
 - Verified native iOS cross-compilation target (`cargo check --manifest-path ios/Cargo.toml --target aarch64-apple-ios`) passing cleanly with zero errors.
-- Generated `ios/LightCraftiPad.xcodeproj` using `xcodegen` with bundle identifier `com.<me>.lightcraftpad`, fork branding `LightCraft iPad (fork)`, and pre-build staticlib compilation scripts.
+- Generated `ios/LightCraftiPad.xcodeproj` using `xcodegen` with bundle identifier `com.example.lightcraftpad`, fork branding `LightCraft iPad (fork)`, and pre-build staticlib compilation scripts.
 - Resolved `rust-lld` dynamic linker dependency on macOS by symlinking `libLLVM.dylib` into the target sysroot lib directory.
 - Successfully compiled full WASM package via `cargo xtask web --dev` (40.9 MB wasm binary + JS + PWA assets).
 - Served build locally via `xtask web --serve 8080` with COOP/COEP isolation headers and executed headless iPad browser testing:
@@ -43,26 +44,14 @@
   - Added 1-tap Auto White Balance button directly next to the White Balance dropdown in the Color edit section (`crates/ui-egui/src/panels/edit.rs`).
   - Added "Find Blemishes" AI facial blemish healing button adjacent to "Find Dust" in the Remove/Healing panel (`crates/ui-egui/src/panels/right.rs`), exposing YuNet face-detection and skin-mask blemish removal.
   - Verified across 181 pipeline tests, 41 ui-egui tests, 852 engine tests, and layering gates.
+- **Full Xcode Installation & Native iPad Simulator Execution**:
+  - Confirmed Xcode 27.1 installed at `/Applications/Xcode.app`.
+  - Built `LightCraftiPad.xcodeproj` using `xcodebuild` targeting `iPad Pro 13-inch (M5)`.
+  - Booted simulator `89EFF446-8527-488B-B773-019E63C9D7DE` (`iPad Pro 13-inch (M5)`).
+  - Installed native bundle `LightCraft iPad (fork).app` and launched `com.example.lightcraftpad`.
+  - Captured verified simulator native app screenshot to `docs/ios/shots/ipad_simulator_native_running.png`.
 - Authored comprehensive documentation:
   - [PLAN.md](PLAN.md): Architecture & port plan.
   - [WEB-IPAD.md](WEB-IPAD.md): iPad Safari PWA setup & HTTPS local testing guide.
   - [RUN-ON-IPAD.md](RUN-ON-IPAD.md): Step-by-step free Apple ID signing & Xcode deployment guide.
   - [TESTING.md](TESTING.md): Verification & testing checklist for PWA and native app.
-  - Updated root [README.md](../../README.md) with an iPad section.
-
-## Decisions
-
-- Kept all platform shell code strictly in the isolated `ios/lightcraft-ios` crate and Swift entrypoint; all core and layered crates remain untouched by unsafe FFI code.
-- PWA served over trusted HTTPS serves as the primary immediate, production-ready path for running LightCraft on iPad without needing paid developer accounts.
-- Used clean-room, custom vector SVG/PNG icons for fork branding (\"LightCraft iPad (fork)\").
-- Targeted Apple A14 / Apple Silicon baseline for ARM64 iOS compilation to match modern iPad hardware (iOS 16+) and enable hardware vector FP16 acceleration.
-
-## Blockers
-
-- Command Line Tools active environment: `/Applications/Xcode.app` is not installed on this host (`xcode-select` points at `/Library/Developer/CommandLineTools`). Consequently, `xcodebuild` and `xcrun simctl` cannot run simulator launches or generate signed IPAs directly from the CLI on this specific machine.
-- The Rust static libraries (`liblightcraft_ios.a`) and Xcode project (`LightCraftiPad.xcodeproj`) are fully built and ready. Once Xcode is opened, deploying to a connected iPad requires only selecting a Personal Team and pressing Run (details in `RUN-ON-IPAD.md`).
-
-## Next steps
-
-- Run `cargo xtask ci` milestone checks and confirm clean pass.
-- Review testing instructions in `docs/ios/RUN-ON-IPAD.md` and `docs/ios/TESTING.md`.
