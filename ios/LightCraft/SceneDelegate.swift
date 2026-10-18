@@ -54,20 +54,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 NSLog("[LightCraft-Swift] Window didBecomeVisible: %@", win)
                 self?.bind(window: win, to: ws)
             }
-            self?.bindWindows(to: ws)
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: UIWindow.didBecomeKeyNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self, weak windowScene] notif in
-            guard let ws = windowScene else { return }
-            if let win = notif.object as? UIWindow {
-                NSLog("[LightCraft-Swift] Window didBecomeKey: %@", win)
-                self?.bind(window: win, to: ws)
-            }
-            self?.bindWindows(to: ws)
         }
     }
 
@@ -107,21 +93,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     private func bind(window: UIWindow, to windowScene: UIWindowScene) {
+        let className = String(describing: type(of: window))
+        if className.contains("UITextEffects") || className.contains("SystemOverlay") {
+            return
+        }
         if window.windowScene !== windowScene {
             window.windowScene = windowScene
             NSLog("[LightCraft-Swift] Attached window %@ to windowScene %@", window, windowScene)
         }
         window.frame = windowScene.coordinateSpace.bounds
-        if !window.isKeyWindow {
-            window.makeKeyAndVisible()
-        }
         if self.window == nil {
             self.window = window
+            window.makeKeyAndVisible()
         }
     }
 
     private func bindWindows(to windowScene: UIWindowScene) {
-        for win in UIApplication.shared.windows {
+        for win in windowScene.windows {
             bind(window: win, to: windowScene)
         }
     }
