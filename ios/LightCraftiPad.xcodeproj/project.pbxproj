@@ -10,10 +10,12 @@
 		51C2D593D3D20BDD9276CB50 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D06A0C46339D0E8848D960 /* main.swift */; };
 		6164197B175636C1A71799AF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0F19600327560EABFC7D6A5E /* Assets.xcassets */; };
 		69EAE00B6D5782368C78A7CA /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */; };
+		FA36834ED3DDCD8A14DB05B8 /* PhotoPickerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4868D13EB3396B18851FCCDD /* PhotoPickerBridge.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0F19600327560EABFC7D6A5E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4868D13EB3396B18851FCCDD /* PhotoPickerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerBridge.swift; sourceTree = "<group>"; };
 		4CF7E954CDDA2B9226DAC442 /* LightCraftiPad.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LightCraftiPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F4ABFADA8E18DDA5F214D69 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0D06A0C46339D0E8848D960 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -43,6 +45,7 @@
 				0F19600327560EABFC7D6A5E /* Assets.xcassets */,
 				9F4ABFADA8E18DDA5F214D69 /* Info.plist */,
 				B0D06A0C46339D0E8848D960 /* main.swift */,
+				4868D13EB3396B18851FCCDD /* PhotoPickerBridge.swift */,
 				EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */,
 			);
 			path = LightCraft;
@@ -132,7 +135,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nexport PATH=\"/opt/homebrew/bin:$PATH\"\nTOOLCHAIN_BIN=\"$(dirname \"$(rustup which cargo)\")\"\nexport PATH=\"$TOOLCHAIN_BIN:$PATH\"\nif [[ \"$SDK_NAME\" == *simulator* ]]; then\n  export RUST_TARGET=aarch64-apple-ios-sim\nelse\n  export RUST_TARGET=aarch64-apple-ios\nfi\nexport CARGO_BUILD_JOBS=2\nexport CARGO_TARGET_DIR=\"$PROJECT_DIR/build\"\ncargo build --manifest-path \"$PROJECT_DIR/Cargo.toml\" -p lightcraft-ios --release --target \"$RUST_TARGET\"\ncp \"$CARGO_TARGET_DIR/$RUST_TARGET/release/liblightcraft_ios.a\" \"$PROJECT_DIR/build/liblightcraft_ios.a\"\n";
+			shellScript = "set -euo pipefail\nexport PATH=\"/Users/kislayranjanneetandon/.rustup/toolchains/stable-aarch64-apple-darwin/bin:/opt/homebrew/bin:$PATH\"\nif which rustup >/dev/null 2>&1; then\n  TOOLCHAIN_BIN=\"$(dirname \"$(rustup which cargo)\")\"\n  export PATH=\"$TOOLCHAIN_BIN:$PATH\"\nfi\nif [[ \"$SDK_NAME\" == *simulator* ]]; then\n  export RUST_TARGET=aarch64-apple-ios-sim\nelse\n  export RUST_TARGET=aarch64-apple-ios\nfi\nmkdir -p \"${PROJECT_DIR}/build\"\ncargo build --manifest-path \"${PROJECT_DIR}/lightcraft-ios/Cargo.toml\" --target \"$RUST_TARGET\" --release\nif [ -f \"${PROJECT_DIR}/target/${RUST_TARGET}/release/liblightcraft_ios.a\" ]; then\n  cp \"${PROJECT_DIR}/target/${RUST_TARGET}/release/liblightcraft_ios.a\" \"${PROJECT_DIR}/build/liblightcraft_ios.a\"\nelif [ -f \"${PROJECT_DIR}/lightcraft-ios/../../target/${RUST_TARGET}/release/liblightcraft_ios.a\" ]; then\n  cp \"${PROJECT_DIR}/lightcraft-ios/../../target/${RUST_TARGET}/release/liblightcraft_ios.a\" \"${PROJECT_DIR}/build/liblightcraft_ios.a\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -141,6 +144,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA36834ED3DDCD8A14DB05B8 /* PhotoPickerBridge.swift in Sources */,
 				69EAE00B6D5782368C78A7CA /* SceneDelegate.swift in Sources */,
 				51C2D593D3D20BDD9276CB50 /* main.swift in Sources */,
 			);
@@ -156,6 +160,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LightCraft/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -185,6 +191,12 @@
 					CoreFoundation,
 					"-framework",
 					ImageIO,
+					"-framework",
+					Photos,
+					"-framework",
+					PhotosUI,
+					"-framework",
+					UniformTypeIdentifiers,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
 				PRODUCT_NAME = "LightCraft iPad (fork)";
@@ -257,6 +269,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LightCraft/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -286,6 +300,12 @@
 					CoreFoundation,
 					"-framework",
 					ImageIO,
+					"-framework",
+					Photos,
+					"-framework",
+					PhotosUI,
+					"-framework",
+					UniformTypeIdentifiers,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
 				PRODUCT_NAME = "LightCraft iPad (fork)";

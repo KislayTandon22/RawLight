@@ -51,6 +51,9 @@ pub struct SceneAnalysis {
     pub p995: f64,
     pub chroma_mean: f64,
     pub chroma_90: f64,
+    pub center_mean: f64,
+    pub sky_mean: f64,
+    pub is_backlit: bool,
 }
 
 /// Analyze scene-linear luminance percentiles, dynamic range, and chroma on a 512 px proxy under the
@@ -72,11 +75,33 @@ pub fn analyze_scene(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> Op
     }
     let fit = |img: &Rgb32f| lightcraft_raster::resample::fit(img, 512, 512, lightcraft_raster::resample::Filter::Box);
     let (img, weight) = (fit(&clean), fit(&weight));
-    let kept: Vec<[f32; 3]> = img.data.iter().zip(&weight.data).filter(|(_, w)| w[0] > 1e-6).map(|(p, w)| p.map(|v| v / w[0])).collect();
-    if kept.is_empty() {
+    let (w, h) = (img.width, img.height);
+    if w == 0 || h == 0 {
         return None;
     }
-    let mut kept = Rgb32f { width: kept.len(), height: 1, data: kept };
+
+    let mut kept_data: Vec<[f32; 3]> = Vec::with_capacity(w * h);
+    let mut kept_pos: Vec<(f64, f64)> = Vec::with_capacity(w * h);
+
+    for y in 0..h {
+        let ny = (y as f64 + 0.5) / h as f64;
+        for x in 0..w {
+            let idx = y * w + x;
+            let wt = weight.data[idx][0];
+            if wt > 1e-6 {
+                let p = img.data[idx].map(|v| v / wt);
+                let nx = (x as f64 + 0.5) / w as f64;
+                kept_data.push(p);
+                kept_pos.push((nx, ny));
+            }
+        }
+    }
+
+    if kept_data.is_empty() {
+        return None;
+    }
+
+    let mut kept = Rgb32f { width: kept_data.len(), height: 1, data: kept_data };
     let base = DevelopSettings { wb: s.wb, process: s.process, ..DevelopSettings::default() };
     crate::local::scene_linear_pre(&mut kept, info, &base);
 
@@ -84,13 +109,29 @@ pub fn analyze_scene(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> Op
     let mut chromas: Vec<f32> = Vec::with_capacity(kept.data.len());
     let mut sum_ev = 0.0f64;
     let mut sum_chroma = 0.0f64;
+    let mut sum_center_ev = 0.0f64;
+    let mut count_center = 0usize;
+    let mut sum_sky_ev = 0.0f64;
+    let mut count_sky = 0usize;
 
-    for c in &kept.data {
+    for (c, (nx, ny)) in kept.data.iter().zip(kept_pos.iter()) {
         let y = luminance_2020(*c);
         let ev = (y.max(1e-6) / 0.18).log2();
         if ev.is_finite() {
             evs.push(ev);
             sum_ev += ev as f64;
+
+            let dx = nx - 0.5;
+            let dy = ny - 0.5;
+            let r2 = dx * dx + dy * dy;
+            if r2 < 0.09 {
+                sum_center_ev += ev as f64;
+                count_center += 1;
+            }
+            if *ny < 0.35 {
+                sum_sky_ev += ev as f64;
+                count_sky += 1;
+            }
 
             let mx = c[0].max(c[1]).max(c[2]);
             let mn = c[0].min(c[1]).min(c[2]);
@@ -111,19 +152,28 @@ pub fn analyze_scene(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> Op
         arr[idx.min(arr.len().saturating_sub(1))] as f64
     };
 
+    let mean = sum_ev / n as f64;
+    let center_mean = if count_center > 0 { sum_center_ev / count_center as f64 } else { mean };
+    let sky_mean = if count_sky > 0 { sum_sky_ev / count_sky as f64 } else { mean };
+    let p50 = pct(&evs, 0.50);
+    let is_backlit = count_center > 0 && count_sky > 0 && (sky_mean - center_mean > 1.6) && (p50 < 0.2);
+
     Some(SceneAnalysis {
-        mean: sum_ev / n as f64,
+        mean,
         p01: pct(&evs, 0.001),
         p1: pct(&evs, 0.01),
         p5: pct(&evs, 0.05),
         p25: pct(&evs, 0.25),
-        p50: pct(&evs, 0.50),
+        p50,
         p75: pct(&evs, 0.75),
         p95: pct(&evs, 0.95),
         p99: pct(&evs, 0.99),
         p995: pct(&evs, 0.995),
         chroma_mean: sum_chroma / n as f64,
         chroma_90: pct(&chromas, 0.90),
+        center_mean,
+        sky_mean,
+        is_backlit,
     })
 }
 
@@ -155,7 +205,8 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
     let dr = (stats.p99 - stats.p1).max(0.0);
 
     // 1. Exposure: empirical regression slope -0.41 EV per EV of log-average luminance
-    let mut base_exposure = EXPOSURE_AT_GREY + EXPOSURE_SLOPE * stats.mean;
+    let effective_mean = if stats.chroma_mean > 0.0 || dr > 0.05 { 0.75 * stats.mean + 0.25 * stats.center_mean } else { stats.mean };
+    let mut base_exposure = EXPOSURE_AT_GREY + EXPOSURE_SLOPE * effective_mean;
 
     // For real multi-tonal scenes (dr >= 1.0 EV and not flat synthetic charts), apply scene context:
     if dr >= 1.0 {
@@ -170,6 +221,11 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
         if stats.p75 < -1.2 && stats.p50 < -2.2 && stats.p99 > 0.0 && dr > 4.5 {
             let low_key_damping = ((-1.2 - stats.p75) * 0.25).clamp(0.0, 0.50);
             base_exposure -= low_key_damping;
+        }
+        // Backlit subject detection: lift subject exposure so portraits and subjects aren't silhouettes
+        if stats.is_backlit {
+            let backlit_boost = ((stats.sky_mean - stats.center_mean - 1.6) * 0.30).clamp(0.0, 0.65);
+            base_exposure += backlit_boost;
         }
     }
 
@@ -191,6 +247,9 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
         let mut hi = -(excess_hi * 34.0);
         if dr > 7.0 {
             hi -= ((dr - 7.0) * 6.5).clamp(0.0, 25.0);
+        }
+        if stats.is_backlit {
+            hi = (hi - 20.0).clamp(-100.0, 0.0);
         }
         let hi = hi.clamp(-100.0, 5.0);
 
@@ -217,6 +276,10 @@ pub fn auto_tone(src: &Rgb32f, info: &SourceInfo, s: &DevelopSettings) -> AutoTo
         let mut sh = deficit_shadow * 28.0;
         if dr > 7.0 {
             sh += ((dr - 7.0) * 5.5).clamp(0.0, 25.0);
+        }
+        if stats.is_backlit {
+            let backlit_sh = ((stats.sky_mean - stats.center_mean - 1.2) * 20.0).clamp(35.0, 60.0);
+            sh = (sh + backlit_sh).clamp(0.0, 85.0);
         }
         let sh = sh.clamp(0.0, 85.0);
 
@@ -311,8 +374,8 @@ pub fn auto_wb(src: &Rgb32f, info: &SourceInfo) -> (f64, f64) {
     }
 
     let block_sz = 16.min(w).min(h).max(1);
-    let bx = (w + block_sz - 1) / block_sz;
-    let by = (h + block_sz - 1) / block_sz;
+    let bx = w.div_ceil(block_sz);
+    let by = h.div_ceil(block_sz);
 
     let mut block_acc = vec![[0.0f64; 3]; bx * by];
     let mut block_wsum = vec![0.0f64; bx * by];
@@ -376,7 +439,8 @@ pub fn auto_wb(src: &Rgb32f, info: &SourceInfo) -> (f64, f64) {
     (t.clamp(2000.0, 50000.0).round(), tint.clamp(-150.0, 150.0).round())
 }
 
-/// Temperature/tint currently in effect (for UI display).
+/// The effective white balance for `s` (mode resolved, custom temp/tint when chosen, as-shot
+/// for presets that don't say).
 pub fn current_wb(info: &SourceInfo, s: &DevelopSettings) -> (f64, f64) {
     effective_wb(info, s)
 }
@@ -429,6 +493,30 @@ mod tests {
         // Flat scene boosts contrast to punch up textures, doesn't over-pull highlights
         assert!(a_flat.contrast > 60.0, "Flat contrast: {}", a_flat.contrast);
         assert!(a_flat.highlights > -30.0, "Flat highlights: {}", a_flat.highlights);
+    }
+
+    #[test]
+    fn backlit_scene_detects_and_recovers_subject() {
+        let auto = |img: &Rgb32f| auto_tone(img, &SourceInfo::default(), &DevelopSettings::default());
+        // Backlit scene: top sky is very bright (+2.0 EV above grey), center subject is underexposed (-1.5 EV below grey)
+        let backlit_scene = Rgb32f::from_fn(128, 128, |x, y| {
+            let nx = x as f32 / 128.0;
+            let ny = y as f32 / 128.0;
+            let dx = nx - 0.5;
+            let dy = ny - 0.5;
+            let r2 = dx * dx + dy * dy;
+            if r2 < 0.08 {
+                [0.06; 3] // Underexposed subject in center
+            } else if ny < 0.35 {
+                [1.5; 3] // Bright sky in top third
+            } else {
+                [0.15; 3] // Terrain / background
+            }
+        });
+        let a = auto(&backlit_scene);
+        // Backlit portrait/scene: lifts shadows and pulls highlights strongly
+        assert!(a.shadows > 30.0, "Backlit shadows lifted: {}", a.shadows);
+        assert!(a.highlights < -20.0, "Backlit highlights recovered: {}", a.highlights);
     }
 
     #[test]

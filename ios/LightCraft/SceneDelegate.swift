@@ -8,6 +8,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     override init() {
         super.init()
+        NSLog("[LightCraft-Swift] SceneDelegate init")
         Self.enableWindowSceneAttachmentHook()
     }
 
@@ -21,6 +22,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let m1 = class_getInstanceMethod(UIWindow.self, origInit),
            let m2 = class_getInstanceMethod(UIWindow.self, swizInit) {
             method_exchangeImplementations(m1, m2)
+            NSLog("[LightCraft-Swift] Swizzled UIWindow initWithFrame")
         }
     }
 
@@ -30,18 +32,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         options connectionOptions: UIScene.ConnectionOptions
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
-
-        // Forward launch & active notifications to winit
-        NotificationCenter.default.post(
-            name: UIApplication.didFinishLaunchingNotification,
-            object: UIApplication.shared
-        )
-        NotificationCenter.default.post(
-            name: UIApplication.didBecomeActiveNotification,
-            object: UIApplication.shared
-        )
+        NSLog("[LightCraft-Swift] Scene willConnectTo session")
 
         self.bindWindows(to: windowScene)
+
+        DispatchQueue.main.async {
+            NSLog("[LightCraft-Swift] Posting didBecomeActiveNotification after scene connection")
+            NotificationCenter.default.post(
+                name: UIApplication.didBecomeActiveNotification,
+                object: UIApplication.shared
+            )
+        }
 
         NotificationCenter.default.addObserver(
             forName: UIWindow.didBecomeVisibleNotification,
@@ -50,6 +51,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         ) { [weak self, weak windowScene] notif in
             guard let ws = windowScene else { return }
             if let win = notif.object as? UIWindow {
+                NSLog("[LightCraft-Swift] Window didBecomeVisible: %@", win)
                 self?.bind(window: win, to: ws)
             }
             self?.bindWindows(to: ws)
@@ -62,26 +64,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         ) { [weak self, weak windowScene] notif in
             guard let ws = windowScene else { return }
             if let win = notif.object as? UIWindow {
+                NSLog("[LightCraft-Swift] Window didBecomeKey: %@", win)
                 self?.bind(window: win, to: ws)
             }
             self?.bindWindows(to: ws)
-        }
-
-        for delay in [0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak windowScene] in
-                guard let ws = windowScene else { return }
-                self?.bindWindows(to: ws)
-                NotificationCenter.default.post(
-                    name: UIApplication.didBecomeActiveNotification,
-                    object: UIApplication.shared
-                )
-            }
         }
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         guard let windowScene = scene as? UIWindowScene else { return }
+        NSLog("[LightCraft-Swift] sceneDidBecomeActive")
         bindWindows(to: windowScene)
+
         NotificationCenter.default.post(
             name: UIApplication.didBecomeActiveNotification,
             object: UIApplication.shared
@@ -89,31 +83,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
-        NotificationCenter.default.post(
-            name: UIApplication.willResignActiveNotification,
-            object: UIApplication.shared
-        )
+        NSLog("[LightCraft-Swift] sceneWillResignActive")
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
         guard let windowScene = scene as? UIWindowScene else { return }
+        NSLog("[LightCraft-Swift] sceneWillEnterForeground")
         bindWindows(to: windowScene)
-        NotificationCenter.default.post(
-            name: UIApplication.willEnterForegroundNotification,
-            object: UIApplication.shared
-        )
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        NotificationCenter.default.post(
-            name: UIApplication.didEnterBackgroundNotification,
-            object: UIApplication.shared
-        )
+        NSLog("[LightCraft-Swift] sceneDidEnterBackground")
     }
 
     private func bind(window: UIWindow, to windowScene: UIWindowScene) {
         if window.windowScene !== windowScene {
             window.windowScene = windowScene
+            NSLog("[LightCraft-Swift] Attached window %@ to windowScene %@", window, windowScene)
         }
         window.frame = windowScene.coordinateSpace.bounds
         if !window.isKeyWindow {

@@ -376,24 +376,70 @@ pub fn specs() -> Vec<CommandSpec> {
                 Ok(json!({"mix": m}))
             }
         ),
-        cmd!("develop.auto", "Auto Settings", ["Photo"], Some("Shift+A"), "{}", has_active, |s, _| {
-            let id = active(s, "develop.auto")?;
-            let src = s.source_now(id, SourceLevel::Thumb).map_err(|e| bad("develop.auto", e))?;
-            let info = s.source_info(id);
-            let d = s.develop_of(id).unwrap_or_default();
-            let a = lightcraft_pipeline::auto::auto_tone(&src, &info, &d);
-            edit(s, "develop.auto", "Auto", |d| {
-                d.light.exposure = a.exposure;
-                d.light.contrast = a.contrast;
-                d.light.highlights = a.highlights;
-                d.light.shadows = a.shadows;
-                d.light.whites = a.whites;
-                d.light.blacks = a.blacks;
-                d.color.vibrance = a.vibrance;
-                d.color.saturation = a.saturation;
-                Ok(())
-            })?;
-            Ok(serde_json::to_value(a).unwrap_or_default())
+        cmd!("develop.auto", "Auto Settings", ["Photo"], Some("Shift+A"), "{wb?, ids?, id?}", has_active, |s, p| {
+            let targets = s.targets(p);
+            if targets.is_empty() {
+                return Err(bad("develop.auto", "no photo selected"));
+            }
+            let do_wb = p.get("wb").and_then(Value::as_bool).unwrap_or(false);
+
+            if targets.len() == 1 {
+                let id = targets[0];
+                let src = s.source_now(id, SourceLevel::Thumb).map_err(|e| bad("develop.auto", e))?;
+                let info = s.source_info(id);
+                let d = s.develop_of(id).unwrap_or_default();
+                let a = lightcraft_pipeline::auto::auto_tone(&src, &info, &d);
+                let wb_calc = if do_wb { Some(lightcraft_pipeline::auto::auto_wb(&src, &info)) } else { None };
+                edit(s, "develop.auto", "Auto", |d| {
+                    d.light.exposure = a.exposure;
+                    d.light.contrast = a.contrast;
+                    d.light.highlights = a.highlights;
+                    d.light.shadows = a.shadows;
+                    d.light.whites = a.whites;
+                    d.light.blacks = a.blacks;
+                    d.color.vibrance = a.vibrance;
+                    d.color.saturation = a.saturation;
+                    if let Some((temp, tint)) = wb_calc {
+                        d.wb.mode = WbMode::Custom;
+                        d.wb.temp = temp;
+                        d.wb.tint = tint;
+                    }
+                    Ok(())
+                })?;
+                return Ok(serde_json::to_value(a).unwrap_or_default());
+            }
+
+            let mut ops = Vec::new();
+            let mut results = Vec::new();
+            for &id in &targets {
+                if let Ok(src) = s.source_now(id, SourceLevel::Thumb) {
+                    let info = s.source_info(id);
+                    let mut d = (*s.develop_of(id).unwrap_or_default()).clone();
+                    let a = lightcraft_pipeline::auto::auto_tone(&src, &info, &d);
+                    d.light.exposure = a.exposure;
+                    d.light.contrast = a.contrast;
+                    d.light.highlights = a.highlights;
+                    d.light.shadows = a.shadows;
+                    d.light.whites = a.whites;
+                    d.light.blacks = a.blacks;
+                    d.color.vibrance = a.vibrance;
+                    d.color.saturation = a.saturation;
+                    if do_wb {
+                        let (temp, tint) = lightcraft_pipeline::auto::auto_wb(&src, &info);
+                        d.wb.mode = WbMode::Custom;
+                        d.wb.temp = temp;
+                        d.wb.tint = tint;
+                    }
+                    if let Some(op) = s.develop_op(id, d, "Auto") {
+                        ops.push(op);
+                    }
+                    results.push(serde_json::to_value(a).unwrap_or_default());
+                }
+            }
+            if !ops.is_empty() {
+                s.commit("Auto Settings", Op::Batch { ops })?;
+            }
+            Ok(json!({ "count": results.len(), "results": results }))
         }),
         cmd!(
             "develop.wb",

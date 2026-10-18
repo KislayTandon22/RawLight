@@ -2390,9 +2390,14 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "egui",
+ "lightcraft-codecs",
+ "lightcraft-develop",
  "lightcraft-engine",
+ "lightcraft-pipeline",
+ "lightcraft-raster",
  "lightcraft-ui-egui",
  "log",
+ "serde_json",
 ]
 
 [[package]]

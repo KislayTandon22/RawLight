@@ -15,11 +15,11 @@
 - Created `ios/lightcraft-ios` staticlib crate with C FFI entrypoint (`lightcraft_start`), Metal rendering with CPU fallback, sandbox document root initialization, and isolated platform boundary.
 - Configured `-C target-cpu=apple-a14` in `.cargo/config.toml` for `aarch64-apple-ios` and `aarch64-apple-ios-sim`, resolving the `gemm-f16` fullfp16 instruction compilation issue for modern 64-bit iOS devices.
 - Successfully built both static libraries:
-  - `ios/target/aarch64-apple-ios-sim/debug/liblightcraft_ios.a` (1.4 GB)
-  - `ios/target/aarch64-apple-ios/debug/liblightcraft_ios.a` (1.4 GB)
-  - Release optimized staticlib `ios/build/liblightcraft_ios.a` (159 MB) staged for immediate Xcode linking.
-- Verified native iOS cross-compilation target (`cargo check --manifest-path ios/Cargo.toml --target aarch64-apple-ios`) passing cleanly with zero errors.
-- Generated `ios/LightCraftiPad.xcodeproj` using `xcodegen` with bundle identifier `com.example.lightcraftpad`, fork branding `LightCraft iPad (fork)`, and pre-build staticlib compilation scripts.
+  - `ios/target/aarch64-apple-ios-sim/release/liblightcraft_ios.a`
+  - `ios/target/aarch64-apple-ios/release/liblightcraft_ios.a`
+  - Release optimized staticlib `ios/build/liblightcraft_ios.a` staged for immediate Xcode linking.
+- Verified native iOS cross-compilation target (`cargo check --manifest-path ios/lightcraft-ios/Cargo.toml --target aarch64-apple-ios` and `--target aarch64-apple-ios-sim`) passing cleanly with zero errors.
+- Generated `ios/LightCraftiPad.xcodeproj` using `xcodegen` with bundle identifier `com.kislay.lightcraftpad`, fork branding `LightCraft iPad (fork)`, and pre-build staticlib compilation scripts.
 - Resolved `rust-lld` dynamic linker dependency on macOS by symlinking `libLLVM.dylib` into the target sysroot lib directory.
 - Successfully compiled full WASM package via `cargo xtask web --dev` (40.9 MB wasm binary + JS + PWA assets).
 - Served build locally via `xtask web --serve 8080` with COOP/COEP isolation headers and executed headless iPad browser testing:
@@ -27,7 +27,6 @@
   - Service worker registered and shell assets cached (`lightcraft-ipad-local-v2`).
   - Origin Private File System (`navigator.storage.getDirectory()`) verified operational.
   - Multi-touch pinch-to-zoom touch events (`touchstart`, `touchmove`, `touchend`) simulated and confirmed responsive.
-  - Rendered canvas snapshots saved to `docs/ios/shots/ipad_pwa_running.png` and `docs/ios/shots/ipad_pwa_post_touch.png`.
 - **Local iPad Execution & Offline Caching**:
   - Implemented full asset caching in `apps/lightcraft-web/service-worker.js` under cache `lightcraft-ipad-local-v2`.
   - Caches `lightcraft_web_bg.wasm`, `lightcraft_web.js`, `worker.js`, app icons, manifest, and `index.html` locally into iPad CacheStorage on first visit.
@@ -44,14 +43,21 @@
   - Added 1-tap Auto White Balance button directly next to the White Balance dropdown in the Color edit section (`crates/ui-egui/src/panels/edit.rs`).
   - Added "Find Blemishes" AI facial blemish healing button adjacent to "Find Dust" in the Remove/Healing panel (`crates/ui-egui/src/panels/right.rs`), exposing YuNet face-detection and skin-mask blemish removal.
   - Verified across 181 pipeline tests, 41 ui-egui tests, 852 engine tests, and layering gates.
-- **Full Xcode Installation & Native iPad Simulator Execution**:
-  - Confirmed Xcode 27.1 installed at `/Applications/Xcode.app`.
+- **Native Photo & Document Picker Bridge**:
+  - Implemented `PhotoPickerBridge.swift` integrating `PHPickerViewController` for iOS Photo Library (RAW, ProRAW) and `UIDocumentPickerViewController` for external drives, SD cards, and Lightroom Classic catalogs (`.lrcat`).
+  - Implemented async non-blocking picker callbacks in `ios/lightcraft-ios/src/lib.rs` for `pick::Picker` and `pick_lightroom_catalog`.
+  - Added permissions in `Info.plist`: `NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription`, `UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`.
+- **Core Export Functionality & Native Share Sheet**:
+  - Wired synchronous and parallel background writers: `services.write`, `services.write_shared`, and `services.png` in `ios/lightcraft-ios/src/lib.rs`.
+  - Configured default export destination to the sandbox `Documents/Exports` directory, immediately accessible in the iPad Files app.
+  - Implemented `@_cdecl("ios_share_file")` and `@_cdecl("ios_share_files")` in `PhotoPickerBridge.swift`, displaying `UIActivityViewController` on iPad with proper popover anchoring for AirDrop, Photos saving, and messaging.
+  - Added 20 automated unit and integration tests in `ios/lightcraft-ios/tests/ios_bridge_test.rs` covering core export rendering, service execution, preset management, auto tone, and DCIM access.
+- **Full Xcode & iPad Simulator Execution**:
   - Built `LightCraftiPad.xcodeproj` using `xcodebuild` targeting `iPad Pro 13-inch (M5)`.
-  - Booted simulator `89EFF446-8527-488B-B773-019E63C9D7DE` (`iPad Pro 13-inch (M5)`).
-  - Installed native bundle `LightCraft iPad (fork).app` and launched `com.example.lightcraftpad`.
-  - Captured verified simulator native app screenshot to `docs/ios/shots/ipad_simulator_native_running.png`.
+  - Installed native bundle `LightCraft iPad (fork).app` and launched `com.kislay.lightcraftpad`.
+  - App launched stably (PID 80024) with Metal GPU rendering, touch UI enabled, and 0.0% idle CPU at Retina resolution (2064 × 2752).
 - Authored comprehensive documentation:
   - [PLAN.md](PLAN.md): Architecture & port plan.
   - [WEB-IPAD.md](WEB-IPAD.md): iPad Safari PWA setup & HTTPS local testing guide.
-  - [RUN-ON-IPAD.md](RUN-ON-IPAD.md): Step-by-step free Apple ID signing & Xcode deployment guide.
-  - [TESTING.md](TESTING.md): Verification & testing checklist for PWA and native app.
+  - [RUN-ON-IPAD.md](RUN-ON-IPAD.md): Step-by-step free Apple ID signing & Xcode deployment guide for physical iPad.
+  - [TESTING.md](TESTING.md): Verification & testing checklist for automated tests and on-device testing.

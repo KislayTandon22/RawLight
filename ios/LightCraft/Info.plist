@@ -50,5 +50,15 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>LightCraft needs access to your Photos library to import and edit your photos and RAW files.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LightCraft needs permission to save exported high-resolution photos to your Photos library.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
 </dict>
 </plist>

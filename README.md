@@ -461,7 +461,18 @@ environment.systemPackages = [ pkgs.lightcraft ];           # home-manager: home
 
 ## iPad
 
-LightCraft can run as an installable Safari Home Screen app on iPad. Build it with `cargo xtask web`, serve it from a trusted HTTPS origin, then use **Share → Add to Home Screen** in Safari. Plain HTTP at a Mac LAN IP is not a secure context and may disable browser storage and GPU features. See [docs/ios/WEB-IPAD.md](docs/ios/WEB-IPAD.md) for exact setup and testing steps. The native iOS app is still in progress.
+LightCraft supports iPad both as a native Apple Silicon iPadOS app and as an installable Web PWA:
+
+- **Native iPad App (`LightCraft iPad (fork)`)**:
+  - Direct Metal GPU compute and Apple Silicon hardware acceleration.
+  - Native iPad photo library picker (`PHPickerViewController`) for RAW and ProRAW imports.
+  - Native Files, SSD, SD card, and Lightroom catalog (`.lrcat`) picker (`UIDocumentPickerViewController`).
+  - Native iOS Share Sheet (`UIActivityViewController`) and Files app integration (`UIFileSharingEnabled`) for exports.
+  - Full touch UI with minimum 44pt touch targets, two-finger pan, and pinch-to-zoom gestures.
+  - Build and run via Xcode or `xcodegen` in `ios/` (see [docs/ios/RUN-ON-IPAD.md](docs/ios/RUN-ON-IPAD.md)).
+
+- **Installable Web PWA**:
+  - Run as an installable Safari Home Screen app on iPad. Build with `cargo xtask web`, serve from a trusted HTTPS origin, then use **Share → Add to Home Screen** in Safari. Plain HTTP at a Mac LAN IP is not a secure context and may disable browser storage and GPU features. See [docs/ios/WEB-IPAD.md](docs/ios/WEB-IPAD.md) for exact setup and testing steps.
 
 ## How it's built
 
