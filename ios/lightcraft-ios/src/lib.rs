@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString, c_char, c_void};
 use std::path::PathBuf;
 use std::sync::mpsc::{Sender, channel};
 
-use eframe::egui::{Context, Ui};
+use eframe::egui::{Context, RawInput, Ui};
 use lightcraft_engine::Session;
 use lightcraft_ui_egui::{LightcraftApp, Services};
 
@@ -81,6 +81,10 @@ impl eframe::App for IosApp {
             log::info!("[LightCraft] First logic frame rendering!");
         }
         self.app.logic(ctx);
+    }
+
+    fn raw_input_hook(&mut self, _ctx: &Context, raw: &mut RawInput) {
+        self.app.raw_input_hook(raw);
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {

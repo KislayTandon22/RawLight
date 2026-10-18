@@ -96,6 +96,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         NSLog("[LightCraft-Swift] sceneDidEnterBackground")
     }
 
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        didUpdate previousCoordinateSpace: UICoordinateSpace,
+        interfaceOrientation previousInterfaceOrientation: UIInterfaceOrientation,
+        traitCollection previousTraitCollection: UITraitCollection
+    ) {
+        NSLog("[LightCraft-Swift] windowScene didUpdate coordinateSpace: %@", NSCoder.string(for: windowScene.coordinateSpace.bounds))
+        bindWindows(to: windowScene)
+    }
+
     private func bind(window: UIWindow, to windowScene: UIWindowScene) {
         if window.windowScene !== windowScene {
             window.windowScene = windowScene

@@ -228,10 +228,15 @@ final class PhotoPickerManager: NSObject, PHPickerViewControllerDelegate, UIDocu
 
     func topViewController() -> UIViewController? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first else {
+        guard let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first ?? UIApplication.shared.windows.first else {
             return nil
         }
         var top = window.rootViewController
+        if top == nil {
+            let fallbackVC = UIViewController()
+            window.rootViewController = fallbackVC
+            top = fallbackVC
+        }
         while let presented = top?.presentedViewController {
             top = presented
         }
