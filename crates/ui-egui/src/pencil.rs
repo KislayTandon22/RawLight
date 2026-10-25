@@ -42,7 +42,7 @@ fn path_len(p: &[Pt]) -> f32 {
 /// `n` points evenly spaced along the path.
 fn resample(p: &[Pt], n: usize) -> Vec<Pt> {
     let total = path_len(p);
-    if p.len() < 2 || total <= 0.0 || !total.is_finite() {
+    if n < 2 || p.len() < 2 || total <= 0.0 || !total.is_finite() {
         return Vec::new();
     }
     let step = total / (n - 1) as f32;

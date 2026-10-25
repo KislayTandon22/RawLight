@@ -560,7 +560,7 @@ pub fn specs() -> Vec<CommandSpec> {
                         && let Some(parent) = mf.parent()
                     {
                         let _ = std::fs::create_dir_all(parent);
-                        let _ = std::fs::write(parent.join("sam3-token.txt"), tok);
+                        write_private(&parent.join("sam3-token.txt"), tok);
                     }
                 }
                 if !url.is_empty()
@@ -1113,4 +1113,19 @@ fn clamp_local(mut a: LocalAdjustments) -> LocalAdjustments {
     c(&mut a.color_sat, 0.0, 100.0);
     c(&mut a.amount, 0.0, 200.0);
     a
+}
+
+/// Writes a secret (an access token) readable by the owner only; best effort, like the rest of the mirror settings.
+fn write_private(path: &std::path::Path, text: &str) {
+    use std::io::Write;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    if let Ok(mut f) = opts.open(path) {
+        let _ = f.write_all(text.as_bytes());
+    }
 }

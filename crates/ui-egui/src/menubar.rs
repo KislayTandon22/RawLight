@@ -270,6 +270,10 @@ const HIDDEN: &[&str] = &[
     "album.create",
     "library.import",
     "preset.create",
+    // needs the model files' paths: the AI-mask download row of the Masking panel is its way in
+    "segment.model.import",
+    "segment.model.setMirror",
+    "segment.model.setRemote",
 ];
 
 /// The selection includes a photo in Recently Deleted.

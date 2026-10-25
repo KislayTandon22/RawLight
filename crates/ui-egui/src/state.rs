@@ -1086,7 +1086,7 @@ fn default_mixer_hsl_tab() -> String {
 }
 
 fn default_mixer_band() -> String {
-    "all".into()
+    "red".into()
 }
 
 /// How many changes a Synchronize Folder scan found, by kind.
@@ -1192,9 +1192,9 @@ impl Default for UiState {
             dragging_album: None,
             dragging_section: None,
             curve_channel: "parametric".into(),
-            mixer_mode: "hue".into(),
+            mixer_mode: "hsl".into(),
             mixer_hsl_tab: "all".into(),
-            mixer_band: "all".into(),
+            mixer_band: "red".into(),
             grading_mode: "3way".into(),
             grading_hidden: None,
             tool: String::new(),

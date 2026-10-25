@@ -442,7 +442,15 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let pointer_pos = ui.input(|i| i.pointer.interact_pos().or(i.pointer.latest_pos()));
 
     let pinching = ui.input(|i| i.multi_touch().is_some());
-    if resp.contains_pointer() && is_down && !pinching && app.gesture.is_none() && app.ui.tool.is_empty() && !app.ui.right.is_edit_tool() {
+    // (touch only: on a mouse, resting the button on the photo is not a request to compare)
+    if crate::theme::touch_ui(ui.ctx())
+        && resp.contains_pointer()
+        && is_down
+        && !pinching
+        && app.gesture.is_none()
+        && app.ui.tool.is_empty()
+        && !app.ui.right.is_edit_tool()
+    {
         if let Some(pos) = pointer_pos {
             if let Some((start_t, start_pos)) = app.ui.canvas_press_start {
                 if (pos - start_pos).length() > 18.0 {
@@ -458,6 +466,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
             } else {
                 app.ui.canvas_press_start = Some((now, pos));
+                app.ui.canvas_suppress_click_zoom = false;
             }
         }
     } else if (!is_down || pinching) && app.ui.canvas_press_start.is_some() {
@@ -1404,7 +1413,12 @@ fn general_interaction(
     }
     // click toggles Fit ↔ the chosen click-zoom ratio at the clicked point; drag pans when zoomed
     let zoomed = img.width() > canvas.width() + 1.0 || img.height() > canvas.height() + 1.0;
-    let suppress_zoom = std::mem::take(&mut app.ui.canvas_suppress_click_zoom);
+    // a hold that showed Before must not also zoom when the finger lifts: the flag lives until that click is seen
+    let suppress_zoom = if resp.clicked() || resp.double_clicked() {
+        std::mem::take(&mut app.ui.canvas_suppress_click_zoom)
+    } else {
+        app.ui.canvas_suppress_click_zoom
+    };
     if !suppress_zoom && (resp.double_clicked() || (resp.clicked() && !zoomed)) {
         if let Some(q) = resp.interact_pointer_pos() {
             let u = ((q.x - img.left()) / img.width()).clamp(0.0, 1.0);
@@ -1913,7 +1927,9 @@ fn mask_overlay(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Respons
                         let (s, co) = angle.to_radians().sin_cos();
                         let (x, y) = (rx * a_local.cos(), ry * a_local.sin());
                         let q = map.screen(Point::new(center.x + (x * co - y * s) * l.0, center.y + (x * s + y * co) * l.1));
-                        p.circle_filled(q, handle_r, Color32::from_black_alpha(150));
+                        if touch {
+                            p.circle_filled(q, handle_r, Color32::from_black_alpha(150));
+                        }
                         p.circle_stroke(q, handle_r, Stroke::new(if touch { 2.0 } else { 1.5 }, Color32::WHITE));
                         register(ui.ctx(), format!("maskHandle:{}:{ci}:{}", m.id, i + 1), Rect::from_center_size(q, handle_sz));
                         grips.push((m.id, ci, i as u8 + 1, q));
@@ -1924,8 +1940,10 @@ fn mask_overlay(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Respons
                     let rot_q = map.screen(Point::new(center.x + (rot_r * co) * l.0, center.y + (rot_r * s) * l.1));
                     let h1_q = map.screen(Point::new(center.x + (rx * co) * l.0, center.y + (rx * s) * l.1));
                     p.line_segment([h1_q, rot_q], Stroke::new(1.0, Color32::from_white_alpha(200)));
-                    p.circle_filled(rot_q, handle_r * 0.85, Color32::from_black_alpha(150));
-                    p.circle_stroke(rot_q, handle_r * 0.85, Stroke::new(if touch { 2.0 } else { 1.5 }, Color32::WHITE));
+                    if touch {
+                        p.circle_filled(rot_q, handle_r * 0.85, Color32::from_black_alpha(150));
+                    }
+                    p.circle_stroke(rot_q, handle_r * if touch { 0.85 } else { 0.8 }, Stroke::new(if touch { 2.0 } else { 1.5 }, Color32::WHITE));
                     register(ui.ctx(), format!("maskHandle:{}:{ci}:5", m.id), Rect::from_center_size(rot_q, handle_sz));
                     grips.push((m.id, ci, 5, rot_q));
                 }
@@ -1937,7 +1955,9 @@ fn mask_overlay(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Respons
                         p.line_segment([q - perp, q + perp], Stroke::new(1.0, Color32::from_white_alpha(alpha)));
                     }
                     for (i, q) in [a, b].iter().enumerate() {
-                        p.circle_filled(*q, handle_r, Color32::from_black_alpha(150));
+                        if touch {
+                            p.circle_filled(*q, handle_r, Color32::from_black_alpha(150));
+                        }
                         p.circle_stroke(*q, handle_r, Stroke::new(if touch { 2.0 } else { 1.5 }, Color32::WHITE));
                         register(ui.ctx(), format!("maskHandle:{}:{ci}:{i}", m.id), Rect::from_center_size(*q, handle_sz));
                         grips.push((m.id, ci, i as u8 + 1, *q));
@@ -2022,7 +2042,8 @@ fn mask_overlay(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Respons
         return;
     }
     // Direct linear / radial drag creation
-    if (app.ui.tool == "linear" || app.ui.tool == "radial")
+    if touch
+        && (app.ui.tool == "linear" || app.ui.tool == "radial")
         && let Some(mid) = active
     {
         if resp.drag_started()

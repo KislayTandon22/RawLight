@@ -898,6 +898,7 @@ mod tests {
         let ctx = fonts_ctx(&[]);
         let mut app = crate::LightcraftApp::new(lightcraft_engine::Session::with_demo(), Default::default());
         app.ui.left_panel = true;
+        app.ui.view = crate::state::ViewMode::PhotoGrid; // (Detail + Edit shows the Develop sidebar, not the sources)
         let text = painted_text(&ctx, &mut app, Locale::Uk);
         assert!(text.contains("Мої фото") && text.contains("Усі фото"), "{text}");
         for (command, title) in [("app.about", "Про LightCraft"), ("app.shortcuts", "Клавіатурні скорочення"), ("app.settings", "Налаштування")]
@@ -1039,6 +1040,7 @@ mod tests {
         let ctx = fonts_ctx(&[]);
         let mut app = crate::LightcraftApp::new(lightcraft_engine::Session::with_demo(), Default::default());
         app.ui.left_panel = true;
+        app.ui.view = crate::state::ViewMode::PhotoGrid; // (Detail + Edit shows the Develop sidebar, not the sources)
         let text = painted_text(&ctx, &mut app, Locale::De);
         assert!(text.contains("Meine Fotos") && text.contains("Alle Fotos"), "{text}");
         app.ui.view = crate::state::ViewMode::People;
@@ -1165,6 +1167,7 @@ mod tests {
         crate::theme::install_fonts(&ctx);
         let mut app = crate::LightcraftApp::new(lightcraft_engine::Session::with_demo(), Default::default());
         app.ui.left_panel = true;
+        app.ui.view = crate::state::ViewMode::PhotoGrid; // (Detail + Edit shows the Develop sidebar, not the sources)
         let ids = |app: &crate::LightcraftApp| crate::menus::menu_entries(app).into_iter().map(|entry| entry.id).collect::<Vec<_>>();
         let english_ids = ids(&app);
         for language in Locale::ALL {
