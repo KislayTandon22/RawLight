@@ -82,11 +82,13 @@ pub struct Options {
     /// The environment variable holding a bearer token, sent to each configured mirror's own host (only over https,
     /// never to a host a redirect leads to), so list only mirrors that may see it. `None`: nothing is ever sent, so one model's token cannot leak to another's server.
     pub token_env: Option<&'static str>,
+    /// Explicit bearer token (takes precedence over token_env).
+    pub token: Option<String>,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Options { connect_timeout: Duration::from_secs(15), stall_timeout: Duration::from_secs(30), attempts: 3, token_env: None }
+        Options { connect_timeout: Duration::from_secs(15), stall_timeout: Duration::from_secs(30), attempts: 3, token_env: None, token: None }
     }
 }
 
@@ -345,7 +347,9 @@ fn fetch_file(f: &FileSpec<'_>, url: &str, dir: &Path, opts: &Options, cancel: &
                 headers.push(("Range", format!("bytes={have}-")));
             }
             // a token for the configured host only (never sent on to a redirect's host)
-            if let Some(t) = bearer(opts.token_env.and_then(|name| std::env::var(name).ok()).as_deref(), &url, &origin) {
+            let tok_env = opts.token_env.and_then(|name| std::env::var(name).ok());
+            let tok_str = opts.token.as_deref().or(tok_env.as_deref());
+            if let Some(t) = bearer(tok_str, &url, &origin) {
                 headers.push(("Authorization", format!("Bearer {t}")));
             }
             let r = http::get(&url, &headers, &limits).map_err(http_fail)?;

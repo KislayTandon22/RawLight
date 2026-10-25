@@ -137,7 +137,7 @@ fn tmp(name: &str) -> PathBuf {
 }
 
 fn quick() -> Options {
-    Options { connect_timeout: Duration::from_secs(2), stall_timeout: Duration::from_millis(600), attempts: 2, token_env: None }
+    Options { connect_timeout: Duration::from_secs(2), stall_timeout: Duration::from_millis(600), attempts: 2, token_env: None, token: None }
 }
 
 fn run(files: &[FileSpec<'_>], mirrors: &[String], dir: &Path, cancel: &AtomicBool) -> (Result<(), DownloadError>, Vec<Progress>) {

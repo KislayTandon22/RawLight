@@ -14,7 +14,7 @@ const VIEW_MODES: &[(&str, Icon, ViewMode, &str)] = &[
     ("photoGrid", Icon::GridPhoto, ViewMode::PhotoGrid, "Photo Grid (G)"),
     ("squareGrid", Icon::GridSquare, ViewMode::SquareGrid, "Square Grid (G toggles)"),
     ("detail", Icon::Single, ViewMode::Detail, "Detail (D)"),
-    ("compare", Icon::Compare, ViewMode::Compare, "Compare (C)"),
+    ("compare", Icon::Compare, ViewMode::Compare, "Compare (Shift+C)"),
     ("survey", Icon::Survey, ViewMode::Survey, "Survey (N)"),
     ("people", Icon::Subject, ViewMode::People, "People"),
 ];
@@ -156,7 +156,9 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 ui.add_space(10.0);
                 let sort = icon_button(ui, "sort", Icon::Sort, vec2(30.0, 30.0), false, true, "Sort");
                 egui::Popup::menu(&sort).show(|ui| sort_menu(app, ui));
-                bulk_buttons(app, ui, &t);
+                if crate::theme::touch_ui(ui.ctx()) {
+                    bulk_buttons(app, ui, &t);
+                }
             } else {
                 let current_icon = VIEW_MODES.iter().find(|(_, _, mode, _)| *mode == app.ui.view).map_or(Icon::More, |(_, icon, _, _)| *icon);
                 let more = icon_button(ui, "viewOptions", current_icon, vec2(40.0, 32.0), true, true, "View");

@@ -56,6 +56,11 @@ pub fn options() -> Options {
     Options { token_env: Some(TOKEN_ENV), ..Options::default() }
 }
 
+/// Download settings for SAM 3 with an explicit token.
+pub fn options_with_token(token: Option<String>) -> Options {
+    Options { token_env: Some(TOKEN_ENV), token, ..Options::default() }
+}
+
 /// Environment variable with a bearer token for the SAM 3 mirror's own host (a gated Hugging Face repository).
 pub const TOKEN_ENV: &str = "LIGHTCRAFT_SAM3_TOKEN";
 

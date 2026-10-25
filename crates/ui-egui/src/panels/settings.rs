@@ -37,7 +37,9 @@ const LABEL_W: f32 = 150.0;
 pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, tab: &mut String) {
     let t = Tokens::get(ui.ctx());
     ui.set_width((ui.ctx().content_rect().width() - 64.0).clamp(240.0, 560.0));
-    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+    if crate::theme::touch_ui(ui.ctx()) {
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+    }
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
         for (id, label) in TABS {
@@ -65,15 +67,15 @@ pub(super) fn heading(ui: &mut egui::Ui, t: &Tokens, text: &str) {
 }
 
 fn row<R>(ui: &mut egui::Ui, t: &Tokens, label: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    // wrapped, so a long row of chips or a long hint drops to the next line instead of widening the dialog
-    ui.horizontal_wrapped(|ui| {
+    let content = |ui: &mut egui::Ui| {
         ui.allocate_ui_with_layout(egui::vec2(LABEL_W, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.set_min_width(LABEL_W);
             ui.label(RichText::new(crate::i18n::tr(label)).color(t.text_label));
         });
         add(ui)
-    })
-    .inner
+    };
+    // on the iPad the row wraps, so a long row of chips or a long hint drops to the next line instead of widening the dialog
+    if crate::theme::touch_ui(ui.ctx()) { ui.horizontal_wrapped(content).inner } else { ui.horizontal(content).inner }
 }
 
 pub(super) fn hint(ui: &mut egui::Ui, t: &Tokens, text: &str) {
@@ -544,7 +546,7 @@ fn smart_previews(app: &mut LightcraftApp, ui: &mut egui::Ui, t: &Tokens) {
     }
     let existing = ["move", "leave", "discard"][mode.min(2) as usize];
     let mut result = None;
-    ui.horizontal_wrapped(|ui| {
+    ui.horizontal(|ui| {
         ui.add_space(LABEL_W);
         if app.services.pick_folder.is_some() {
             let r = ui.button(crate::i18n::tr("Choose Folder…"));

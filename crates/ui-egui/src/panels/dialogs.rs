@@ -186,7 +186,8 @@ fn window_id(dialog: &Dialog) -> egui::Id {
 pub(crate) fn prepare(app: &LightcraftApp, ui: &mut egui::Ui) {
     let Some(dialog) = &app.ui.dialog else { return };
     ui.disable();
-    let layer = egui::LayerId::new(egui::Order::Foreground, window_id(dialog));
+    let order = if crate::theme::touch_ui(ui.ctx()) { egui::Order::Foreground } else { egui::Order::Middle };
+    let layer = egui::LayerId::new(order, window_id(dialog));
     if ui.ctx().memory(|m| m.top_modal_layer()) != Some(layer) {
         egui::Popup::close_all(ui.ctx());
     }
@@ -354,7 +355,11 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
     let insets = crate::theme::safe_area_insets(ctx);
     let safe_vert = insets[0] + insets[1];
     let max_dialog_h = (screen.height() - safe_vert - 36.0).max(280.0);
-    let body_max = (max_dialog_h - chrome.max(if crate::theme::touch_ui(ctx) { TOUCH_DIALOG_CHROME } else { 80.0 })).max(DIALOG_MIN_BODY);
+    let body_max = if crate::theme::touch_ui(ctx) {
+        (max_dialog_h - chrome.max(TOUCH_DIALOG_CHROME)).max(DIALOG_MIN_BODY)
+    } else {
+        (screen.height() - 2.0 * DIALOG_SCREEN_MARGIN - chrome).max(DIALOG_MIN_BODY)
+    };
     let mut body_h = None;
     let target_w = match dlg {
         Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
@@ -392,10 +397,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
     };
     let target_w = target_w.min((screen.width() - 32.0).max(300.0));
     let touch = crate::theme::touch_ui(ctx);
-    let mut is_open = true;
+    let is_open = true;
     let mut win = egui::Window::new(crate::i18n::tr(&title))
         .id(window_id)
-        .order(egui::Order::Foreground)
+        .order(if touch { egui::Order::Foreground } else { egui::Order::Middle })
         .collapsible(false)
         .movable(!crate::theme::touch_ui(ctx))
         .resizable(import)
@@ -403,13 +408,12 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
         .resize(|r| if import { r.default_height(crate::import::DIALOG_SIZE[1]) } else { r })
         .frame(frame)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .default_width(target_w)
-        .max_height(max_dialog_h)
-        .constrain_to(screen);
+        .default_width(target_w);
+    if touch {
+        win = win.max_height(max_dialog_h).constrain_to(screen);
+    }
     if touch || matches!(dlg, Dialog::Welcome) {
         win = win.title_bar(false);
-    } else {
-        win = win.open(&mut is_open);
     }
     if touch && !import {
         win = win.max_width(target_w);

@@ -82,22 +82,30 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         }
         let btn_size = if touch { vec2(38.0, 38.0) } else { vec2(30.0, 30.0) };
         let mut left_cluster_end = full.left();
+        // desktop: the search field is centred on the window, with room for the in-window menus left of it
+        let mut desk_sw = 640.0f32.min(full.width() - 540.0).max(200.0);
+        if !app.native_menu && !touch {
+            let menus_right = full.left() + 140.0 + crate::menubar::bar_width(ui) + 24.0;
+            desk_sw = desk_sw.min(2.0 * (full.center().x - menus_right)).max(200.0);
+        }
+        let desk_search_left = full.center().x - desk_sw / 2.0;
         ui.horizontal_centered(|ui| {
             ui.spacing_mut().item_spacing.x = if touch { 8.0 } else { 4.0 };
             if icon_button(ui, "sidebar", Icon::Sidebar, btn_size, app.ui.left_panel, true, crate::i18n::tr("Show/hide My Photos panel")).clicked() {
                 let _ = app.run("view.leftPanel", json!({}));
             }
             ui.add_space(if touch { 4.0 } else { 8.0 });
-            if icon_button(
-                ui,
-                "home_library",
-                Icon::Album,
-                btn_size,
-                app.ui.dialog == Some(crate::state::Dialog::Welcome),
-                true,
-                crate::i18n::tr("Libraries & Opening Page"),
-            )
-            .clicked()
+            if touch
+                && icon_button(
+                    ui,
+                    "home_library",
+                    Icon::Album,
+                    btn_size,
+                    app.ui.dialog == Some(crate::state::Dialog::Welcome),
+                    true,
+                    crate::i18n::tr("Libraries & Opening Page"),
+                )
+                .clicked()
             {
                 if app.ui.dialog == Some(crate::state::Dialog::Welcome) {
                     app.ui.dialog = None;
@@ -105,7 +113,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                     app.ui.dialog = Some(crate::state::Dialog::Welcome);
                 }
             }
-            ui.add_space(if touch { 4.0 } else { 8.0 });
+            if touch {
+                ui.add_space(4.0);
+            }
             // (view history is the first thing to go when the bar is tight: portrait, Split View)
             if !(touch && full.width() < 900.0) {
                 if icon_button(ui, "back", Icon::Back, btn_size, false, true, crate::i18n::tr("Back")).clicked() {
@@ -127,7 +137,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             }
             if !app.native_menu {
                 ui.add_space(if touch { 6.0 } else { 10.0 });
-                let room = if touch { 90.0 } else { 160.0 };
+                let room = if touch { 90.0 } else { desk_search_left - ui.cursor().left() - 16.0 };
                 crate::menubar::show_in_window(app, ui, room);
             }
             left_cluster_end = ui.cursor().left();
@@ -153,7 +163,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let search_center_x = (search_left_bound + search_right_bound) / 2.0;
         let search_h = if touch { 36.0 } else { 28.0 };
         // narrow: the field starts right after the buttons (never over them) and takes what is left; wide: centred in its space
-        let sr = if narrow {
+        let sr = if !touch {
+            Rect::from_center_size(pos2(full.center().x, full.center().y), vec2(desk_sw, search_h))
+        } else if narrow {
             Rect::from_min_size(pos2(search_left_bound, full.center().y - search_h / 2.0), vec2(available_search_w.clamp(120.0, 360.0), search_h))
         } else {
             Rect::from_center_size(pos2(search_center_x, full.center().y), vec2(sw, search_h))
@@ -205,7 +217,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         }
         // filter icon right of the search field, safely clamped
         let fr_size = if touch { vec2(34.0, 34.0) } else { vec2(28.0, 28.0) };
-        let fr_x = (sr.right() + if touch { 20.0 } else { 18.0 }).min(full.right() - (if touch { 170.0 } else { 270.0 }));
+        let fr_x = if touch { (sr.right() + 20.0).min(full.right() - 170.0) } else { sr.right() + 22.0 };
         let fr = Rect::from_center_size(pos2(fr_x, sr.center().y), fr_size);
         let fresp = ui.interact(fr, egui::Id::new("filter-btn"), Sense::click());
         register(ui.ctx(), "icon:filter", fr);
@@ -288,7 +300,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 ui.painter().text(c, Align2::CENTER_CENTER, "!", t.semibold(9.5), t.canvas);
                 register(ui.ctx(), "indicator:unsaved", r);
             }
-            if id == "share" && app.session.selection.ids.len() > 1 {
+            if touch && id == "share" && app.session.selection.ids.len() > 1 {
                 let sel_n = app.session.selection.ids.len();
                 let badge_text = if sel_n > 99 { "99+".to_string() } else { sel_n.to_string() };
                 let g = ui.painter().layout_no_wrap(badge_text, t.semibold(9.0), Color32::WHITE);
@@ -376,7 +388,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         // Lightroom Classic Module Switcher: [ LIBRARY | DEVELOP ]
         let left_bound = fr.right() + 16.0;
         let right_bound = x - icon_size.x / 2.0 - 12.0;
-        if right_bound > left_bound + 150.0 {
+        if touch && right_bound > left_bound + 150.0 {
             use crate::state::{RightPanel, ViewMode};
             let is_develop = app.ui.right.is_edit_tool() || (app.ui.view == ViewMode::Detail && app.ui.right == RightPanel::Edit);
             let mod_w = if touch { 82.0 } else { 70.0 };

@@ -713,7 +713,7 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         p.rect_filled(img_rect, 0.0, Color32::from_black_alpha(110));
     }
     // Apple-style circular multiselect checkbox
-    if app.ui.multi_select || selected || (crate::theme::touch_ui(ui.ctx()) && app.session.selection.ids.len() > 1) {
+    if crate::theme::touch_ui(ui.ctx()) && (app.ui.multi_select || selected || app.session.selection.ids.len() > 1) {
         let center = img_rect.right_top() + vec2(-18.0, 18.0);
         let check_circle = Rect::from_center_size(center, vec2(26.0, 26.0));
         register(ui.ctx(), format!("select_circle:{}", id.0), check_circle);

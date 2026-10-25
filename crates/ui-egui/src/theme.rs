@@ -91,7 +91,7 @@ pub enum ThemeKind {
 }
 
 impl ThemeKind {
-    pub const ALL: [ThemeKind; 5] = [ThemeKind::Glass, ThemeKind::Charcoal, ThemeKind::Midnight, ThemeKind::Silver, ThemeKind::Paper];
+    pub const ALL: [ThemeKind; 5] = [ThemeKind::Charcoal, ThemeKind::Midnight, ThemeKind::Silver, ThemeKind::Paper, ThemeKind::Glass];
 
     pub fn is_dark(self) -> bool {
         matches!(self, ThemeKind::Charcoal | ThemeKind::Midnight | ThemeKind::Glass)
@@ -483,15 +483,15 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
     v.selection.bg_fill = t.accent.gamma_multiply(0.6);
     v.selection.stroke = Stroke::new(1.0, t.accent);
     v.override_text_color = Some(t.text_label);
-    let (popup, window) = if dark { (160, 200) } else { (50, 60) };
-    v.popup_shadow =
-        egui::epaint::Shadow { offset: [0, 8], blur: if touch_ui || is_glass { 32 } else { 16 }, spread: 1, color: Color32::from_black_alpha(popup) };
-    v.window_shadow = egui::epaint::Shadow {
-        offset: [0, 14],
-        blur: if touch_ui || is_glass { 48 } else { 30 },
-        spread: 2,
-        color: Color32::from_black_alpha(window),
-    };
+    if touch_ui || is_glass {
+        let (popup, window) = if dark { (160, 200) } else { (50, 60) };
+        v.popup_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 32, spread: 1, color: Color32::from_black_alpha(popup) };
+        v.window_shadow = egui::epaint::Shadow { offset: [0, 14], blur: 48, spread: 2, color: Color32::from_black_alpha(window) };
+    } else {
+        let (popup, window) = if dark { (140, 160) } else { (50, 60) };
+        v.popup_shadow = egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(popup) };
+        v.window_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 30, spread: 0, color: Color32::from_black_alpha(window) };
+    }
     let w = &mut v.widgets;
     // pill-shaped on the iPad: half the height of a 36-40pt button
     let widget_corner = CornerRadius::same(if touch_ui || is_glass { 18 } else { 4 });
@@ -531,7 +531,10 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
             s.spacing.icon_spacing = 10.0;
         }
         s.text_styles.insert(egui::TextStyle::Body, FontId::proportional(if touch_ui { 14.0 } else { 13.0 }));
-        s.text_styles.insert(egui::TextStyle::Button, FontId::new(if touch_ui { 14.0 } else { 13.0 }, FontFamily::Name(FONT_SEMIBOLD.into())));
+        s.text_styles.insert(
+            egui::TextStyle::Button,
+            if touch_ui { FontId::new(14.0, FontFamily::Name(FONT_SEMIBOLD.into())) } else { FontId::proportional(13.0) },
+        );
         s.text_styles.insert(egui::TextStyle::Small, FontId::proportional(if touch_ui { 12.0 } else { 11.0 }));
         s.text_styles.insert(egui::TextStyle::Heading, FontId::new(if touch_ui { 18.0 } else { 16.0 }, FontFamily::Name(FONT_SEMIBOLD.into())));
         s.animation_time = if touch_ui { 0.12 } else { 0.08 };

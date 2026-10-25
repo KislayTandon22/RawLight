@@ -2455,7 +2455,7 @@ pub(crate) fn filmstrip(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect) {
                     crate::icons::paint(p, Rect::from_min_size(br.min + vec2(4.0, 2.0), vec2(11.0, 11.0)), crate::icons::Icon::Stack, Color32::WHITE);
                     p.galley(pos2(br.min.x + 17.0, br.center().y - g.size().y / 2.0), g, Color32::WHITE);
                 }
-                if app.ui.multi_select || selected || (crate::theme::touch_ui(ui.ctx()) && app.session.selection.ids.len() > 1) {
+                if crate::theme::touch_ui(ui.ctx()) && (app.ui.multi_select || selected || app.session.selection.ids.len() > 1) {
                     let center = fr.right_top() + vec2(-13.0, 13.0);
                     let check_circle = Rect::from_center_size(center, vec2(20.0, 20.0));
                     register(ui.ctx(), format!("film_select_circle:{}", id.0), check_circle);
