@@ -223,27 +223,56 @@ pub fn specs() -> Vec<CommandSpec> {
                 })
             }
         ),
-        cmd!("develop.adjust", "Nudge Develop Value", [], None, "{control, delta}", has_active, |s, p| {
+        cmd!("develop.adjust", "Nudge Develop Value", ["Photo"], None, "{control, delta, ids?}", has_active, |s, p| {
             let c = str_param(p, "control").ok_or_else(|| bad("develop.adjust", "missing control"))?.to_string();
             let spec = controls::find(&c).ok_or_else(|| bad("develop.adjust", "unknown control"))?;
             let delta = f64_req(p, "delta", "develop.adjust")?;
-            let id = active(s, "develop.adjust")?;
-            let (info, dims) = (s.source_info(id), crop_dims(s, id));
-            edit(s, "develop.adjust", spec.label, |d| {
-                let before = d.crop.geometry;
-                if c == "wb.temp" || c == "wb.tint" {
-                    lightcraft_pipeline::local::normalize_wb(d, &info);
-                    if d.wb.mode == WbMode::AsShot {
-                        d.wb.temp = info.as_shot_temp;
-                        d.wb.tint = info.as_shot_tint;
+            let targets = s.targets(p);
+            if targets.is_empty() {
+                return Err(bad("develop.adjust", "no photo"));
+            }
+            if targets.len() == 1 {
+                let id = targets[0];
+                let (info, dims) = (s.source_info(id), crop_dims(s, id));
+                edit(s, "develop.adjust", spec.label, |d| {
+                    let before = d.crop.geometry;
+                    if c == "wb.temp" || c == "wb.tint" {
+                        lightcraft_pipeline::local::normalize_wb(d, &info);
+                        if d.wb.mode == WbMode::AsShot {
+                            d.wb.temp = info.as_shot_temp;
+                            d.wb.tint = info.as_shot_tint;
+                        }
+                        d.wb.mode = WbMode::Custom;
                     }
-                    d.wb.mode = WbMode::Custom;
-                }
-                let v = controls::get(d, &c).unwrap_or(spec.default);
-                controls::set(d, &c, v + delta);
-                refit_crop_angle(c == CROP_ANGLE, before, d, dims);
-                Ok(())
-            })
+                    let v = controls::get(d, &c).unwrap_or(spec.default);
+                    controls::set(d, &c, v + delta);
+                    refit_crop_angle(c == CROP_ANGLE, before, d, dims);
+                    Ok(())
+                })
+            } else {
+                let ops: Vec<_> = targets
+                    .iter()
+                    .filter_map(|&id| {
+                        let mut d = (*s.develop_of(id)?).clone();
+                        let (info, dims) = (s.source_info(id), crop_dims(s, id));
+                        let before = d.crop.geometry;
+                        if c == "wb.temp" || c == "wb.tint" {
+                            lightcraft_pipeline::local::normalize_wb(&mut d, &info);
+                            if d.wb.mode == WbMode::AsShot {
+                                d.wb.temp = info.as_shot_temp;
+                                d.wb.tint = info.as_shot_tint;
+                            }
+                            d.wb.mode = WbMode::Custom;
+                        }
+                        let v = controls::get(&d, &c).unwrap_or(spec.default);
+                        controls::set(&mut d, &c, v + delta);
+                        refit_crop_angle(c == CROP_ANGLE, before, &mut d, dims);
+                        s.develop_op(id, d, spec.label)
+                    })
+                    .collect();
+                s.commit(spec.label, Op::Batch { ops })?;
+                ok()
+            }
         }),
         cmd!("develop.merge", "Apply Settings JSON", [], None, "{settings: partial DevelopSettings JSON, label?}", has_active, |s, p| {
             let partial = p.get("settings").cloned().ok_or_else(|| bad("develop.merge", "missing settings"))?;
@@ -399,6 +428,9 @@ pub fn specs() -> Vec<CommandSpec> {
                     d.light.blacks = a.blacks;
                     d.color.vibrance = a.vibrance;
                     d.color.saturation = a.saturation;
+                    d.effects.texture = a.texture;
+                    d.effects.clarity = a.clarity;
+                    d.effects.dehaze = a.dehaze;
                     if let Some((temp, tint)) = wb_calc {
                         d.wb.mode = WbMode::Custom;
                         d.wb.temp = temp;
@@ -424,6 +456,9 @@ pub fn specs() -> Vec<CommandSpec> {
                     d.light.blacks = a.blacks;
                     d.color.vibrance = a.vibrance;
                     d.color.saturation = a.saturation;
+                    d.effects.texture = a.texture;
+                    d.effects.clarity = a.clarity;
+                    d.effects.dehaze = a.dehaze;
                     if do_wb {
                         let (temp, tint) = lightcraft_pipeline::auto::auto_wb(&src, &info);
                         d.wb.mode = WbMode::Custom;

@@ -23,6 +23,7 @@ pub mod camera_profiles;
 pub mod cmd;
 pub mod config;
 pub mod contact_sheet;
+pub mod container_relink;
 pub mod crs;
 pub mod crs_masks;
 pub mod demo;
@@ -1055,3 +1056,6 @@ mod tests_spots;
 mod tests_sync;
 #[cfg(test)]
 mod tests_xmp;
+
+#[cfg(test)]
+mod tests_signature_edits;

@@ -65,6 +65,18 @@ fn seg_param(p: &Value) -> Option<lightcraft_develop::SegMask> {
     p.get("seg").and_then(|v| serde_json::from_value(v.clone()).ok())
 }
 
+/// Where the host has its own segmenter (Apple Vision on iPad), a Subject mask is its foreground
+/// selection instead of the built-in estimate; when it finds nothing the estimate stays.
+fn platform_subject(s: &mut Session, shape: &mut MaskShape) {
+    if !matches!(shape, MaskShape::Subject) || crate::segment::platform::platform_segmenter().is_none() {
+        return;
+    }
+    let Some(id) = s.active() else { return };
+    if let Ok(Some(seg)) = s.segment_subject(id) {
+        *shape = MaskShape::Object { hint: Vec::new(), exclude: Vec::new(), seg: Some(seg), detail: Vec::new(), edge: 0.0 };
+    }
+}
+
 /// What a new AI shape still needs once it is added.
 enum Later {
     Nothing,
@@ -170,6 +182,7 @@ pub fn specs() -> Vec<CommandSpec> {
             |s, p| {
                 let kind = str_param(p, "kind").unwrap_or("radial").to_string();
                 let mut shape = shape_from(&kind, p, "mask.add")?;
+                platform_subject(s, &mut shape);
                 let later = resolve_ai(s, &mut shape, "mask.add")?;
                 let name = str_param(p, "name").map(str::to_string);
                 if let Later::Text(text) = &later {
@@ -209,6 +222,7 @@ pub fn specs() -> Vec<CommandSpec> {
                     return Err(bad("mask.addComponent", format!("no mask {mid}")));
                 }
                 let mut shape = shape_from(&kind, p, "mask.addComponent")?;
+                platform_subject(s, &mut shape);
                 let later = resolve_ai(s, &mut shape, "mask.addComponent")?;
                 if let Later::Text(text) = &later {
                     let op = p.get("op").and_then(Value::as_str).unwrap_or("add");
@@ -483,6 +497,99 @@ pub fn specs() -> Vec<CommandSpec> {
             "{} — stop the SAM 3 download (what has arrived is kept, and a new download resumes from it) → {cancelled}",
             super::always,
             |s, _| Ok(json!({"cancelled": s.segmenter.cancel_download()}))
+        ),
+        cmd!(
+            query "segment.model.import",
+            "Import AI Mask Model Files",
+            ["paths"],
+            None,
+            "{paths: [path, ...]} — import SAM 3 model files (model.safetensors, vocab.json, merges.txt) into the model folder → {imported: [string, ...], installed: bool}",
+            super::always,
+            |s, p| {
+                let dir = s.segmenter.dir.as_ref().ok_or_else(|| bad("segment.model.import", "no folder is set for the SAM 3 model"))?;
+                std::fs::create_dir_all(dir).map_err(|e| bad("segment.model.import", format!("could not create {}: {e}", dir.display())))?;
+                let paths: Vec<String> = serde_json::from_value(p.get("paths").cloned().unwrap_or_default())
+                    .map_err(|_| bad("segment.model.import", "expected an array of paths in `paths`"))?;
+                if paths.is_empty() {
+                    return Err(bad("segment.model.import", "no files provided"));
+                }
+                let mut imported = Vec::new();
+                for src_str in paths {
+                    let src = std::path::Path::new(&src_str);
+                    if !src.exists() {
+                        continue;
+                    }
+                    let file_name = src.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    if file_name == "model.safetensors" || file_name.ends_with(".safetensors") {
+                        let dst = dir.join("model.safetensors");
+                        if std::fs::copy(src, &dst).is_ok() {
+                            imported.push("model.safetensors".to_string());
+                        }
+                    } else if file_name == "vocab.json" {
+                        let dst = dir.join("vocab.json");
+                        if std::fs::copy(src, &dst).is_ok() {
+                            imported.push("vocab.json".to_string());
+                        }
+                    } else if file_name == "merges.txt" {
+                        let dst = dir.join("merges.txt");
+                        if std::fs::copy(src, &dst).is_ok() {
+                            imported.push("merges.txt".to_string());
+                        }
+                    }
+                }
+                Ok(json!({
+                    "imported": imported,
+                    "installed": s.segmenter.installed(),
+                    "dir": dir.to_string_lossy()
+                }))
+            }
+        ),
+        cmd!(
+            query "segment.model.setMirror",
+            "Set AI Mask Model Download Mirror",
+            ["url"],
+            None,
+            "{url: string, token?: string} — set a custom download mirror URL or Hugging Face token → {mirrors: [string, ...]}",
+            super::always,
+            |s, p| {
+                let url = p.get("url").and_then(Value::as_str).unwrap_or("").trim();
+                let token = p.get("token").and_then(Value::as_str).map(str::trim);
+                if let Some(tok) = token.filter(|t| !t.is_empty()) {
+                    s.segmenter.token = Some(tok.to_string());
+                    if let Some(mf) = &s.segmenter.mirrors_file
+                        && let Some(parent) = mf.parent()
+                    {
+                        let _ = std::fs::create_dir_all(parent);
+                        let _ = std::fs::write(parent.join("sam3-token.txt"), tok);
+                    }
+                }
+                if !url.is_empty()
+                    && let Some(mf) = &s.segmenter.mirrors_file
+                {
+                    if let Some(parent) = mf.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let _ = std::fs::write(mf, format!("{url}\n"));
+                }
+                Ok(json!({"mirrors": s.segmenter.mirrors()}))
+            }
+        ),
+        cmd!(
+            query "segment.model.setRemote",
+            "Set Remote SAM 3 Worker",
+            ["endpoint"],
+            None,
+            "{endpoint: string} — set host:port for remote Metal SAM 3 inference → {endpoint: string}",
+            super::always,
+            |s, p| {
+                let ep = p.get("endpoint").and_then(Value::as_str).unwrap_or("").trim();
+                if ep.is_empty() {
+                    s.segmenter.remote = None;
+                } else {
+                    s.segmenter.remote = Some(ep.to_string());
+                }
+                Ok(json!({"endpoint": s.segmenter.remote_endpoint()}))
+            }
         ),
         cmd!(
             "mask.refine",

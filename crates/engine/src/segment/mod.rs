@@ -17,6 +17,7 @@
 
 #[cfg(feature = "sam")]
 mod download;
+pub mod platform;
 #[cfg(feature = "sam")]
 mod worker;
 
@@ -122,6 +123,10 @@ pub struct Segmenter {
     pub dir: Option<PathBuf>,
     /// The user's list of download mirrors (one base URL per line), if any.
     pub mirrors_file: Option<PathBuf>,
+    /// Explicit remote worker endpoint (`host:port`).
+    pub remote: Option<String>,
+    /// Explicit bearer token for mirrors.
+    pub token: Option<String>,
     /// Run requests in the background and apply them in [`Session::segment_poll`] (the
     /// desktop app); otherwise commands wait for their result (CLI, MCP, tests).
     pub background: bool,
@@ -142,6 +147,8 @@ impl Default for Segmenter {
         Segmenter {
             dir: None,
             mirrors_file: None,
+            remote: None,
+            token: None,
             background: false,
             pending: None,
             messages: Vec::new(),
@@ -160,6 +167,9 @@ impl Segmenter {
     pub const AVAILABLE: bool = cfg!(feature = "sam");
 
     pub fn remote_endpoint(&self) -> Option<String> {
+        if let Some(r) = &self.remote {
+            return Some(r.clone());
+        }
         #[cfg(feature = "sam")]
         return lightcraft_segment::remote::configured();
         #[cfg(not(feature = "sam"))]
@@ -168,6 +178,9 @@ impl Segmenter {
 
     /// Whether the local model files are in place.
     pub fn installed(&self) -> bool {
+        if platform::platform_segmenter().is_some() {
+            return true;
+        }
         #[cfg(feature = "sam")]
         if let Some(dir) = &self.dir {
             return lightcraft_segment::is_model_dir(dir);
@@ -254,6 +267,10 @@ impl Segmenter {
         if !Self::AVAILABLE {
             return Err(other("AI masks are not available in this build"));
         }
+        // the host's own segmenter (Apple Vision on iPad) needs no files
+        if platform::platform_segmenter().is_some() {
+            return Ok(PathBuf::new());
+        }
         #[cfg(feature = "sam")]
         if lightcraft_segment::remote::configured().is_some() {
             return Ok(PathBuf::new());
@@ -292,7 +309,14 @@ impl Segmenter {
             if mirrors.is_empty() {
                 return Err(lightcraft_segment::fetch::no_mirrors_message());
             }
-            self.download.start(lightcraft_segment::fetch::SAM3_FILES, mirrors, dir, lightcraft_segment::fetch::options(), activity, "SAM 3")
+            let token = self.token.clone().or_else(|| {
+                self.mirrors_file.as_ref().and_then(|f| {
+                    let tf = f.parent().map(|p| p.join("sam3-token.txt"))?;
+                    std::fs::read_to_string(tf).ok().map(|t| t.trim().to_string())
+                })
+            });
+            let opts = lightcraft_segment::fetch::options_with_token(token);
+            self.download.start(lightcraft_segment::fetch::SAM3_FILES, mirrors, dir, opts, activity, "SAM 3")
         }
         #[cfg(not(feature = "sam"))]
         {
@@ -478,6 +502,23 @@ impl Session {
         #[cfg(feature = "sam")]
         {
             self.segment_wait(id, worker::Kind::Clicks(Self::model_clicks(clicks)), None)?.ok_or_else(|| "nothing was selected".to_string())
+        }
+        #[cfg(not(feature = "sam"))]
+        {
+            let _ = id;
+            Err("AI masks are not available in this build".into())
+        }
+    }
+
+    /// The whole foreground of photo `id` from the host platform's segmenter (Apple Vision on iPad);
+    /// `Ok(None)` when it finds none. An error when the host has no such segmenter.
+    pub fn segment_subject(&mut self, id: PhotoId) -> Result<Option<SegMask>, String> {
+        if platform::platform_segmenter().is_none() {
+            return Err("this device has no built-in subject selection".into());
+        }
+        #[cfg(feature = "sam")]
+        {
+            self.segment_wait(id, worker::Kind::Clicks(Vec::new()), None)
         }
         #[cfg(not(feature = "sam"))]
         {

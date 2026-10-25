@@ -305,3 +305,76 @@ fn a_missing_model_is_model_missing_by_kind() {
         }
     }
 }
+
+#[test]
+fn test_sam3_model_management_commands() {
+    let dir = tmp("model-mgmt");
+    let mirrors_file = dir.join("sam3-mirrors.txt");
+    let mut s = Session::with_demo();
+    s.segmenter.dir = Some(dir.clone());
+    s.segmenter.mirrors_file = Some(mirrors_file.clone());
+
+    // 1. setRemote
+    let r = s.execute("segment.model.setRemote", &json!({"endpoint": "192.168.1.100:8793"})).unwrap();
+    assert_eq!(r["endpoint"], "192.168.1.100:8793");
+    assert_eq!(s.segmenter.remote_endpoint().as_deref(), Some("192.168.1.100:8793"));
+
+    let r_clear = s.execute("segment.model.setRemote", &json!({"endpoint": ""})).unwrap();
+    assert!(r_clear["endpoint"].is_null());
+    assert_eq!(s.segmenter.remote_endpoint(), None);
+
+    // 2. setMirror and token
+    let r_mirror = s
+        .execute(
+            "segment.model.setMirror",
+            &json!({
+                "url": "https://example.com/sam3/models",
+                "token": "hf_test_token_123"
+            }),
+        )
+        .unwrap();
+    if Segmenter::AVAILABLE {
+        assert_eq!(r_mirror["mirrors"][0], "https://example.com/sam3/models");
+    }
+    assert_eq!(s.segmenter.token.as_deref(), Some("hf_test_token_123"));
+    assert!(mirrors_file.is_file());
+    assert_eq!(std::fs::read_to_string(dir.join("sam3-token.txt")).unwrap().trim(), "hf_test_token_123");
+
+    // 3. import model files
+    let staging = tmp("staging-files");
+    std::fs::create_dir_all(&staging).unwrap();
+    let m = staging.join("model.safetensors");
+    let v = staging.join("vocab.json");
+    let g = staging.join("merges.txt");
+    std::fs::write(&m, b"weights").unwrap();
+    std::fs::write(&v, b"{}").unwrap();
+    std::fs::write(&g, b"merges").unwrap();
+
+    let r_import = s
+        .execute(
+            "segment.model.import",
+            &json!({
+                "paths": [
+                    m.to_str().unwrap(),
+                    v.to_str().unwrap(),
+                    g.to_str().unwrap(),
+                ]
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(r_import["imported"].as_array().unwrap().len(), 3);
+    assert!(dir.join("model.safetensors").is_file());
+    assert!(dir.join("vocab.json").is_file());
+    assert!(dir.join("merges.txt").is_file());
+    if Segmenter::AVAILABLE {
+        assert_eq!(r_import["installed"], true);
+        assert!(s.segmenter.installed());
+    } else {
+        assert_eq!(r_import["installed"], false);
+        assert!(!s.segmenter.installed());
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&staging);
+}

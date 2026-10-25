@@ -175,6 +175,8 @@ pub fn builtin_presets() -> Vec<ExportPreset> {
     vec![
         p("JPEG (Small)", serde_json::json!({"format": "jpeg", "quality": 85, "longEdge": 2048, "colorSpace": "srgb"})),
         p("JPEG (Large)", serde_json::json!({"format": "jpeg", "quality": 92, "longEdge": 0, "colorSpace": "srgb"})),
+        p("Web & Social (2048px)", serde_json::json!({"format": "jpeg", "quality": 85, "longEdge": 2048, "colorSpace": "srgb"})),
+        p("Print Master (16-bit TIFF)", serde_json::json!({"format": "tiff", "bitDepth": 16, "colorSpace": "adobergb"})),
         p("Original + Settings", serde_json::json!({"format": "original"})),
         p("DNG", serde_json::json!({"format": "dng"})),
     ]

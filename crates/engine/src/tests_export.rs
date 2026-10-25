@@ -874,3 +874,296 @@ mod apple_photos {
         assert_eq!(s.commands().into_iter().find(|c| c.id == "export.addToPhotos").unwrap().enabled, cfg!(target_os = "macos"));
     }
 }
+
+// =========================================================================
+// Automated Batch Export & Multi-File Pipeline Tests (Hardening & Validation)
+// =========================================================================
+
+#[test]
+fn batch_export_simultaneous_multi_file_throughput() {
+    use crate::export::{Destination, prepare_batch, run_batch};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Instant;
+
+    let mut s = Session::with_demo();
+    let ids: Vec<_> = s.visible().iter().copied().take(8).collect();
+    assert!(ids.len() >= 4, "demo library provides at least 4 photos for batch throughput testing (found {})", ids.len());
+
+    let opts = ExportOptions::from_json(&json!({
+        "format": "jpeg",
+        "quality": 85,
+        "longEdge": 1024,
+        "colorSpace": "srgb"
+    }));
+
+    let items = prepare_batch(&mut s, &ids, &opts).expect("prepare_batch succeeds for multi-file items");
+    assert_eq!(items.len(), ids.len());
+
+    let dir = temp_dir("batch-throughput");
+    let to = Destination { dir: dir.to_string_lossy().into(), exact: None };
+
+    let written = Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+    let written_clone = written.clone();
+    let mut write_fn = move |path: &str, bytes: &[u8]| {
+        written_clone.lock().unwrap().insert(path.to_string(), bytes.to_vec());
+        std::fs::write(path, bytes).map_err(|e| e.to_string())
+    };
+
+    let progress_calls = Arc::new(AtomicUsize::new(0));
+    let progress_calls_clone = progress_calls.clone();
+
+    let start = Instant::now();
+    let results = run_batch(items, &opts, &to, &mut write_fn, &|path| std::path::Path::new(path).exists(), false, &mut |_done, _name| {
+        progress_calls_clone.fetch_add(1, Ordering::Relaxed);
+        true
+    })
+    .expect("run_batch succeeds across worker lanes");
+
+    let elapsed = start.elapsed();
+    assert_eq!(results.len(), ids.len(), "all photos processed and placed");
+
+    let map = written.lock().unwrap();
+    let mut total_pixels: u64 = 0;
+    for res in &results {
+        assert!(res.get("error").is_none(), "no error in batch item: {res:?}");
+        let w = res["width"].as_u64().unwrap_or(0);
+        let h = res["height"].as_u64().unwrap_or(0);
+        assert!(w > 0 && h > 0, "valid dimensions: {w}x{h}");
+        assert!(w.max(h) <= 1024, "clamped to 1024 long edge: {w}x{h}");
+        total_pixels += w * h;
+
+        let path = res["path"].as_str().expect("path present in result");
+        let bytes = map.get(path).expect("file bytes recorded");
+
+        // Verify valid JPEG header magic bytes (SOI marker 0xFF 0xD8)
+        assert!(bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8, "valid JPEG magic bytes");
+
+        // Verify image decodes cleanly without codec corruption
+        let decoded = lightcraft_codecs::decode(bytes, Default::default()).expect("decodes validly");
+        assert_eq!(decoded.width as u64, w);
+        assert_eq!(decoded.height as u64, h);
+    }
+
+    let total_mp = total_pixels as f64 / 1_000_000.0;
+    let elapsed_sec = elapsed.as_secs_f64().max(0.0001);
+    let throughput_mp_per_sec = total_mp / elapsed_sec;
+
+    eprintln!(
+        "\n[BENCHMARK] Multi-file batch export throughput: {:.2} MP/s ({:.2} Megapixels in {:.2}ms across {} photos, parallelism: {})\n",
+        throughput_mp_per_sec,
+        total_mp,
+        elapsed.as_millis(),
+        ids.len(),
+        crate::export::export_parallelism(ids.len()),
+    );
+
+    assert!(throughput_mp_per_sec > 0.0, "throughput is positive and measured");
+    assert!(progress_calls.load(Ordering::Relaxed) >= ids.len(), "progress callbacks fired");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn batch_export_builtin_presets_and_color_spaces() {
+    use crate::export::{Destination, export_batch};
+
+    let mut s = Session::with_demo();
+    let ids: Vec<_> = s.visible().iter().copied().take(4).collect();
+    assert_eq!(ids.len(), 4);
+
+    let dir = temp_dir("batch-presets");
+
+    // 1. Preset "JPEG (Large)": full resolution, quality 92, sRGB
+    {
+        let p = s.export_params(&json!({"preset": "JPEG (Large)"})).expect("preset JPEG (Large) exists");
+        let opts = ExportOptions::from_params(&p).expect("valid params");
+        let to = Destination { dir: dir.join("large").to_string_lossy().into(), exact: None };
+        let files =
+            export_batch(&mut s, &ids, &opts, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("export succeeds");
+        assert_eq!(files.len(), 4);
+        for f in files {
+            let path = f["path"].as_str().expect("path");
+            let bytes = std::fs::read(path).expect("read file");
+            assert_eq!(&bytes[0..2], &[0xFF, 0xD8], "JPEG magic bytes 0xFF 0xD8");
+            let decoded = lightcraft_codecs::decode(&bytes, Default::default()).expect("valid JPEG");
+            assert!(decoded.width >= 1000 && decoded.height >= 1000, "full resolution retained: {}x{}", decoded.width, decoded.height);
+        }
+    }
+
+    // 2. Preset "Web & Social (2048px)": 2048px long edge, quality 85, sRGB
+    {
+        let p = s.export_params(&json!({"preset": "Web & Social (2048px)"})).expect("preset Web & Social exists");
+        let opts = ExportOptions::from_params(&p).expect("valid params");
+        let to = Destination { dir: dir.join("web").to_string_lossy().into(), exact: None };
+        let files =
+            export_batch(&mut s, &ids, &opts, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("export succeeds");
+        assert_eq!(files.len(), 4);
+        for f in files {
+            let path = f["path"].as_str().expect("path");
+            let bytes = std::fs::read(path).expect("read file");
+            assert_eq!(&bytes[0..2], &[0xFF, 0xD8], "JPEG magic bytes 0xFF 0xD8");
+            let decoded = lightcraft_codecs::decode(&bytes, Default::default()).expect("valid JPEG");
+            assert!(decoded.width.max(decoded.height) <= 2048, "max dimension clamped to 2048: {}x{}", decoded.width, decoded.height);
+        }
+    }
+
+    // 3. Preset "Print Master (16-bit TIFF)": 16-bit TIFF, AdobeRGB
+    {
+        let p = s.export_params(&json!({"preset": "Print Master (16-bit TIFF)"})).expect("preset Print Master exists");
+        let opts = ExportOptions::from_params(&p).expect("valid params");
+        assert_eq!(opts.format, ExportFormat::Tiff);
+        assert_eq!(opts.effective_depth(), lightcraft_pipeline::OutputDepth::U16);
+        assert_eq!(opts.effective_space(), lightcraft_pipeline::OutputSpace::AdobeRgb);
+
+        let to = Destination { dir: dir.join("tiff").to_string_lossy().into(), exact: None };
+        let files =
+            export_batch(&mut s, &ids, &opts, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("export succeeds");
+        assert_eq!(files.len(), 4);
+        for f in files {
+            let path = f["path"].as_str().expect("path");
+            let bytes = std::fs::read(path).expect("read file");
+            // TIFF magic: "II* " (little endian) or "MM *" (big endian)
+            assert!(bytes.starts_with(b"II\x2a\x00") || bytes.starts_with(b"MM\x00\x2a"), "valid TIFF magic bytes");
+            let decoded = lightcraft_codecs::decode(&bytes, Default::default()).expect("valid TIFF");
+            assert!(decoded.icc.is_some(), "ICC profile embedded in TIFF");
+            let icc_data = decoded.icc.unwrap();
+            let parsed_icc = lightcraft_codecs::icc::parse(&icc_data).expect("ICC parses");
+            assert_eq!(parsed_icc.named, Some(crate::export::named_space(lightcraft_pipeline::OutputSpace::AdobeRgb)), "AdobeRGB profile");
+            assert!(parsed_icc.description.as_deref().is_some_and(|d| !d.is_empty()));
+        }
+    }
+
+    // 4. Display P3 Color Space Export
+    {
+        let opts = ExportOptions::from_json(&json!({
+            "format": "jpeg",
+            "quality": 90,
+            "longEdge": 640,
+            "colorSpace": "displayp3"
+        }));
+        let to = Destination { dir: dir.join("p3").to_string_lossy().into(), exact: None };
+        let files = export_batch(&mut s, &ids[..2], &opts, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists())
+            .expect("export succeeds");
+        assert_eq!(files.len(), 2);
+        for f in files {
+            let path = f["path"].as_str().expect("path");
+            let bytes = std::fs::read(path).expect("read file");
+            let decoded = lightcraft_codecs::decode(&bytes, Default::default()).expect("valid JPEG");
+            assert!(decoded.icc.is_some(), "Display P3 ICC profile embedded");
+            let icc_data = decoded.icc.unwrap();
+            let parsed_icc = lightcraft_codecs::icc::parse(&icc_data).expect("ICC parses");
+            assert_eq!(parsed_icc.named, Some(crate::export::named_space(lightcraft_pipeline::OutputSpace::DisplayP3)), "Display P3 profile");
+            assert!(parsed_icc.description.as_deref().is_some_and(|d| !d.is_empty()));
+        }
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn batch_export_naming_tokens_and_metadata() {
+    use crate::export::{Destination, export_batch};
+
+    let mut s = Session::with_demo();
+    let ids: Vec<_> = s.visible().iter().copied().take(3).collect();
+    let dir = temp_dir("batch-naming");
+
+    // Configure token template with {camera}_{seq:3}_{date:%Y%m%d} and startNumber: 101
+    let opts = ExportOptions::from_json(&json!({
+        "format": "jpeg",
+        "longEdge": 400,
+        "naming": "{camera}_{seq:3}_{date:%Y%m%d}",
+        "startNumber": 101,
+        "metadata": "all"
+    }));
+
+    let to = Destination { dir: dir.to_string_lossy().into(), exact: None };
+    let files =
+        export_batch(&mut s, &ids, &opts, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("export succeeds");
+    assert_eq!(files.len(), 3);
+
+    // Sequence numbers should be 101, 102, 103
+    assert!(files[0]["path"].as_str().unwrap().contains("_101_"), "seq 101 in {}", files[0]["path"]);
+    assert!(files[1]["path"].as_str().unwrap().contains("_102_"), "seq 102 in {}", files[1]["path"]);
+    assert!(files[2]["path"].as_str().unwrap().contains("_103_"), "seq 103 in {}", files[2]["path"]);
+
+    // Verify metadata was embedded
+    let p1_bytes = std::fs::read(files[0]["path"].as_str().unwrap()).expect("read file");
+    let decoded = lightcraft_codecs::decode(&p1_bytes, Default::default()).expect("decodes");
+    assert!(decoded.exif.is_some(), "EXIF metadata embedded");
+
+    // Test with removeLocation: true
+    let opts_noloc = ExportOptions::from_json(&json!({
+        "format": "jpeg",
+        "longEdge": 400,
+        "naming": "noloc_{seq:2}",
+        "removeLocation": true
+    }));
+    let files_noloc = export_batch(&mut s, &ids[..1], &opts_noloc, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists())
+        .expect("export succeeds");
+    let p_noloc_bytes = std::fs::read(files_noloc[0]["path"].as_str().unwrap()).expect("read file");
+    let meta_extracted = lightcraft_meta::extract(&p_noloc_bytes);
+    assert!(meta_extracted.gps.is_none(), "GPS coordinates removed when removeLocation is true");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn batch_export_watermarking_and_output_sharpening() {
+    use crate::export::{Destination, SharpenAmount, SharpenFor, export_batch};
+
+    let mut s = Session::with_demo();
+    let id = s.visible().iter().copied().next().expect("photo available");
+    let dir = temp_dir("batch-effects");
+    let to = Destination { dir: dir.to_string_lossy().into(), exact: None };
+
+    // 1. Baseline unsharpened export
+    let opts_plain = ExportOptions::from_json(&json!({
+        "format": "png",
+        "longEdge": 300,
+        "naming": "plain"
+    }));
+    let plain_files =
+        export_batch(&mut s, &[id], &opts_plain, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("plain export");
+    let plain_bytes = std::fs::read(plain_files[0]["path"].as_str().unwrap()).expect("read plain");
+    let plain_img = lightcraft_codecs::decode(&plain_bytes, Default::default()).expect("decode plain").image;
+
+    // 2. Sharpened export
+    let opts_sharp = ExportOptions {
+        format: ExportFormat::Png,
+        sharpen: SharpenFor::Screen,
+        sharpen_amount: SharpenAmount::High,
+        naming: "sharp".into(),
+        ..ExportOptions::from_json(&json!({"longEdge": 300}))
+    };
+    let sharp_files =
+        export_batch(&mut s, &[id], &opts_sharp, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("sharp export");
+    let sharp_bytes = std::fs::read(sharp_files[0]["path"].as_str().unwrap()).expect("read sharp");
+    let sharp_img = lightcraft_codecs::decode(&sharp_bytes, Default::default()).expect("decode sharp").image;
+
+    assert_eq!((plain_img.width, plain_img.height), (sharp_img.width, sharp_img.height));
+    let pixel_diffs = plain_img.data.iter().zip(sharp_img.data.iter()).filter(|(a, b)| a != b).count();
+    assert!(pixel_diffs > 0, "sharpening modified pixel values");
+
+    // 3. Watermarked export
+    let opts_wm = ExportOptions::from_json(&json!({
+        "format": "png",
+        "longEdge": 300,
+        "naming": "watermarked",
+        "watermark": {
+            "text": "© LightCraft 2026",
+            "opacity": 0.9,
+            "anchor": "bottomRight"
+        }
+    }));
+    let wm_files =
+        export_batch(&mut s, &[id], &opts_wm, &to, &mut crate::export::write_file, &|p| std::path::Path::new(p).exists()).expect("watermark export");
+    let wm_bytes = std::fs::read(wm_files[0]["path"].as_str().unwrap()).expect("read wm");
+    let wm_img = lightcraft_codecs::decode(&wm_bytes, Default::default()).expect("decode wm").image;
+
+    assert_eq!((plain_img.width, plain_img.height), (wm_img.width, wm_img.height));
+    let wm_diffs = plain_img.data.iter().zip(wm_img.data.iter()).filter(|(a, b)| a != b).count();
+    assert!(wm_diffs > 0, "watermark was rendered into pixels");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

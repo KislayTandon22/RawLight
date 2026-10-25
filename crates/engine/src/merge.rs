@@ -308,6 +308,9 @@ fn apply_auto(s: &mut DevelopSettings, src: &Rgb32f, info: &SourceInfo) {
     s.light.blacks = a.blacks;
     s.color.vibrance = a.vibrance;
     s.color.saturation = a.saturation;
+    s.effects.texture = a.texture;
+    s.effects.clarity = a.clarity;
+    s.effects.dehaze = a.dehaze;
 }
 
 /// `dir/<stem>-<suffix>.dng`, then `-2`, `-3`… (the candidates for a merge's output).
