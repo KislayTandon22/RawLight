@@ -980,13 +980,20 @@ fn curve_editor(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, d: &Dev
                 Stroke::new(1.0, Color32::from_gray(30)),
             ));
 
-            if is_drag {
+            // one undo step per drag, like every slider
+            if handle_resp.drag_started() {
+                let _ = app.run("develop.beginInteraction", json!({"label": label}));
+            }
+            if is_drag && r.width() > 1.0 {
                 let delta_x = handle_resp.drag_delta().x;
                 let delta_pct = (delta_x / r.width()) as f64 * 100.0;
                 let new_val = (val + delta_pct).clamp(min_v, max_v).round();
                 if (new_val - val).abs() >= 1.0 {
                     let _ = app.run("develop.set", json!({"control": ctrl, "value": new_val}));
                 }
+            }
+            if handle_resp.drag_stopped() {
+                let _ = app.run("develop.endInteraction", json!({}));
             }
             handle_resp.on_hover_text(format!("{}: {val:.0}", crate::i18n::tr(label)));
         }
