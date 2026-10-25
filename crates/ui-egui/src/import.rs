@@ -1136,7 +1136,9 @@ pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
             ui.spacing_mut().item_spacing.x = 4.0;
             let shown = if d.destination.trim().is_empty() { crate::i18n::tr("Library Originals").to_string() } else { d.destination.clone() };
             ui.label(egui::RichText::new(shown).color(Tokens::get(ui.ctx()).text_label));
-            if app.services.pick_folder.is_some()
+            // (not on the iPad: a native picker answers asynchronously, and this call would block the UI thread waiting for it)
+            if !crate::theme::touch_ui(ui.ctx())
+                && app.services.pick_folder.is_some()
                 && crate::widgets::text_button(ui, "importDest", crate::i18n::tr("Choose…"), false).clicked()
                 && let Some(f) = app.services.pick_folder.as_mut().and_then(|f| f())
             {

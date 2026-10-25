@@ -186,8 +186,7 @@ fn window_id(dialog: &Dialog) -> egui::Id {
 pub(crate) fn prepare(app: &LightcraftApp, ui: &mut egui::Ui) {
     let Some(dialog) = &app.ui.dialog else { return };
     ui.disable();
-    let order = if crate::theme::touch_ui(ui.ctx()) { egui::Order::Foreground } else { egui::Order::Middle };
-    let layer = egui::LayerId::new(order, window_id(dialog));
+    let layer = egui::LayerId::new(egui::Order::Middle, window_id(dialog));
     if ui.ctx().memory(|m| m.top_modal_layer()) != Some(layer) {
         egui::Popup::close_all(ui.ctx());
     }
@@ -400,7 +399,6 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
     let is_open = true;
     let mut win = egui::Window::new(crate::i18n::tr(&title))
         .id(window_id)
-        .order(if touch { egui::Order::Foreground } else { egui::Order::Middle })
         .collapsible(false)
         .movable(!crate::theme::touch_ui(ctx))
         .resizable(import)

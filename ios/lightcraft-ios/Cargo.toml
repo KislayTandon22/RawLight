@@ -8,9 +8,6 @@ publish = false
 [lib]
 crate-type = ["staticlib", "rlib"]
 
-[lints]
-workspace = true
-
 [dependencies]
 lightcraft-engine = { path = "../../crates/engine", features = ["sam"] }
 lightcraft-segment = { path = "../../crates/segment" }

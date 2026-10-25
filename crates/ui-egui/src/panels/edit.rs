@@ -984,10 +984,12 @@ fn curve_editor(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, d: &Dev
             if handle_resp.drag_started() {
                 let _ = app.run("develop.beginInteraction", json!({"label": label}));
             }
-            if is_drag && r.width() > 1.0 {
-                let delta_x = handle_resp.drag_delta().x;
-                let delta_pct = (delta_x / r.width()) as f64 * 100.0;
-                let new_val = (val + delta_pct).clamp(min_v, max_v).round();
+            if is_drag
+                && r.width() > 1.0
+                && let Some(pointer) = handle_resp.interact_pointer_pos()
+            {
+                // the value follows the pointer, so slow drags accumulate too
+                let new_val = ((pointer.x - r.left()) / r.width() * 100.0).clamp(min_v as f32, max_v as f32).round() as f64;
                 if (new_val - val).abs() >= 1.0 {
                     let _ = app.run("develop.set", json!({"control": ctrl, "value": new_val}));
                 }

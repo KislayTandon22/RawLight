@@ -227,11 +227,13 @@ pub fn specs() -> Vec<CommandSpec> {
             let c = str_param(p, "control").ok_or_else(|| bad("develop.adjust", "missing control"))?.to_string();
             let spec = controls::find(&c).ok_or_else(|| bad("develop.adjust", "unknown control"))?;
             let delta = f64_req(p, "delta", "develop.adjust")?;
-            let targets = s.targets(p);
+            // no ids: the active photo, as before; explicit ids (the iPad's Quick Develop) may name several
+            let explicit = p.get("ids").is_some() || p.get("id").is_some();
+            let targets: Vec<PhotoId> = if explicit { s.targets(p) } else { s.active().into_iter().collect() };
             if targets.is_empty() {
                 return Err(bad("develop.adjust", "no photo"));
             }
-            if targets.len() == 1 {
+            if targets.len() == 1 && s.active() == Some(targets[0]) {
                 let id = targets[0];
                 let (info, dims) = (s.source_info(id), crop_dims(s, id));
                 edit(s, "develop.adjust", spec.label, |d| {
@@ -406,13 +408,15 @@ pub fn specs() -> Vec<CommandSpec> {
             }
         ),
         cmd!("develop.auto", "Auto Settings", ["Photo"], Some("Shift+A"), "{wb?, ids?, id?}", has_active, |s, p| {
-            let targets = s.targets(p);
+            // no ids: the active photo, as before; explicit ids (the iPad's Quick Develop) may name several
+            let explicit = p.get("ids").is_some() || p.get("id").is_some();
+            let targets: Vec<PhotoId> = if explicit { s.targets(p) } else { s.active().into_iter().collect() };
             if targets.is_empty() {
                 return Err(bad("develop.auto", "no photo selected"));
             }
             let do_wb = p.get("wb").and_then(Value::as_bool).unwrap_or(false);
 
-            if targets.len() == 1 {
+            if targets.len() == 1 && s.active() == Some(targets[0]) {
                 let id = targets[0];
                 let src = s.source_now(id, SourceLevel::Thumb).map_err(|e| bad("develop.auto", e))?;
                 let info = s.source_info(id);
@@ -481,11 +485,47 @@ pub fn specs() -> Vec<CommandSpec> {
             "White Balance",
             [],
             None,
-            "{mode: asShot|auto|daylight|cloudy|shade|tungsten|fluorescent|flash|custom, temp?, tint?}",
+            "{mode: asShot|auto|daylight|cloudy|shade|tungsten|fluorescent|flash|custom, temp?, tint?, ids?}",
             has_active,
             |s, p| {
                 let mode: WbMode =
                     serde_json::from_value(p.get("mode").cloned().unwrap_or(json!("custom"))).map_err(|e| bad("develop.wb", e.to_string()))?;
+                // ids (the iPad's Quick Develop): set the same white balance on several photos in one undo step
+                if p.get("ids").is_some() || p.get("id").is_some() {
+                    let targets = s.targets(p);
+                    if !(targets.len() == 1 && s.active() == Some(targets[0])) {
+                        if targets.is_empty() {
+                            return Err(bad("develop.wb", "no photo"));
+                        }
+                        let ops: Vec<_> = targets
+                            .iter()
+                            .filter_map(|&id| {
+                                let info = s.source_info(id);
+                                let (mut t, mut tint) = match mode {
+                                    WbMode::AsShot => (info.as_shot_temp, info.as_shot_tint),
+                                    WbMode::Auto => {
+                                        let src = s.source_now(id, SourceLevel::Thumb).ok()?;
+                                        lightcraft_pipeline::auto::auto_wb(&src, &info)
+                                    }
+                                    m => m
+                                        .preset()
+                                        .map(|(t, ti)| if info.raw && !info.relative_wb { (t, ti) } else { (6500.0 * t / 5500.0, ti) })
+                                        .unwrap_or((info.as_shot_temp, info.as_shot_tint)),
+                                };
+                                t = f64_or(p, "temp", t);
+                                tint = f64_or(p, "tint", tint);
+                                let mut d = (*s.develop_of(id)?).clone();
+                                lightcraft_pipeline::local::normalize_wb(&mut d, &info);
+                                d.wb.mode = mode;
+                                d.wb.temp = t.clamp(2000.0, 50000.0);
+                                d.wb.tint = tint.clamp(-150.0, 150.0);
+                                s.develop_op(id, d, "White Balance")
+                            })
+                            .collect();
+                        s.commit("White Balance", Op::Batch { ops })?;
+                        return ok();
+                    }
+                }
                 let id = active(s, "develop.wb")?;
                 let info = s.source_info(id);
                 let (mut t, mut tint) = match mode {

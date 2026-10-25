@@ -1,3 +1,4 @@
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 mod monkey;
 use monkey::MonkeyTester;
 use std::ffi::{CStr, CString, c_char, c_void};
@@ -512,9 +513,8 @@ fn launch(library_dir: PathBuf) -> i32 {
         session.undo.clear();
         session.redo.clear();
     }
-    if library_error.is_some() {
-        session = Session::with_demo();
-    }
+    // (a library that would not open leaves the configured session as it is: an empty, in-memory one that keeps the
+    // services, model folder and clock set up above. The user is told below; no demo photos stand in for their own.)
     session.media.preview_capacity = 2;
 
     // Default export directory inside iPad Documents/Exports container
@@ -568,6 +568,9 @@ fn launch(library_dir: PathBuf) -> i32 {
             app.ui.right_width = 340.0;
             app.ui.left_width = 300.0;
             app.ui.dialog = None;
+            if let Some(error) = &library_error {
+                app.toast_for(&cc.egui_ctx, format!("Your library could not be opened ({error}). Photos you add now are not saved."), 12.0);
+            }
             let monkey = MonkeyTester::new();
             Ok(Box::new(IosApp { app, first_frame: true, last_wants_kb: false, monkey, pending_strokes: Vec::new() }))
         }),

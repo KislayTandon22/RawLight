@@ -6,14 +6,3 @@ resolver = "3"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.90"
-
-[workspace.lints.rust]
-unsafe_code = "allow"
-
-[workspace.lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-unimplemented = "deny"
-todo = "deny"
-unreachable = "deny"

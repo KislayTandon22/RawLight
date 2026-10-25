@@ -182,7 +182,7 @@ fn wb_preset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, 
                 WbMode::Cloudy => "cloudy",
                 _ => "custom",
             };
-            let _ = app.run("develop.set", json!({"control": "wb.mode", "value": mode_str, "ids": target_ids}));
+            let _ = app.run("develop.wb", json!({"mode": mode_str, "ids": target_ids}));
         }
     }
 }
