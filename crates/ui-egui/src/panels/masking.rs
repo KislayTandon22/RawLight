@@ -236,12 +236,14 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                 }
                 continue;
             }
-            let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::click());
+            let touch = crate::theme::touch_ui(ui.ctx());
+            let row_h = if touch { 42.0 } else { 30.0 };
+            let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click());
             crate::widgets::announce_selected(&resp, m.name.clone(), Some(m.id) == app.session.active_mask);
             register(ui.ctx(), format!("mask:{}", m.id), r);
             ui.painter().rect_filled(
                 r,
-                4.0,
+                6.0,
                 if sel {
                     t.tool_active
                 } else if resp.hovered() {
@@ -251,25 +253,28 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                 },
             );
             let icon = m.components.first().map(|c| kind_label(&c.shape).1).unwrap_or(Icon::Mask);
-            paint(ui.painter(), Rect::from_min_size(r.min + vec2(8.0, 7.0), vec2(16.0, 16.0)), icon, t.text_label);
+            let icon_y = r.center().y - 8.0;
+            paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, icon_y), vec2(16.0, 16.0)), icon, t.text_label);
             // a long name is cut short (with …) before the eye, the full name on hover
             let color = if m.visible { t.text } else { t.text_disabled };
-            let g = one_line(ui.painter(), &m.name, t.font(13.0), color, r.width() - 32.0 - 32.0);
+            let g = one_line(ui.painter(), &m.name, t.font(13.0), color, r.width() - 32.0 - (if touch { 44.0 } else { 32.0 }));
             let elided = g.elided;
             let at = pos2(r.left() + 32.0, r.center().y - g.size().y / 2.0);
             register(ui.ctx(), format!("maskName:{}", m.id), Rect::from_min_size(at, g.size()));
             ui.painter().galley(at, g, color);
             let resp = if elided { resp.on_hover_text(&m.name) } else { resp };
-            // show / hide on hover (and always while hidden)
-            // (the pointer test, not `hovered`: over the eye, the row itself no longer counts as hovered)
-            if ui.rect_contains_pointer(r) || !m.visible {
-                let er = Rect::from_center_size(pos2(r.right() - 16.0, r.center().y), vec2(22.0, 22.0));
+            // show / hide: always visible on touch devices so users can tap with 1 touch
+            if touch || ui.rect_contains_pointer(r) || !m.visible {
+                let er = Rect::from_center_size(
+                    pos2(r.right() - (if touch { 20.0 } else { 16.0 }), r.center().y),
+                    if touch { vec2(36.0, 36.0) } else { vec2(22.0, 22.0) },
+                );
                 register(ui.ctx(), format!("maskVisible:{}", m.id), er);
                 let eye = ui.interact(er, egui::Id::new(("maskVisible", m.id)), Sense::click());
                 crate::widgets::announce_selected(&eye, crate::i18n::tr("Show mask"), m.visible);
                 paint(
                     ui.painter(),
-                    er.shrink(3.0),
+                    er.shrink(if touch { 6.0 } else { 3.0 }),
                     if m.visible { Icon::Eye } else { Icon::EyeOff },
                     if eye.hovered() { t.text } else { t.text_dim },
                 );
@@ -285,13 +290,14 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
             }
             crate::widgets::context_menu(&resp, |ui| mask_menu(app, ui, m.id, &m.name, m.visible, index, count));
             if sel {
-                // right under the selected mask: ＋ adds to it, − takes away from it (any mask
-                // type; Describe… opens its field here)
+                // right under the selected mask: ＋ adds to it, − takes away from it
                 ui.horizontal(|ui| {
-                    ui.add_space(30.0);
-                    let plus = text_button(ui, &format!("maskPlus:{}", m.id), "+", false).on_hover_text(crate::i18n::tr("Add to this mask"));
+                    ui.add_space(if touch { 12.0 } else { 30.0 });
+                    let plus = text_button(ui, &format!("maskPlus:{}", m.id), if touch { "+ Add" } else { "+" }, false)
+                        .on_hover_text(crate::i18n::tr("Add to this mask"));
                     egui::Popup::menu(&plus).show(|ui| component_menu(app, ui, "add"));
-                    let minus = text_button(ui, &format!("maskMinus:{}", m.id), "−", false).on_hover_text(crate::i18n::tr("Subtract from this mask"));
+                    let minus = text_button(ui, &format!("maskMinus:{}", m.id), if touch { "− Subtract" } else { "−" }, false)
+                        .on_hover_text(crate::i18n::tr("Subtract from this mask"));
                     egui::Popup::menu(&minus).show(|ui| component_menu(app, ui, "subtract"));
                 });
                 describe_field(app, ui, false);
@@ -825,7 +831,20 @@ fn describe_field(app: &mut LightcraftApp, ui: &mut egui::Ui, new_mask: bool) {
     }
     app.ui.describe = Some((op.clone(), text.clone()));
     if submit && !text.trim().is_empty() {
-        let r = if op == "new" {
+        let trimmed = text.trim().to_lowercase();
+        let alias = match trimmed.as_str() {
+            "sky" | "the sky" | "skies" => Some("sky"),
+            "subject" | "the subject" | "person" | "people" => Some("subject"),
+            "background" | "the background" | "bg" => Some("background"),
+            _ => None,
+        };
+        let r = if let Some(kind) = alias {
+            if op == "new" {
+                app.run_typed("mask.add", json!({"kind": kind}))
+            } else {
+                app.run_typed("mask.addComponent", json!({"op": op, "kind": kind}))
+            }
+        } else if op == "new" {
             app.run_typed("mask.add", json!({"kind": "prompt", "text": text}))
         } else {
             app.run_typed("mask.addComponent", json!({"op": op, "kind": "prompt", "text": text}))

@@ -177,10 +177,11 @@ fn cell_ui(
     painter.galley(pos2(cell.left() + 2.0, thumb.bottom() + 12.0 - g.size().y / 2.0), g, name_color);
     // favourite star (always shown when set, on hover otherwise)
     let fav = app.session.profile_favorites.iter().any(|f| f == p_id);
-    let star = Rect::from_center_size(pos2(thumb.right() - 13.0, thumb.top() + 13.0), vec2(20.0, 20.0));
+    let touch_ui = crate::theme::touch_ui(ui.ctx());
+    let star = Rect::from_center_size(pos2(thumb.right() - 22.0, thumb.top() + 22.0), if touch_ui { vec2(44.0, 44.0) } else { vec2(20.0, 20.0) });
     register(ui.ctx(), format!("profileStar:{}{}", if tag.is_empty() { "" } else { "fav:" }, p_id), star);
     let over_star = resp.hover_pos().is_some_and(|q| star.contains(q));
-    if fav || resp.hovered() {
+    if fav || resp.hovered() || touch_ui {
         painter.circle_filled(star.center(), 10.0, Color32::from_black_alpha(110));
         crate::rating::paint_star(painter, star.shrink(4.0), fav, if fav || over_star { t.star } else { Color32::WHITE });
     }

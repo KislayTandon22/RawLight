@@ -46,6 +46,10 @@ fn window_handle(app: &LightcraftApp, ui: &mut egui::Ui, bar: Rect, search_rect:
 }
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    // the iPad's glass bar is its own layout (topbar_touch.rs); everything below is the desktop's, untouched
+    if crate::theme::touch_ui(ui.ctx()) {
+        return super::topbar_touch::show(app, ui);
+    }
     let t = Tokens::get(ui.ctx());
     // room for the traffic lights; in full screen they are gone, and the sidebar button sits as far
     // from the left edge as the Discord button from the right (12 margin + 4)

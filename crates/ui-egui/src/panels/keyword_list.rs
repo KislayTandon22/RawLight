@@ -260,8 +260,9 @@ fn row(app: &mut LightcraftApp, ui: &mut egui::Ui, r: &Row, selection: &[PhotoId
     let ar = ui.interact(arrow, egui::Id::new(("keyword-list-show", r.path.to_lowercase())), Sense::click());
     crate::widgets::announce(&ar, crate::i18n::tr("Show photos"));
     register(ui.ctx(), format!("keywordShow:{}", r.path), arrow);
-    if resp.hovered() || ar.hovered() {
-        paint(ui.painter(), arrow, Icon::ChevronRight, if ar.hovered() { t.text } else { t.text_dim });
+    let touch = crate::theme::touch_ui(ui.ctx());
+    if resp.hovered() || ar.hovered() || touch {
+        paint(ui.painter(), arrow, Icon::ChevronRight, if ar.hovered() || touch { t.text } else { t.text_dim });
     }
     if ar.on_hover_text(crate::i18n::tr("Show Photos with Keyword")).clicked() {
         super::left::browse_all_photos(app, true);
