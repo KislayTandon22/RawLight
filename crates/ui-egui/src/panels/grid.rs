@@ -170,6 +170,7 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         }
     }
     super::chips::show(app, ui, &chips);
+    super::filterbar::missing_banner(app, ui);
     if app.ui.filter_bar {
         super::filterbar::show(app, ui);
     }
@@ -711,6 +712,17 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
     }
     if photo.flag == Flag::Reject {
         p.rect_filled(img_rect, 0.0, Color32::from_black_alpha(110));
+    }
+    // the original is gone (a drive that left, or an old install): say so on the cell, not only in the detail view
+    if crate::theme::touch_ui(ui.ctx())
+        && matches!(&photo.source, lightcraft_catalog::Source::File { path } if app.session.media.availability.is_offline(path))
+    {
+        let g = p.layout_no_wrap(crate::i18n::tr("Original missing").into(), t.semibold(10.5), Color32::WHITE);
+        let br = Rect::from_min_size(img_rect.left_top() + vec2(6.0, 6.0), vec2(g.size().x + 26.0, 20.0));
+        p.rect_filled(br, 10.0, Color32::from_rgba_unmultiplied(40, 30, 10, 220));
+        paint(p, Rect::from_center_size(pos2(br.left() + 11.0, br.center().y), vec2(13.0, 13.0)), Icon::Info, t.caution);
+        p.galley(pos2(br.left() + 20.0, br.center().y - g.size().y / 2.0), g, Color32::WHITE);
+        register(ui.ctx(), format!("badge:missing:{}", id.0), br);
     }
     // Apple-style circular multiselect checkbox
     if crate::theme::touch_ui(ui.ctx()) && (app.ui.multi_select || selected || app.session.selection.ids.len() > 1) {

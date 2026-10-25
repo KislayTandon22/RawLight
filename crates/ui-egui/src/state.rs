@@ -567,6 +567,9 @@ pub struct UiState {
     pub mask_create_drag: bool,
     /// The bottom bar had no room for the rating stars this frame: the canvas floats them instead.
     pub rating_floating: bool,
+    /// The "originals not found" strip above the grid was dismissed for this session.
+    #[serde(skip)]
+    pub missing_banner_hidden: bool,
     /// Review tool: draw the component gallery over the window (`ui.set {"gallery": true}`).
     pub gallery: bool,
     #[serde(skip)]
@@ -1124,6 +1127,7 @@ impl Default for UiState {
             canvas_press_start: None,
             mask_create_drag: false,
             rating_floating: false,
+            missing_banner_hidden: false,
             gallery: false,
             canvas_suppress_click_zoom: false,
             left_width: LEFT_WIDTH.default,
