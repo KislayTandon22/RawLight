@@ -95,14 +95,14 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 /// and 10-point padding at both ends.
 const PILL_W: f32 = 208.0;
 /// Wider on the iPad, where the pick / reject buttons are 30pt touch targets.
-const PILL_W_TOUCH: f32 = 244.0;
+const PILL_W_TOUCH: f32 = 276.0;
 
 /// The stars and the unflag / pick (tick) / reject (cross) buttons, laid out left to right in `pill_ui`.
 fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active: Option<&lightcraft_catalog::Photo>) {
     let t = Tokens::get(pill_ui.ctx());
     pill_ui.spacing_mut().item_spacing.x = 3.0;
     let rating = active.map(|p| p.rating).unwrap_or(0);
-    if let Some(r) = stars(pill_ui, "bottom", rating, 19.0) {
+    if let Some(r) = stars(pill_ui, "bottom", rating, if crate::theme::touch_ui(pill_ui.ctx()) { 28.0 } else { 19.0 }) {
         let mut params = json!({"rating": r});
         crate::panels::compare::target_active(app, &mut params);
         let _ = app.run("photo.rate", params);

@@ -1342,6 +1342,10 @@ impl LightcraftApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         i18n::set_language(self.ui.language);
         let ctx = ui.ctx().clone();
+        // a portrait or Split View window leaves the photo too little room beside a 340pt tool panel
+        if theme::touch_ui(&ctx) && ctx.content_rect().width() < 900.0 && self.ui.right_width > 300.0 {
+            self.ui.right_width = 300.0;
+        }
         glass::paint_backdrop(&ctx);
         if !self.fonts_ready {
             ctx.request_repaint();

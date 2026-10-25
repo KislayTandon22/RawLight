@@ -608,8 +608,15 @@ pub fn icon_button(ui: &mut Ui, id: &str, icon: Icon, size: egui::Vec2, active: 
     let t = Tokens::get(ui.ctx());
     let touch = crate::theme::touch_ui(ui.ctx());
     let (r, resp) = ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
+    // on the iPad a small icon still gets a 40pt target: the hit area grows around it, the layout does not
+    let resp = if touch && (size.x < 40.0 || size.y < 40.0) {
+        let hit = Rect::from_center_size(r.center(), vec2(size.x.max(40.0), size.y.max(40.0)));
+        ui.interact(hit, resp.id.with("hit"), if enabled { Sense::click() } else { Sense::hover() })
+    } else {
+        resp
+    };
     resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, enabled, active, tooltip));
-    register(ui.ctx(), format!("icon:{id}"), r);
+    register(ui.ctx(), format!("icon:{id}"), if touch { r.union(resp.interact_rect) } else { r });
     let p = ui.painter();
     let sq_size = if touch { 36.0f32 } else { 32.0f32 };
     let sq = Rect::from_center_size(r.center(), vec2(sq_size.min(size.x), sq_size.min(size.y)));
@@ -672,7 +679,8 @@ fn star_lit(i: u8, rating: u8, hover: Option<u8>) -> bool {
 pub fn dropdown(ui: &mut Ui, id: &str, text: &str, font: egui::FontId, color: Color32) -> Response {
     let t = Tokens::get(ui.ctx());
     let galley = ui.painter().layout_no_wrap(text.to_string(), font, color);
-    let size = vec2(galley.size().x + 20.0, galley.size().y.max(20.0));
+    let min_h = if crate::theme::touch_ui(ui.ctx()) { 34.0 } else { 20.0 };
+    let size = vec2(galley.size().x + 20.0, galley.size().y.max(min_h));
     let (r, resp) = ui.allocate_exact_size(size, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, text));
     register(ui.ctx(), format!("dropdown:{id}"), r);
