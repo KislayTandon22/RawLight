@@ -11,25 +11,35 @@ use crate::widgets::icon_button;
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
+    let glass = crate::glass::active(ui.ctx());
     egui::Panel::right("tool_strip")
-        .exact_size(t.strip_w)
+        .exact_size(if glass { t.strip_w + 18.0 } else { t.strip_w })
         .resizable(false)
-        .frame(
+        .frame(if glass {
+            // the tool rail as one floating glass capsule
+            crate::glass::shell(egui::Margin { left: 0, right: 0, top: 8, bottom: 8 }, egui::Margin { left: 2, right: 10, top: 8, bottom: 8 })
+        } else {
             egui::Frame::NONE
                 .fill(t.chrome)
                 .inner_margin(egui::Margin { left: 0, right: 0, top: 8, bottom: 8 })
-                .stroke(egui::Stroke::new(1.0, t.divider)),
-        )
+                .stroke(egui::Stroke::new(1.0, t.divider))
+        })
         .show(ui, |ui| {
             let has_photo = app.session.active().is_some();
             ui.vertical_centered(|ui| {
                 ui.spacing_mut().item_spacing.y = 6.0;
-                let sz = vec2(t.strip_w, 40.0);
+                let sz = vec2(t.strip_w, if crate::theme::touch_ui(ui.ctx()) { 46.0 } else { 40.0 });
                 if icon_button(ui, "presets", Icon::Presets, sz, app.ui.presets, has_photo, "Presets (Shift+P)").clicked() {
                     let _ = app.run("panel.presets", json!({}));
                 }
+                let in_library = !matches!(app.ui.view, crate::state::ViewMode::Detail) && !app.ui.right.is_edit_tool();
                 for (id, icon, panel, tip) in [
-                    ("edit", Icon::Sliders, RightPanel::Edit, "Edit (E)"),
+                    (
+                        if in_library { "quickDevelop" } else { "edit" },
+                        Icon::Sliders,
+                        if in_library { RightPanel::QuickDevelop } else { RightPanel::Edit },
+                        if in_library { "Quick Develop" } else { "Edit (E)" },
+                    ),
                     ("crop", Icon::Crop, RightPanel::Crop, "Crop & Rotate (C)"),
                     ("remove", Icon::Eraser, RightPanel::Remove, "Remove (H)"),
                     ("masking", Icon::Mask, RightPanel::Masking, "Masking (M)"),
@@ -39,7 +49,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                     if icon_button(ui, id, icon, sz, on, has_photo, tip).clicked() {
                         let _ = app.run(&format!("panel.{id}"), json!({}));
                     }
-                    if id == "edit" {
+                    if id == "edit" || id == "quickDevelop" {
                         separator(ui, &t);
                     }
                 }
@@ -56,12 +66,14 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             });
             // bottom icons
             let bottom = ui.max_rect().bottom();
+            let insets = crate::theme::safe_area_insets(ui.ctx());
+            let safe_bottom = insets[1].max(if crate::theme::touch_ui(ui.ctx()) { 20.0 } else { 0.0 });
             let mut child = ui.new_child(
                 egui::UiBuilder::new()
-                    .max_rect(egui::Rect::from_min_max(egui::pos2(ui.max_rect().left(), bottom - 96.0), ui.max_rect().right_bottom())),
+                    .max_rect(egui::Rect::from_min_max(egui::pos2(ui.max_rect().left(), bottom - 96.0 - safe_bottom), ui.max_rect().right_bottom())),
             );
             child.vertical_centered(|ui| {
-                let sz = vec2(t.strip_w, 40.0);
+                let sz = vec2(t.strip_w, if crate::theme::touch_ui(ui.ctx()) { 44.0 } else { 40.0 });
                 if icon_button(ui, "keywords", Icon::Tag, sz, app.ui.right == RightPanel::Keywords, has_photo, "Keywords (K)").clicked() {
                     let _ = app.run("panel.keywords", json!({}));
                 }

@@ -200,3 +200,25 @@ fn library_names_must_work_as_folder_names_on_every_system() {
     assert_eq!(app.session.library.as_ref().unwrap().dir, dir.join("Trip 2026"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// iPad: no folder dialog. New Library (with a name) creates a library beside the open one in the
+/// app's storage, and the others there can be listed and reopened.
+#[test]
+fn without_a_folder_dialog_libraries_live_beside_the_open_one() {
+    let dir = temp("sandboxlib");
+    let mut app = app_in(&dir);
+    app.library_changed(&egui::Context::default());
+    assert!(app.services.pick_folder.is_none());
+    let first = app.session.library.as_ref().unwrap().dir.clone();
+    assert_eq!(crate::panels::settings::sandbox_library_root(&app).as_deref(), Some(dir.as_path()));
+    assert!(crate::panels::settings::sandbox_libraries(&app).is_empty());
+
+    app.run("app.newLibrary", json!({"name": "Wedding"})).unwrap();
+    assert_eq!(app.session.library.as_ref().unwrap().dir, dir.join("Wedding"));
+    assert_eq!(crate::panels::settings::sandbox_libraries(&app), vec![first.clone()]);
+
+    app.run("app.openLibrary", json!({"path": first.to_string_lossy()})).unwrap();
+    assert_eq!(app.session.library.as_ref().unwrap().dir, first);
+    assert_eq!(crate::panels::settings::sandbox_libraries(&app), vec![dir.join("Wedding")]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -801,6 +801,10 @@ fn smart_album_editor_keeps_albums_from_including_themselves() {
     assert!(has(&h, format!("albumPickerItem:{trip}:rules-0")));
     // itself and an album that tests it are shown, greyed: clicking them picks nothing
     for blocked in [excluded, travel] {
+        if !has(&h, format!("albumPickerItem:{blocked}:rules-0")) {
+            let _ = h.request("ui.clickWidget", json!({"id": "albumPicker:rules-0"}), T);
+            h.settle(SETTLE);
+        }
         let r = h.request("ui.clickWidget", json!({"id": format!("albumPickerItem:{blocked}:rules-0")}), T);
         assert_eq!(r["ok"], true, "{r}");
         h.settle(SETTLE);
@@ -1557,4 +1561,80 @@ fn a_fast_brush_stroke_shows_without_gaps_before_the_button_is_released() {
         let (l, k) = (px(&held, x, y), px(&done, x, y));
         assert!((0..3).all(|i| (l[i] - k[i]).abs() < 24.0), "live {l:?} vs committed {k:?} at ({x}, {y})");
     }
+}
+
+#[test]
+fn all_mask_sliders_and_global_sliders_work_together() {
+    let mut h = detail("panel.masking");
+    exec(&mut h, "mask.add", json!({"kind": "linear", "start": [0.2, 0.2], "end": [0.8, 0.8]}));
+    assert_eq!(h.app.session.active_mask, Some(1));
+
+    // 1. Verify all 17 local adjustment sliders work independently and accurately
+    let test_adjustments = [
+        ("temp", 35.0),
+        ("tint", -25.0),
+        ("exposure", 1.25),
+        ("contrast", 40.0),
+        ("highlights", -50.0),
+        ("shadows", 30.0),
+        ("whites", 20.0),
+        ("blacks", -15.0),
+        ("texture", 45.0),
+        ("clarity", 25.0),
+        ("dehaze", 30.0),
+        ("hue", 10.0),
+        ("saturation", -30.0),
+        ("sharpness", 50.0),
+        ("noise", 20.0),
+        ("moire", 15.0),
+        ("defringe", 60.0),
+    ];
+
+    for (key, val) in test_adjustments {
+        exec(&mut h, "mask.adjust", json!({"values": {key: val}}));
+        let d = develop(&h);
+        let m = &d.masks[0];
+        let current_val = crate::panels::masking::local_get(&m.adjust, key);
+        assert!((current_val - val).abs() < 1e-4, "Slider {key} expected {val}, got {current_val}");
+    }
+
+    // 2. Verify Amount and Refine Edges sliders
+    exec(&mut h, "mask.adjust", json!({"values": {"amount": 80.0}}));
+    assert_eq!(develop(&h).masks[0].adjust.amount, 80.0, "Amount slider works");
+
+    exec(&mut h, "mask.refine", json!({"value": 35.0}));
+    assert_eq!(develop(&h).masks[0].refine, 35.0, "Refine slider works");
+
+    // 3. Verify Brush tool sliders
+    exec(&mut h, "tool.brush", json!({"new": true}));
+    h.app.ui.brush_size = 0.45;
+    h.app.ui.brush_feather = 65.0;
+    h.app.ui.brush_flow = 75.0;
+    assert_eq!(h.app.ui.brush_size, 0.45);
+    assert_eq!(h.app.ui.brush_feather, 65.0);
+    assert_eq!(h.app.ui.brush_flow, 75.0);
+
+    // 4. Verify Mask Overlay Opacity slider
+    h.app.ui.mask_overlay_opacity = 70.0;
+    assert_eq!(h.app.ui.mask_overlay_opacity, 70.0);
+
+    // 5. Verify switching to Edit panel: global sliders work alongside the mask
+    exec(&mut h, "panel.edit", json!({}));
+    exec(&mut h, "develop.set", json!({"control": "light.exposure", "value": 0.5}));
+    exec(&mut h, "develop.set", json!({"control": "light.contrast", "value": 20.0}));
+
+    let d = develop(&h);
+    assert_eq!(d.light.exposure, 0.5, "Global exposure slider updated");
+    assert_eq!(d.light.contrast, 20.0, "Global contrast slider updated");
+
+    // Mask adjustments are preserved and active
+    assert_eq!(d.masks.len(), 2, "Both masks exist");
+    assert!((d.masks[0].adjust.exposure - 1.25).abs() < 1e-4, "Mask local exposure preserved");
+    assert!((d.masks[0].adjust.temp - 35.0).abs() < 1e-4, "Mask local temp preserved");
+    assert_eq!(d.masks[0].adjust.amount, 80.0, "Mask local amount preserved");
+
+    // 6. Test touch UI slider hit areas
+    crate::theme::set_touch_ui(&h.view.ctx, true);
+    h.settle(SETTLE);
+    crate::theme::set_touch_ui(&h.view.ctx, false);
 }

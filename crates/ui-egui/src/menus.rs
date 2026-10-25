@@ -61,7 +61,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("library.selectOnlyActive", "Select Only Active Photo", Some("Cmd+Shift+D"), "Edit"),
     ("tool.guidedUpright", "Guided Upright", Some("Shift+G"), "Window>Tools"),
     ("view.detail", "Detail", Some("D"), "View"),
-    ("view.compare", "Compare", Some("Shift+C"), "View"),
+    ("view.compare", "Compare", Some("C"), "View"),
     ("view.survey", "Survey", Some("N"), "View"),
     ("view.people", "People", None, "View"),
     ("view.person", "Show Person", None, ""),
@@ -72,6 +72,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("compare.set", "Show in Compare", None, ""),
     ("compare.makeSelect", "Make Candidate the Select", None, "View"),
     ("view.autoAdvance", "Auto Advance", None, "Photo"),
+    ("view.multiSelect", "Select Photos", None, "View"),
     ("view.filmstrip", "Filmstrip", Some("/"), "View"),
     ("view.leftPanel", "My Photos Panel", Some("Cmd+Shift+L"), "View"),
     ("view.beforeAfter", "Compare Before and After", Some("Y"), "View"),
@@ -82,6 +83,9 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("view.zoomFit", "Zoom to Fit", Some("Cmd+0"), "View"),
     ("view.zoom100", "Zoom 100%", Some("Cmd+Alt+0"), "View"),
     ("view.zoomToggle", "Toggle Zoom", Some("Z"), "View"),
+    ("input.twoFingerTap", "Undo Gesture", None, "Edit"),
+    ("input.threeFingerTap", "Redo Gesture", None, "Edit"),
+    ("input.pencilDoubleTap", "Apple Pencil Double-Tap", None, "View"),
     // the ratio a click (and Z / Space) zooms to
     ("view.clickZoom", "Click Zoom Ratio", None, ""),
     ("view.navigate", "Set Image Zoom and Pan", None, ""),
@@ -113,9 +117,10 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("view.enterFullScreen", "Enter Full Screen", Some("Cmd+Shift+F"), "View"),
     ("view.infoOverlay", "Cycle Info Overlay", Some("Cmd+I"), "View"),
     ("view.navigator", "Navigator", None, "View"),
+    ("panel.quickDevelop", "Quick Develop", None, "Window"),
     ("panel.edit", "Edit", Some("E"), "Window"),
     ("panel.profiles", "Profile Browser", None, "Window"),
-    ("panel.crop", "Crop & Rotate", Some("C"), "Window"),
+    ("panel.crop", "Crop & Rotate", Some("R"), "Window"),
     ("panel.remove", "Remove", Some("H"), "Window"),
     ("panel.masking", "Masking", Some("M"), "Window"),
     ("panel.redeye", "Red Eye", None, "Window"),
@@ -132,7 +137,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("section.optics", "Optics", Some("Cmd+5"), "Window>Edit Sections"),
     ("tool.brush", "Brush", Some("B"), "Window>Tools"),
     ("tool.linear", "Linear Gradient", Some("L"), "Window>Tools"),
-    ("tool.radial", "Radial Gradient", Some("R"), "Window>Tools"),
+    ("tool.radial", "Radial Gradient", Some("Shift+M"), "Window>Tools"),
     ("tool.wbPicker", "White Balance Selector", Some("W"), "Window>Tools"),
     ("tool.none", "No Tool", None, ""),
     // brush size / feather of the active brush (Masking brush, Remove tool and its selected spot)
@@ -676,6 +681,10 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
                 None => Err("not available here: on the desktop the library is a folder; back it up with your other files".into()),
             }
         }
+        "view.multiSelect" => {
+            app.ui.multi_select = !app.ui.multi_select;
+            Ok(Value::Null)
+        }
         "view.filmstrip" => {
             app.ui.filmstrip = !app.ui.filmstrip;
             Ok(Value::Null)
@@ -718,6 +727,9 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
             app.ui.zoom_anim = true;
             Ok(Value::Null)
         }
+        "input.twoFingerTap" => app.run("edit.undo", json!({})),
+        "input.threeFingerTap" => app.run("edit.redo", json!({})),
+        "input.pencilDoubleTap" => app.run("view.zoomToggle", json!({})),
         "view.clickZoom" => {
             // {ratio?: 1|2|3|4|8} → {ratio}
             if let Some(r) = p.get("ratio").and_then(Value::as_f64) {
@@ -965,6 +977,10 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
                 app.ui.view = ViewMode::PhotoGrid;
             }
             Ok(json!({"filterBar": app.ui.filter_bar}))
+        }
+        "panel.quickDevelop" => {
+            panel(app, &ctx, RightPanel::QuickDevelop, "Quick Develop");
+            Ok(Value::Null)
         }
         "panel.edit" => {
             panel(app, &ctx, RightPanel::Edit, "Edit");
@@ -1229,12 +1245,27 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
         "dialog.export" => {
             let prev = app.session.last_export.clone().unwrap_or_default();
             let u = |k: &str, d: u64| prev.get(k).and_then(Value::as_u64).unwrap_or(d);
-            let dir = prev.get("dir").and_then(Value::as_str).map(str::to_string).unwrap_or_else(crate::control::default_export_dir);
+            #[allow(unused_mut)]
+            let mut dir = prev
+                .get("dir")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(crate::control::default_export_dir);
+            #[cfg(target_os = "ios")]
+            {
+                if !std::path::Path::new(&dir).exists() && std::fs::create_dir_all(&dir).is_err() {
+                    dir = crate::control::default_export_dir();
+                }
+            }
             let opts = lightcraft_engine::export::ExportOptions::from_json(&prev);
             // no previous export: 2048 px long edge; a previous full-size export: full size
             let full_size = opts.resize.is_none() && lightcraft_engine::export::ExportOptions::has_size_param(&prev);
             let resize = opts.resize.unwrap_or_default();
-            app.ui.dialog = Some(Dialog::Export { opts, full_size, resize, preset_name: String::new(), limit_kb: u("limitKb", 0) as u32, dir });
+            let scope = crate::state::ExportScope::default();
+            app.ui.dialog =
+                Some(Dialog::Export { opts, full_size, resize, preset_name: String::new(), limit_kb: u("limitKb", 0) as u32, dir, scope });
             Ok(Value::Null)
         }
         "merge.hdrLast" => crate::merge::start_last(app, "merge.hdr"),
@@ -1893,12 +1924,12 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
 
 pub fn ui_enabled(app: &LightcraftApp, id: &str) -> bool {
     match id {
+        "view.multiSelect" => !app.session.catalog.is_empty(),
         "library.selectOnlyActive" => app.session.active().is_some(),
         "dialog.contactSheet" | "app.contactSheet" => !cfg!(target_arch = "wasm32") && app.session.active().is_some() && app.export.is_none(),
         s if s.starts_with("panel.") || s.starts_with("tool.") || s.starts_with("section.") => app.session.active().is_some() || s == "panel.close",
-        "app.export" | "dialog.export" | "dialog.createPreset" | "dialog.rename" | "dialog.captureTime" | "dialog.copySettings" => {
-            app.session.active().is_some()
-        }
+        "app.export" | "dialog.export" => app.session.active().is_some() || !app.session.selection.ids.is_empty() || !app.session.catalog.is_empty(),
+        "dialog.createPreset" | "dialog.rename" | "dialog.captureTime" | "dialog.copySettings" => app.session.active().is_some(),
         "photo.tagFromTracklog" => app.session.active().is_some() && app.services.pick_tracklog.is_some(),
         "photo.editInPhotoCraft" | "photo.editInExternal" => app.session.active().is_some() && app.services.open_with.is_some(),
         "app.exportPrevious" => app.session.active().is_some() && app.session.last_export.is_some(),

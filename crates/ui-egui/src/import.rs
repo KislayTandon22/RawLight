@@ -809,11 +809,64 @@ fn xmp_warning_text(warning: &ImportWarning) -> String {
 }
 
 fn xmp_warnings_text(warnings: &[ImportWarning]) -> String {
-    crate::i18n::tr_format!(
-        "Import warnings ({n}):\n{warnings}",
-        n = warnings.len(),
-        warnings = warnings.iter().map(xmp_warning_text).collect::<Vec<_>>().join("\n"),
-    )
+    let mut shown: Vec<String> = warnings.iter().take(2).map(xmp_warning_text).map(|text| shorten_paths(&text)).collect();
+
+    if warnings.len() > 2 {
+        let remaining = warnings.len().saturating_sub(2);
+        shown.push(format!("…and {remaining} more"));
+    }
+
+    crate::i18n::tr_format!("Import warnings ({n}):\n{warnings}", n = warnings.len(), warnings = shown.join("\n"),)
+}
+
+/// A whitespace-delimited token that is an absolute path, cut to its file name (anything else unchanged).
+fn shorten_token(token: &str) -> &str {
+    match token.rsplit_once('/') {
+        Some((_, name)) if token.starts_with('/') && !name.is_empty() => name,
+        _ => token,
+    }
+}
+
+fn shorten_paths(text: &str) -> String {
+    let mut result = String::new();
+    let mut token = String::new();
+
+    for c in text.chars() {
+        if c.is_whitespace() {
+            if !token.is_empty() {
+                result.push_str(shorten_token(&token));
+                token.clear();
+            }
+            result.push(c);
+        } else {
+            token.push(c);
+        }
+    }
+
+    if !token.is_empty() {
+        result.push_str(shorten_token(&token));
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod shorten_tests {
+    use super::*;
+
+    #[test]
+    fn test_shorten_paths_with_punctuation() {
+        let input = "Failed to load /var/mobile/Containers/Data/Application/<UUID>/Documents/TestRAWs/AMF_1134.dng: corrupted";
+        let expected = "Failed to load AMF_1134.dng: corrupted";
+        assert_eq!(shorten_paths(input), expected);
+    }
+
+    #[test]
+    fn test_shorten_paths_multiple() {
+        let input = "Found /tmp/photo1.dng; also /var/log/photo2.dng. Plain /root/photo3.raw";
+        let expected = "Found photo1.dng; also photo2.dng. Plain photo3.raw";
+        assert_eq!(shorten_paths(input), expected);
+    }
 }
 
 /// The import is done (or cancelled): one undo step, show and select the first photo (unless the

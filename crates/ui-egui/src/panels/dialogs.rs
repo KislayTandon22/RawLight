@@ -186,10 +186,71 @@ fn window_id(dialog: &Dialog) -> egui::Id {
 pub(crate) fn prepare(app: &LightcraftApp, ui: &mut egui::Ui) {
     let Some(dialog) = &app.ui.dialog else { return };
     ui.disable();
-    let layer = egui::LayerId::new(egui::Order::Middle, window_id(dialog));
+    let layer = egui::LayerId::new(egui::Order::Foreground, window_id(dialog));
     if ui.ctx().memory(|m| m.top_modal_layer()) != Some(layer) {
         egui::Popup::close_all(ui.ctx());
     }
+}
+
+/// An Apple-style circular close button (32pt visual circle with specular rim, 44x44pt touch hit target for Apple HIG).
+pub fn apple_close_button(ui: &mut egui::Ui) -> egui::Response {
+    let touch = crate::theme::touch_ui(ui.ctx());
+    let hit_size = if touch { egui::vec2(44.0, 44.0) } else { egui::vec2(36.0, 36.0) };
+    let (rect, resp) = ui.allocate_exact_size(hit_size, egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let center = rect.center();
+        let circle_radius = if touch { 16.0 } else { 14.0 };
+        let dark = ui.visuals().dark_mode;
+        // Apple HIG Tertiary System Fill: prominent on dark glass backgrounds
+        let (bg, stroke_rim, cross_color) = if dark {
+            if resp.is_pointer_button_down_on() {
+                (
+                    egui::Color32::from_rgba_unmultiplied(160, 160, 175, 200),
+                    egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(255, 255, 255, 120)),
+                    egui::Color32::WHITE,
+                )
+            } else if resp.hovered() {
+                (
+                    egui::Color32::from_rgba_unmultiplied(140, 140, 150, 160),
+                    egui::Stroke::new(0.8, egui::Color32::from_rgba_unmultiplied(255, 255, 255, 90)),
+                    egui::Color32::WHITE,
+                )
+            } else {
+                (
+                    egui::Color32::from_rgba_unmultiplied(110, 110, 120, 130),
+                    egui::Stroke::new(0.6, egui::Color32::from_rgba_unmultiplied(255, 255, 255, 65)),
+                    egui::Color32::WHITE,
+                )
+            }
+        } else {
+            if resp.is_pointer_button_down_on() {
+                (
+                    egui::Color32::from_rgba_unmultiplied(0, 0, 0, 80),
+                    egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(0, 0, 0, 100)),
+                    egui::Color32::WHITE,
+                )
+            } else if resp.hovered() {
+                (
+                    egui::Color32::from_rgba_unmultiplied(0, 0, 0, 55),
+                    egui::Stroke::new(0.8, egui::Color32::from_rgba_unmultiplied(0, 0, 0, 70)),
+                    egui::Color32::WHITE,
+                )
+            } else {
+                (
+                    egui::Color32::from_rgba_unmultiplied(0, 0, 0, 38),
+                    egui::Stroke::new(0.6, egui::Color32::from_rgba_unmultiplied(0, 0, 0, 50)),
+                    egui::Color32::from_rgb(40, 40, 40),
+                )
+            }
+        };
+        ui.painter().circle_filled(center, circle_radius, bg);
+        ui.painter().circle_stroke(center, circle_radius, stroke_rim);
+        let cross = if touch { 6.5 } else { 5.5 };
+        let stroke = egui::Stroke::new(if touch { 2.4 } else { 2.0 }, cross_color);
+        ui.painter().line_segment([center + egui::vec2(-cross, -cross), center + egui::vec2(cross, cross)], stroke);
+        ui.painter().line_segment([center + egui::vec2(cross, -cross), center + egui::vec2(-cross, cross)], stroke);
+    }
+    resp
 }
 
 pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
@@ -204,8 +265,12 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
     let screen = ctx.content_rect();
     // The backdrop is an area below the dialog window (a bare `Middle` layer painter would be
     // painted after every area — i.e. over the dialog too).
+    let touch = crate::theme::touch_ui(ctx);
+    let kind = crate::theme::current(ctx).unwrap_or_default();
+    let is_glass = kind == crate::theme::ThemeKind::Glass || (touch && kind.is_dark());
     egui::Area::new(egui::Id::new("dialog-dim")).order(egui::Order::Middle).fixed_pos(screen.min).interactable(false).show(ctx, |ui| {
-        ui.painter().rect_filled(screen, 0.0, egui::Color32::from_black_alpha(140));
+        let dim_c = if is_glass { egui::Color32::from_rgba_unmultiplied(12, 12, 16, 175) } else { egui::Color32::from_black_alpha(140) };
+        ui.painter().rect_filled(screen, 0.0, dim_c);
     });
     let mut close = false;
     let mut confirm = false;
@@ -263,9 +328,18 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
         Dialog::SamModel { .. } => "Download the SAM 3 Model?",
         Dialog::About => "About LightCraft",
         Dialog::Shortcuts => "Keyboard Shortcuts",
+        Dialog::Welcome => "Welcome to LightCraft",
     }
     .to_string();
-    let frame = egui::Frame::window(&ctx.global_style()).inner_margin(egui::Margin::symmetric(16, 12));
+    let frame = if is_glass {
+        egui::Frame::window(&ctx.global_style())
+            .fill(egui::Color32::from_rgba_unmultiplied(26, 26, 34, 236))
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(255, 255, 255, 42)))
+            .corner_radius(22.0)
+            .inner_margin(egui::Margin::symmetric(20, 16))
+    } else {
+        egui::Frame::window(&ctx.global_style()).inner_margin(egui::Margin::symmetric(16, 12))
+    };
     // The import review can be resized (its photo grid takes the room); it keeps a window id of its
     // own so the size it is given doesn't carry over to the other dialogs. Its content scrolls
     // rather than growing the window when the options below the grid get taller (e.g. Copy).
@@ -275,25 +349,98 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
     // bar and the button row stay outside the scroll area. The room they take is measured on the
     // previous frame (a guess on the first one).
     let chrome_id = window_id.with("chrome");
-    let chrome = ctx.data(|d| d.get_temp::<f32>(chrome_id)).unwrap_or(DIALOG_CHROME_GUESS);
-    let body_max = (screen.height() - 2.0 * DIALOG_SCREEN_MARGIN - chrome).max(DIALOG_MIN_BODY);
+    let chrome =
+        ctx.data(|d| d.get_temp::<f32>(chrome_id)).unwrap_or(if crate::theme::touch_ui(ctx) { TOUCH_DIALOG_CHROME } else { DIALOG_CHROME_GUESS });
+    let insets = crate::theme::safe_area_insets(ctx);
+    let safe_vert = insets[0] + insets[1];
+    let max_dialog_h = (screen.height() - safe_vert - 36.0).max(280.0);
+    let body_max = (max_dialog_h - chrome.max(if crate::theme::touch_ui(ctx) { TOUCH_DIALOG_CHROME } else { 80.0 })).max(DIALOG_MIN_BODY);
     let mut body_h = None;
-    let shown = egui::Window::new(crate::i18n::tr(&title)).id(window_id)
+    let target_w = match dlg {
+        Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
+        Dialog::SmartRules { .. } => 680.0,
+        Dialog::AllMetadata { .. } => 620.0,
+        Dialog::FaceModel { .. } => 460.0,
+        Dialog::LightroomCatalog { .. } => 440.0,
+        Dialog::Export { .. } if crate::theme::touch_ui(ctx) => 540.0,
+        Dialog::Welcome => {
+            if crate::theme::touch_ui(ctx) {
+                640.0
+            } else {
+                580.0
+            }
+        }
+        // on the iPad every dialog is one of three centred widths (small 380, medium 560, large 720), never a full-width slab
+        Dialog::Settings { .. } if crate::theme::touch_ui(ctx) => 1000.0,
+        Dialog::Rename { .. }
+        | Dialog::CaptureTime { .. }
+        | Dialog::Shortcuts
+        | Dialog::WhatsNew
+        | Dialog::SystemInfo { .. }
+        | Dialog::About
+        | Dialog::Cull { .. }
+        | Dialog::ContactSheet { .. }
+        | Dialog::CopySettings { .. }
+        | Dialog::PasteSettings { .. }
+        | Dialog::CreatePreset { .. }
+        | Dialog::AutoStack { .. }
+            if crate::theme::touch_ui(ctx) =>
+        {
+            560.0
+        }
+        _ => 380.0,
+    };
+    let target_w = target_w.min((screen.width() - 32.0).max(300.0));
+    let touch = crate::theme::touch_ui(ctx);
+    let mut is_open = true;
+    let mut win = egui::Window::new(crate::i18n::tr(&title))
+        .id(window_id)
+        .order(egui::Order::Foreground)
         .collapsible(false)
+        .movable(!crate::theme::touch_ui(ctx))
         .resizable(import)
         .vscroll(import)
         .resize(|r| if import { r.default_height(crate::import::DIALOG_SIZE[1]) } else { r })
         .frame(frame)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .default_width(match dlg {
-            Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
-            Dialog::SmartRules { .. } => 680.0,
-            Dialog::AllMetadata { .. } => 620.0,
-            Dialog::FaceModel { .. } => 460.0,
-            Dialog::LightroomCatalog { .. } => 440.0,
-            _ => 380.0,
-        })
-        .show(ctx, |ui| {
+        .default_width(target_w)
+        .max_height(max_dialog_h)
+        .constrain_to(screen);
+    if touch || matches!(dlg, Dialog::Welcome) {
+        win = win.title_bar(false);
+    } else {
+        win = win.open(&mut is_open);
+    }
+    if touch && !import {
+        win = win.max_width(target_w);
+    }
+    let shown = win.show(ctx, |ui| {
+            if crate::theme::touch_ui(ctx) && matches!(dlg, Dialog::Export { .. } | Dialog::Welcome) {
+                let content_w = target_w - frame.inner_margin.sum().x;
+                ui.set_max_width(content_w);
+                ui.set_width(content_w);
+            }
+            if touch {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(crate::i18n::tr(&title)).font(t.semibold(17.0)).color(t.text));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let btn = apple_close_button(ui);
+                        crate::widgets::register(ui.ctx(), "button:dialogClose", btn.rect);
+                        if btn.clicked() {
+                            close = true;
+                        }
+                    });
+                });
+                ui.add_space(4.0);
+                let sep_c = if ui.visuals().dark_mode {
+                    egui::Color32::from_rgba_unmultiplied(255, 255, 255, 20)
+                } else {
+                    egui::Color32::from_rgba_unmultiplied(0, 0, 0, 16)
+                };
+                let (sep_r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 1.0), egui::Sense::hover());
+                ui.painter().hline(sep_r.x_range(), sep_r.top(), egui::Stroke::new(1.0, sep_c));
+                ui.add_space(6.0);
+            }
             ui.spacing_mut().item_spacing.y = 8.0;
             body_h = dialog_body(ui, (!import).then_some(title.as_str()), body_max, |ui| match &mut dlg {
                 Dialog::AutoStack { gap } => {
@@ -320,9 +467,12 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     let r = ui.add(egui::Slider::new(reject_below, 0.0..=80.0).text(crate::i18n::tr("Reject below focus")).step_by(1.0));
                     crate::widgets::register(ui.ctx(), "field:cullReject", r.rect);
                     ui.label(egui::RichText::new(crate::i18n::tr(if *reject_below > 0.0 { "Blurry photos below the score are flagged as rejects." } else { "0: nothing is rejected." })).color(t.text_dim));
-                    let r = ui.checkbox(pick_best, crate::i18n::tr("Pick the sharpest photo of each burst"));
+                    let r = crate::widgets::toggle(ui, pick_best, crate::i18n::tr("Pick the sharpest photo of each burst"));
                     crate::widgets::register(ui.ctx(), "check:cullPick", r.rect);
                     ui.label(egui::RichText::new(crate::i18n::tr("Scores stay on the photos: filter or make smart albums with Focus and Best of Similar Shots.")).color(t.text_dim));
+                }
+                Dialog::Welcome => {
+                    show_welcome(app, ui, &mut close);
                 }
                 Dialog::WhatsNew => {
                     egui::ScrollArea::vertical().max_height(list_height(ui, 460.0)).auto_shrink([false, true]).show(ui, |ui| {
@@ -616,7 +766,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     // as in Lightroom, the option is only there when something is selected
                     if !*folder && !app.session.targets(&json!({})).is_empty() {
                         ui.add_space(6.0);
-                        let r = ui.checkbox(include_selected, crate::i18n::tr("Include selected photos"));
+                        let r = crate::widgets::toggle(ui, include_selected, crate::i18n::tr("Include selected photos"));
                         crate::widgets::register(ui.ctx(), "check:albumIncludeSelected", r.rect);
                     }
                 }
@@ -651,36 +801,69 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                             ui.selectable_value(&mut options.paper, "letter".into(), "Letter");
                         });
                     });
-                    ui.checkbox(&mut options.landscape, "Landscape");
+                    crate::widgets::toggle(ui, &mut options.landscape, "Landscape");
                     field(ui, "Columns", |ui| { ui.add(egui::DragValue::new(&mut options.columns).range(1..=8)); });
                     field(ui, "Rows", |ui| { ui.add(egui::DragValue::new(&mut options.rows).range(1..=10)); });
-                    ui.checkbox(&mut options.captions, "Filename captions");
+                    crate::widgets::toggle(ui, &mut options.captions, "Filename captions");
                     ui.label("150 dpi · sRGB · current edits · fit without cropping");
                     ui.label("Choose a PDF destination after confirming. Print the PDF from your viewer.");
                 }
-                Dialog::Export { opts, full_size, resize, preset_name, limit_kb, dir } => {
+                Dialog::Export { opts, full_size, resize, preset_name, limit_kb, dir, scope } => {
                     use lightcraft_engine::export::{ExportFormat as F, MetadataPolicy as M, SharpenAmount as A, SharpenFor as S};
-                    let n = app.session.selection.ids.len().max(1);
-                    ui.label(egui::RichText::new(crate::i18n::tr_format!("{n} photo{}", if n == 1 { "" } else { "s" }, n = n)).color(t.text_dim));
+                    let selected_count = app.session.selection.ids.len().max(1);
+                    let visible_count = app.session.visible().len();
+                    let total_count = if visible_count > 0 { visible_count } else { app.session.catalog.len() };
+                    if crate::theme::touch_ui(ui.ctx()) && total_count > 1 {
+                        let sel_str = format!("{} ({selected_count})", crate::i18n::tr("Selected"));
+                        let all_str = format!("{} ({total_count})", crate::i18n::tr("All Photos"));
+                        choices(
+                            ui,
+                            "Export",
+                            "exportScope",
+                            &[
+                                (crate::state::ExportScope::Selected, &sel_str),
+                                (crate::state::ExportScope::All, &all_str),
+                            ],
+                            scope,
+                        );
+                        ui.add_space(4.0);
+                    } else {
+                        ui.label(egui::RichText::new(crate::i18n::tr_format!("{n} photo{}", if selected_count == 1 { "" } else { "s" }, n = selected_count)).color(t.text_dim));
+                    }
                     // Preset: load a built-in or saved set of options into the dialog
                     field(ui, "Preset", |ui| {
                         let mut chosen = None;
-                        let c = egui::ComboBox::from_id_salt("exportPreset").width(220.0).selected_text(crate::i18n::tr("Choose…")).show_ui(ui, |ui| {
-                            let mut builtin = true;
-                            for (p, b) in app.session.all_export_presets() {
-                                if builtin && !b {
-                                    ui.separator();
+                        if crate::theme::touch_ui(ui.ctx()) {
+                            ui.horizontal_wrapped(|ui| {
+                                for (p, b) in app.session.all_export_presets() {
+                                    let is_active = preset_name.as_str() == p.name.as_str();
+                                    let label = crate::i18n::builtin_label(&p.name, b);
+                                    let btn = crate::widgets::text_button(ui, &format!("presetChip:{}", p.name), label, is_active);
+                                    if btn.clicked() {
+                                        chosen = Some(p.name);
+                                    }
                                 }
-                                builtin = b;
-                                if ui.selectable_label(false, crate::i18n::builtin_label(&p.name, b)).clicked() {
-                                    chosen = Some(p.name);
+                            });
+                        } else {
+                            let combo_w = 220.0;
+                            let c = egui::ComboBox::from_id_salt("exportPreset").width(combo_w).selected_text(crate::i18n::tr("Choose…")).show_ui(ui, |ui| {
+                                let mut builtin = true;
+                                for (p, b) in app.session.all_export_presets() {
+                                    if builtin && !b {
+                                        ui.separator();
+                                    }
+                                    builtin = b;
+                                    if ui.selectable_label(false, crate::i18n::builtin_label(&p.name, b)).clicked() {
+                                        chosen = Some(p.name);
+                                    }
                                 }
-                            }
-                        });
-                        crate::widgets::register(ui.ctx(), "combo:exportPreset", c.response.rect);
+                            });
+                            crate::widgets::register(ui.ctx(), "combo:exportPreset", c.response.rect);
+                        }
                         if let Some(name) = chosen
                             && let Ok(params) = app.session.export_params(&json!({"preset": name}))
                         {
+                            *preset_name = name;
                             let o = lightcraft_engine::export::ExportOptions::from_json(&params);
                             *full_size = o.resize.is_none();
                             *resize = o.resize.unwrap_or_default();
@@ -726,7 +909,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     }
                     if matches!(opts.format, F::Jpeg | F::Tiff | F::Avif | F::Png | F::Jxl) {
                         let tip = "Photos edited in HDR: JPEG with an HDR gain map (looks right everywhere, brighter highlights on HDR displays), AVIF as 10-bit, PNG and JPEG XL as 16-bit Rec. 2020 PQ; TIFF needs 32-bit float";
-                        ui.checkbox(&mut opts.hdr, "HDR output").on_hover_text(tip);
+                        crate::widgets::toggle(ui, &mut opts.hdr, "HDR output").on_hover_text(tip);
                         if opts.hdr && !opts.hdr_output() {
                             ui.label(egui::RichText::new("HDR TIFF needs 32-bit float.").color(t.text_dim));
                         }
@@ -768,7 +951,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     }
                     if opts.format == F::Jxl {
                         let tip = "Mathematically lossless: every pixel is kept exactly (larger files)";
-                        ui.checkbox(&mut opts.jxl_lossless, crate::i18n::tr("Lossless")).on_hover_text(crate::i18n::tr(tip));
+                        crate::widgets::toggle(ui, &mut opts.jxl_lossless, crate::i18n::tr("Lossless")).on_hover_text(crate::i18n::tr(tip));
                     }
                     if matches!(opts.format, F::Jpeg | F::Avif) || (opts.format == F::Jxl && !opts.jxl_lossless) {
                         let mut q = opts.quality as f64;
@@ -780,7 +963,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                         use lightcraft_engine::export::JxlEffort as E;
                         choices(ui, "Effort", "exportJxlEffort", &[(E::Fast, "Fast"), (E::Normal, "Normal")], &mut opts.jxl_effort);
                         let tip = "Shows a coarse version first and refines it as the file loads";
-                        ui.checkbox(&mut opts.jxl_progressive, crate::i18n::tr("Progressive")).on_hover_text(crate::i18n::tr(tip));
+                        crate::widgets::toggle(ui, &mut opts.jxl_progressive, crate::i18n::tr("Progressive")).on_hover_text(crate::i18n::tr(tip));
                     }
                     if opts.format == F::Jpeg {
                         let mut k = *limit_kb as f64;
@@ -818,10 +1001,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                         &mut opts.metadata,
                     );
                     if !matches!(opts.metadata, M::None | M::Copyright) {
-                        ui.checkbox(&mut opts.remove_location, crate::i18n::tr("Remove location info"));
+                        crate::widgets::toggle(ui, &mut opts.remove_location, crate::i18n::tr("Remove location info"));
                     }
                     let mut wm_on = opts.watermark.is_some();
-                    if ui.checkbox(&mut wm_on, crate::i18n::tr("Watermark")).changed() {
+                    if crate::widgets::toggle(ui, &mut wm_on, crate::i18n::tr("Watermark")).changed() {
                         opts.watermark = wm_on.then(|| lightcraft_engine::export::Watermark { text: "© ".into(), ..Default::default() });
                     }
                     let wm_shown = opts.watermark.clone();
@@ -889,7 +1072,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                             wm.inset_y = (v / 100.0) as f32;
                         }
                         if !graphic {
-                            ui.checkbox(&mut wm.shadow, crate::i18n::tr("Shadow"));
+                            crate::widgets::toggle(ui, &mut wm.shadow, crate::i18n::tr("Shadow"));
                         }
                     }
                     if opts.watermark != wm_shown {
@@ -924,6 +1107,12 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                         }
                     }
                     field(ui, "Folder", |ui| {
+                        #[cfg(target_os = "ios")]
+                        {
+                            let _ = dir;
+                            ui.label(egui::RichText::new(crate::i18n::tr("Files app ▸ On My iPad ▸ LightCraft iPad (fork) ▸ Exports")).color(t.text_dim));
+                        }
+                        #[cfg(not(target_os = "ios"))]
                         trailing_button_row(ui, |ui| {
                             if app.services.pick_folder.is_some()
                                 && crate::widgets::text_button(ui, "exportChooseFolder", crate::i18n::tr("Choose…"), false).clicked()
@@ -949,7 +1138,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     // After export: Apple Photos imports the files written (macOS only)
                     #[cfg(target_os = "macos")]
                     {
-                        let r = ui.checkbox(&mut opts.add_to_photos, crate::i18n::tr("Add to Apple Photos"));
+                        let r = crate::widgets::toggle(ui, &mut opts.add_to_photos, crate::i18n::tr("Add to Apple Photos"));
                         crate::widgets::register(ui.ctx(), "exportAddToPhotos", r.rect);
                         if opts.add_to_photos {
                             field(ui, "Album", |ui| {
@@ -1028,7 +1217,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     ui.add_space(6.0);
                     if editing.is_none() {
                         if let Some(p) = parent {
-                            let r = ui.checkbox(inside, crate::i18n::tr_format!("Put inside “{parent}”", parent = p.replace('|', " › ")));
+                            let r = crate::widgets::toggle(ui, inside, crate::i18n::tr_format!("Put inside “{parent}”", parent = p.replace('|', " › ")));
                             crate::widgets::register(ui.ctx(), "check:keywordInside", r.rect);
                         }
                         let n = app.session.selection.ids.len();
@@ -1043,7 +1232,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                         (export_synonyms, "Export Synonyms", "check:keywordExportSynonyms"),
                         (person, "Person", "check:keywordPerson"),
                     ] {
-                        let r = ui.checkbox(on, crate::i18n::tr(label));
+                        let r = crate::widgets::toggle(ui, on, crate::i18n::tr(label));
                         crate::widgets::register(ui.ctx(), id, r.rect);
                     }
                 }
@@ -1077,7 +1266,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     });
                     if replaces.is_some() {
                         ui.add_space(6.0);
-                        let r = ui.checkbox(as_new, crate::i18n::tr("Save as a new set"));
+                        let r = crate::widgets::toggle(ui, as_new, crate::i18n::tr("Save as a new set"));
                         crate::widgets::register(ui.ctx(), "check:keywordSetAsNew", r.rect);
                     }
                     // Return in any field saves the set
@@ -1195,13 +1384,24 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
             });
             ui.add_space(4.0);
             ui.horizontal(|ui| {
+                // iPad dialogs end with their buttons at the trailing edge (Cancel, then the main action);
+                // the row's width comes from the previous frame
+                let footer_id = window_id.with("footer-width");
+                let trail = crate::theme::touch_ui(ui.ctx()) && !import;
+                if trail {
+                    let used = ui.ctx().data(|d| d.get_temp::<f32>(footer_id)).unwrap_or(0.0);
+                    if used > 0.0 {
+                        ui.add_space((ui.available_width() - used).max(0.0));
+                    }
+                }
+                let footer_x0 = ui.cursor().left();
                 // a model file LightCraft cannot use has nothing to confirm, nor has a dialog that
                 // only shows something (one Close, no Cancel / OK)
                 let unusable_model = matches!(&dlg, Dialog::DenoiseModel { info, .. } | Dialog::FaceModel { info, .. } if info["kind"] == "unsupported");
                 let informational = unusable_model
                     || matches!(
                         dlg,
-                        Dialog::About | Dialog::Shortcuts | Dialog::Settings { .. } | Dialog::SystemInfo { .. } | Dialog::AllMetadata { .. } | Dialog::WhatsNew
+                        Dialog::About | Dialog::Shortcuts | Dialog::Settings { .. } | Dialog::SystemInfo { .. } | Dialog::AllMetadata { .. } | Dialog::WhatsNew | Dialog::Welcome
                     );
                 let sam = &app.session.segmenter;
                 let (sam_installed, sam_running, sam_failed) = (sam.installed(), sam.download_status().running, sam.download_status().error.is_some());
@@ -1213,7 +1413,14 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     _ => "Cancel",
                 };
                 if !informational {
-                    let r = ui.button(crate::i18n::tr(cancel));
+                    let r = if crate::theme::touch_ui(ui.ctx()) {
+                        let btn = egui::Button::new(egui::RichText::new(crate::i18n::tr(cancel)).font(t.font(14.0)))
+                            .min_size(egui::vec2(90.0, 42.0))
+                            .corner_radius(21.0);
+                        ui.add(btn)
+                    } else {
+                        ui.button(crate::i18n::tr(cancel))
+                    };
                     crate::widgets::register(ui.ctx(), "button:dialogCancel", r.rect);
                     if r.clicked() {
                         close = true;
@@ -1226,6 +1433,17 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                         let verb = if opts.copy && opts.move_files { "Move" } else { "Import" };
                         add_label = crate::i18n::tr_format!("{verb} {n} Photo{}", if n == 1 { "" } else { "s" }, verb = crate::i18n::tr(verb), n = n);
                         add_label.as_str()
+                    }
+                    Dialog::Export { scope, .. } => {
+                        let sel_n = app.session.selection.ids.len();
+                        if *scope == crate::state::ExportScope::All {
+                            "Export All"
+                        } else if sel_n > 1 {
+                            add_label = format!("Export {sel_n} Photos");
+                            add_label.as_str()
+                        } else {
+                            "Export"
+                        }
                     }
                     Dialog::ContactSheet { .. } => "Choose PDF…",
                     Dialog::Merge { .. } => "Merge",
@@ -1246,6 +1464,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     Dialog::SamModel { .. } if sam_installed || sam_running || sam_nowhere => "",
                     Dialog::SamModel { error, .. } if error.is_some() || sam_failed => "Try Again",
                     Dialog::SamModel { .. } => "Download",
+                    _ if matches!(&dlg, Dialog::Welcome) => "",
                     _ if informational => "Close",
                     _ => "OK",
                 };
@@ -1258,7 +1477,17 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                     )
                         // smart-album rules that can't mean anything wait to be fixed
                         && !matches!(&dlg, Dialog::SmartRules { id, rules, .. } if !rules.check_for(&app.session.catalog, id.map(lightcraft_catalog::AlbumId)).is_empty());
-                let r = (!ok.is_empty()).then(|| ui.add_enabled(can_confirm, egui::Button::new(crate::i18n::tr(ok))));
+                let r = (!ok.is_empty()).then(|| {
+                    let btn = if crate::theme::touch_ui(ui.ctx()) {
+                        egui::Button::new(egui::RichText::new(crate::i18n::tr(ok)).font(t.semibold(14.0)).color(egui::Color32::WHITE))
+                            .fill(t.accent)
+                            .corner_radius(21.0)
+                            .min_size(egui::vec2(100.0, 42.0))
+                    } else {
+                        egui::Button::new(crate::i18n::tr(ok))
+                    };
+                    ui.add_enabled(can_confirm, btn)
+                });
                 if let Some(r) = &r {
                     crate::widgets::register(ui.ctx(), "button:dialogOk", r.rect);
                 }
@@ -1267,6 +1496,14 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
                         close = true;
                     } else {
                         confirm = true;
+                    }
+                }
+                if trail {
+                    let used_now = ui.min_rect().right() - footer_x0;
+                    let was = ui.ctx().data(|d| d.get_temp::<f32>(footer_id)).unwrap_or(0.0);
+                    if used_now > 0.0 && (used_now - was).abs() > 0.5 {
+                        ui.ctx().data_mut(|d| d.insert_temp(footer_id, used_now));
+                        ui.ctx().request_repaint();
                     }
                 }
             });
@@ -1330,14 +1567,16 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
             _ => close = true,
         }
     }
-    // a dialog opened from inside this one (a button in Settings that shows a licence) takes its place
-    if app.ui.dialog.as_ref().is_some_and(|now| *now != at_start) {
+    // a dialog opened or closed from inside this one takes its place
+    if app.ui.dialog.as_ref() != Some(&at_start) {
         return;
     }
+    close = close || !is_open;
     app.ui.dialog = if close { None } else { Some(dlg) };
 }
 
 /// Room kept free above and below a dialog (#781).
+#[allow(dead_code)]
 const DIALOG_SCREEN_MARGIN: f32 = 12.0;
 /// A dialog's title bar, frame and button row before the first frame measures them.
 const DIALOG_CHROME_GUESS: f32 = 100.0;
@@ -1365,6 +1604,10 @@ pub fn list_height(ui: &egui::Ui, preferred: f32) -> f32 {
     height
 }
 
+/// What a touch dialog's title row and button row take beside its scrolling body (points). The learned
+/// value can't exceed this on a short screen (the window is already clamped to it), so it is also the floor.
+const TOUCH_DIALOG_CHROME: f32 = 190.0;
+
 /// A dialog's options: in a vertical scroll area at most `max_height` tall when `scroll` names
 /// the dialog (it shrinks to its content, so a dialog that fits looks as it would without it;
 /// each dialog keeps a scroll position of its own), drawn directly otherwise. Returns the height
@@ -1379,12 +1622,15 @@ fn dialog_body(ui: &mut egui::Ui, scroll: Option<&str>, max_height: f32, body: i
     let top = ui.cursor().top();
     // (an auto-sized window offers its content last frame's height; the minimum lets a dialog
     // that grows take its full height at once, and the area still shrinks to fit its content)
-    let out = egui::ScrollArea::vertical()
-        .id_salt(("dialog-body", name))
-        .max_height(max_height)
-        .min_scrolled_height(max_height)
-        .auto_shrink([true, true])
-        .show(ui, body);
+    let min_h = if crate::theme::touch_ui(ui.ctx()) { 0.0 } else { max_height };
+    let mut scroll_area = egui::ScrollArea::vertical().id_salt(("dialog-body", name)).max_height(max_height).min_scrolled_height(min_h);
+    if crate::theme::touch_ui(ui.ctx()) {
+        scroll_area =
+            scroll_area.max_width(ui.available_width()).auto_shrink([false, true]).scroll_source(egui::containers::scroll_area::ScrollSource::ALL);
+    } else {
+        scroll_area = scroll_area.auto_shrink([true, true]);
+    }
+    let out = scroll_area.show(ui, body);
     // what the lists that scroll on their own gave up this frame, and what they should next frame
     let applied = ui.data(|d| d.get_temp::<f32>(list_applied_id())).unwrap_or(0.0);
     let was = ui.data(|d| d.get_temp::<f32>(list_shrink_id())).unwrap_or(0.0);
@@ -1464,6 +1710,10 @@ fn sam_model_body(app: &mut LightcraftApp, ui: &mut egui::Ui, error: Option<&str
         ui.label(crate::i18n::tr("The SAM 3 model is installed: Object and Describe masks are ready."));
         return;
     }
+    if let Some(endpoint) = seg.remote_endpoint() {
+        ui.label(format!("{}: {endpoint}", crate::i18n::tr("Connected to remote SAM 3 worker")));
+        return;
+    }
     let gb = |b: u64| b as f64 / 1e9;
     ui.label(crate::i18n::tr(
         "Object and Describe masks use SAM 3, Meta's segmentation model. It isn't part of LightCraft, and everything else works without it.",
@@ -1516,6 +1766,18 @@ fn sam_model_body(app: &mut LightcraftApp, ui: &mut egui::Ui, error: Option<&str
                     && let Err(e) = app.run("app.openSamModelFolder", json!({}))
                 {
                     app.toast_error(ui.ctx(), e);
+                }
+            }
+            if app.services.picker.is_some() {
+                let r = ui.button(crate::i18n::tr("Import Model Files…"));
+                crate::widgets::register(ui.ctx(), "button:samImport", r.rect);
+                if r.clicked() {
+                    let req = crate::pick::PickRequest::files(
+                        Some(crate::i18n::tr("Select SAM 3 Model Files").to_string()),
+                        crate::i18n::tr("Model Files"),
+                        &["safetensors", "json", "txt"],
+                    );
+                    let _ = crate::pick::ask(app, "segment.model.import", &json!({}), "paths", req, |_| None);
                 }
             }
             let r = ui.link(crate::i18n::tr("How to install the model")).on_hover_text(SAM_HELP);
@@ -1679,7 +1941,7 @@ pub fn confirm_dialog(app: &mut LightcraftApp, dlg: &Dialog) -> Result<serde_jso
         Dialog::AutoStack { gap } => app.run("stack.auto", json!({"gap": gap})),
         Dialog::DenoiseModel { info, accepted } => crate::panels::denoise::install(app, info, *accepted),
         Dialog::FaceModel { path, info, accepted } => crate::panels::faces::install(app, path, info, *accepted),
-        Dialog::AllMetadata { .. } | Dialog::SystemInfo { .. } | Dialog::WhatsNew => Ok(serde_json::Value::Null),
+        Dialog::AllMetadata { .. } | Dialog::SystemInfo { .. } | Dialog::WhatsNew | Dialog::Welcome => Ok(serde_json::Value::Null),
         Dialog::Cull { reject_below, pick_best } => {
             let mut p = json!({"pickBest": pick_best});
             if *reject_below > 0.0 {
@@ -1713,10 +1975,18 @@ pub fn confirm_dialog(app: &mut LightcraftApp, dlg: &Dialog) -> Result<serde_jso
         Dialog::ContactSheet { options } => app.run("app.contactSheet", json!(options)),
         Dialog::CopySettings { groups } => app.run("develop.copy", json!({"groups": groups})),
         Dialog::PasteSettings { groups } => app.run("develop.paste", json!({"groups": groups})),
-        Dialog::Export { opts, full_size, resize, limit_kb, dir, .. } => {
+        Dialog::Export { opts, full_size, resize, limit_kb, dir, scope, .. } => {
             let mut p = export_dialog_params(opts, *full_size, resize, *limit_kb);
             p["dir"] = json!(dir);
             p["background"] = json!(true);
+            if *scope == crate::state::ExportScope::All {
+                let ids: Vec<_> = if !app.session.visible().is_empty() {
+                    app.session.visible().iter().map(|id| id.0).collect()
+                } else {
+                    app.session.catalog.photos().map(|p| p.id.0).collect()
+                };
+                p["ids"] = json!(ids);
+            }
             app.run("app.export", p)
         }
         Dialog::Merge { opts } => crate::merge::start_final(app, opts),
@@ -1815,13 +2085,14 @@ fn export_size(ui: &mut egui::Ui, full: &mut bool, r: &mut lightcraft_engine::ex
         (R::Megapixels, "Megapixels"),
         (R::Percent, "Percentage"),
     ];
-    let r_full = ui.checkbox(full, crate::i18n::tr("Full size"));
+    let r_full = crate::widgets::toggle(ui, full, crate::i18n::tr("Full size"));
     crate::widgets::register(ui.ctx(), "check:exportFullSize", r_full.rect);
     if !*full {
         field(ui, "Resize to", |ui| {
             let cur = MODES.iter().find(|m| m.0 == r.mode).map_or("Long Edge", |m| m.1);
             let before = r.mode;
-            let c = egui::ComboBox::from_id_salt("exportResizeMode").width(150.0).selected_text(crate::i18n::tr(cur)).show_ui(ui, |ui| {
+            let combo_w = if crate::theme::touch_ui(ui.ctx()) { 200.0 } else { 150.0 };
+            let c = egui::ComboBox::from_id_salt("exportResizeMode").width(combo_w).selected_text(crate::i18n::tr(cur)).show_ui(ui, |ui| {
                 for (m, l) in MODES {
                     ui.selectable_value(&mut r.mode, m, crate::i18n::tr(l));
                 }
@@ -1856,7 +2127,7 @@ fn export_size(ui: &mut egui::Ui, full: &mut bool, r: &mut lightcraft_engine::ex
                 r.height = h as u32;
             }
         }
-        let c = ui.checkbox(&mut r.dont_enlarge, crate::i18n::tr("Don't enlarge"));
+        let c = crate::widgets::toggle(ui, &mut r.dont_enlarge, crate::i18n::tr("Don't enlarge"));
         crate::widgets::register(ui.ctx(), "check:exportDontEnlarge", c.rect);
     }
     let mut p = *ppi as f64;
@@ -1893,8 +2164,9 @@ fn num(ui: &mut egui::Ui, spec: &ControlSpec, v: &mut f64) -> bool {
 /// A labelled row (fixed label column).
 fn field<R>(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let t = Tokens::get(ui.ctx());
+    let h = if crate::theme::touch_ui(ui.ctx()) { 36.0 } else { 24.0 };
     ui.horizontal(|ui| {
-        ui.allocate_ui_with_layout(egui::vec2(LABEL_W, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        ui.allocate_ui_with_layout(egui::vec2(LABEL_W, h), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.set_min_width(LABEL_W);
             ui.label(egui::RichText::new(crate::i18n::tr(label)).color(t.text_label));
         });
@@ -1907,17 +2179,31 @@ fn field<R>(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui) -> R
 /// then a text field taking exactly the width that's left. (Subtracting a guessed button width
 /// instead made the auto-sized dialog grow every frame when the real button was wider, #8.)
 fn trailing_button_row(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
-    let h = ui.spacing().interact_size.y.max(24.0);
+    let min_h = if crate::theme::touch_ui(ui.ctx()) { 36.0 } else { 24.0 };
+    let h = ui.spacing().interact_size.y.max(min_h);
     ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), h), egui::Layout::right_to_left(egui::Align::Center), add);
 }
 
 /// A labelled row of mutually exclusive choice buttons (ids `button:{id}-{index}`).
 fn choices<V: PartialEq + Copy>(ui: &mut egui::Ui, label: &str, id: &str, options: &[(V, &str)], value: &mut V) {
     field(ui, label, |ui| {
-        ui.spacing_mut().item_spacing.x = 4.0;
-        for (i, (v, l)) in options.iter().enumerate() {
-            if crate::widgets::text_button(ui, &format!("{id}-{i}"), l, *value == *v).clicked() {
-                *value = *v;
+        if crate::theme::touch_ui(ui.ctx()) {
+            let max_w = (ui.available_width()).min(390.0);
+            ui.allocate_ui_with_layout(egui::vec2(max_w, 0.0), egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true), |ui| {
+                ui.set_max_width(max_w);
+                ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                for (i, (v, l)) in options.iter().enumerate() {
+                    if crate::widgets::text_button(ui, &format!("{id}-{i}"), l, *value == *v).clicked() {
+                        *value = *v;
+                    }
+                }
+            });
+        } else {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            for (i, (v, l)) in options.iter().enumerate() {
+                if crate::widgets::text_button(ui, &format!("{id}-{i}"), l, *value == *v).clicked() {
+                    *value = *v;
+                }
             }
         }
     });
@@ -1949,6 +2235,206 @@ fn just_opened(ui: &egui::Ui, key: &str) -> bool {
     let last: Option<u64> = ui.data_mut(|d| d.get_temp(id));
     ui.data_mut(|d| d.insert_temp(id, pass));
     last.and_then(|l| l.checked_add(1)) != Some(pass)
+}
+
+fn show_welcome(app: &mut LightcraftApp, ui: &mut egui::Ui, close: &mut bool) {
+    use crate::icons::{Icon, paint};
+    use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+    let t = Tokens::get(ui.ctx());
+    let dark = ui.visuals().dark_mode;
+
+    // Top Header with Apple close button
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let btn = apple_close_button(ui);
+            crate::widgets::register(ui.ctx(), "button:welcomeClose", btn.rect);
+            if btn.clicked() {
+                *close = true;
+            }
+        });
+    });
+
+    // Header Branding
+    ui.vertical_centered(|ui| {
+        ui.add_space(6.0);
+        ui.label(egui::RichText::new("LightCraft Studio").font(t.semibold(24.0)).color(t.text));
+        ui.add_space(2.0);
+        ui.label(egui::RichText::new(crate::i18n::tr("Desktop-class RAW Photo Development & Studio for iPad")).font(t.font(13.0)).color(t.text_dim));
+        ui.add_space(14.0);
+    });
+
+    // Current Active Library Card
+    let lib_name = crate::panels::settings::open_library_name(app).unwrap_or_else(|| "LightCraft Library".to_string());
+    let photo_count = app.session.catalog.len();
+    let card_bg = if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 12) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 10) };
+    let card_border = if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 24) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 20) };
+    egui::Frame::NONE
+        .fill(card_bg)
+        .corner_radius(14.0)
+        .stroke(egui::Stroke::new(1.0, card_border))
+        .inner_margin(egui::Margin::symmetric(16, 12))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new(crate::i18n::tr("CURRENT ACTIVE LIBRARY")).font(t.semibold(10.5)).color(t.text_dim));
+                    ui.add_space(2.0);
+                    ui.label(egui::RichText::new(&lib_name).font(t.semibold(15.0)).color(t.text));
+                    let count_str = if photo_count == 0 {
+                        crate::i18n::tr("Ready for Photos — Empty Catalog").to_string()
+                    } else {
+                        format!("{} {}", photo_count, if photo_count == 1 { crate::i18n::tr("photo") } else { crate::i18n::tr("photos") })
+                    };
+                    ui.label(egui::RichText::new(count_str).font(t.font(12.0)).color(t.accent));
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let enter_btn =
+                        egui::Button::new(egui::RichText::new(crate::i18n::tr("Enter Studio \u{2192}")).font(t.semibold(13.5)).color(Color32::WHITE))
+                            .fill(t.accent)
+                            .corner_radius(10.0)
+                            .min_size(egui::vec2(130.0, 38.0));
+                    if ui.add(enter_btn).clicked() {
+                        *close = true;
+                    }
+                });
+            });
+        });
+
+    ui.add_space(14.0);
+
+    // Section 1: Libraries & Catalogs
+    ui.label(egui::RichText::new(crate::i18n::tr("LIBRARIES & CATALOGS")).font(t.semibold(11.0)).color(t.text_dim));
+    ui.add_space(6.0);
+
+    let card_btn = |ui: &mut egui::Ui, title: &str, subtitle: &str, btn_w: f32, icon: Icon| -> bool {
+        let mut clicked = false;
+        let card_h = 62.0;
+        let (rect, resp) = ui.allocate_exact_size(vec2(btn_w, card_h), Sense::click());
+        let is_down = resp.is_pointer_button_down_on();
+        let hovered = resp.hovered();
+
+        let fill = if is_down {
+            if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 30) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 24) }
+        } else if hovered {
+            if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 20) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 16) }
+        } else {
+            if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 10) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 8) }
+        };
+        let stroke_color = if hovered || is_down {
+            t.accent
+        } else {
+            if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 20) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 16) }
+        };
+
+        ui.painter().rect(rect, 12.0, fill, Stroke::new(1.0, stroke_color), StrokeKind::Inside);
+
+        // Icon pill
+        let icon_box = Rect::from_center_size(pos2(rect.left() + 24.0, rect.center().y), vec2(28.0, 28.0));
+        ui.painter().rect_filled(
+            icon_box,
+            8.0,
+            if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 14) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 12) },
+        );
+        paint(ui.painter(), icon_box.shrink(6.0), icon, if hovered { t.text } else { t.icon });
+
+        // Text
+        let text_left = rect.left() + 46.0;
+        let text_w = (rect.right() - text_left - 10.0).max(60.0);
+        let mut child = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(Rect::from_min_size(pos2(text_left, rect.top() + 10.0), vec2(text_w, card_h - 20.0)))
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+        );
+        child.label(egui::RichText::new(crate::i18n::tr(title)).font(t.semibold(13.0)).color(t.text));
+        child.add_space(2.0);
+        child.label(egui::RichText::new(crate::i18n::tr(subtitle)).font(t.font(11.0)).color(t.text_dim));
+
+        if resp.clicked() {
+            clicked = true;
+        }
+        clicked
+    };
+
+    let col_w = ((ui.available_width() - 10.0) / 2.0).max(140.0);
+
+    ui.horizontal(|ui| {
+        if card_btn(ui, "Open Library\u{2026}", "From Files, iCloud or SSD", col_w, Icon::Folder) {
+            *close = true;
+            let _ = app.run("app.openLibrary", serde_json::json!({}));
+        }
+        if card_btn(ui, "Create New Library\u{2026}", "Start a fresh project folder", col_w, Icon::Plus) {
+            *close = true;
+            let _ = app.run("app.newLibrary", serde_json::json!({}));
+        }
+    });
+
+    ui.add_space(12.0);
+
+    // Section 2: Photos & Imports
+    ui.label(egui::RichText::new(crate::i18n::tr("PHOTOS & IMPORTS")).font(t.semibold(11.0)).color(t.text_dim));
+    ui.add_space(6.0);
+
+    ui.horizontal(|ui| {
+        if card_btn(ui, "Import Photos\u{2026}", "ProRAW, RAW & JPEGs from iPad", col_w, Icon::Photos) {
+            *close = true;
+            let _ = app.run("file.addPhotos", serde_json::json!({}));
+        }
+        if card_btn(ui, "Import Lightroom\u{2026}", "Import .lrcat metadata and edits", col_w, Icon::Sliders) {
+            *close = true;
+            let _ = app.run("file.importLightroom", serde_json::json!({}));
+        }
+    });
+
+    ui.add_space(12.0);
+
+    // Section 3: AI & Smart Tools (SAM 3 Models)
+    ui.label(egui::RichText::new(crate::i18n::tr("AI & SMART TOOLS")).font(t.semibold(11.0)).color(t.text_dim));
+    ui.add_space(6.0);
+
+    let sam_ready = app.session.segmenter.installed();
+    let sam_title = if sam_ready { "SAM 3 Models Ready" } else { "SAM 3 AI Segmentation" };
+    let sam_sub = if sam_ready { "Metal GPU Accelerated — Tap to manage" } else { "Tap to install or import SAM 3 weights" };
+    if card_btn(ui, sam_title, sam_sub, ui.available_width(), Icon::Mask) {
+        app.ui.dialog = Some(crate::state::Dialog::SamModel { then: None, error: None });
+    }
+
+    // Section 4: Recent Libraries
+    if !app.ui.settings.recent_libraries.is_empty() {
+        ui.add_space(12.0);
+        ui.label(egui::RichText::new(crate::i18n::tr("RECENT LIBRARIES")).font(t.semibold(11.0)).color(t.text_dim));
+        ui.add_space(6.0);
+        let recents: Vec<String> = app.ui.settings.recent_libraries.iter().take(3).cloned().collect();
+        for r_path in recents {
+            let display_name = std::path::Path::new(&r_path).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| r_path.clone());
+            let item_bg = if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 8) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 6) };
+            let item_border = if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 16) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 14) };
+            egui::Frame::NONE
+                .fill(item_bg)
+                .corner_radius(10.0)
+                .stroke(egui::Stroke::new(1.0, item_border))
+                .inner_margin(egui::Margin::symmetric(14, 8))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(format!("\u{1F4C1}  {}", display_name)).font(t.semibold(12.5)).color(t.text));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let switch_btn = egui::Button::new(egui::RichText::new(crate::i18n::tr("Open")).font(t.semibold(12.0)).color(t.text))
+                                .fill(if dark {
+                                    Color32::from_rgba_unmultiplied(255, 255, 255, 24)
+                                } else {
+                                    Color32::from_rgba_unmultiplied(0, 0, 0, 16)
+                                })
+                                .corner_radius(6.0)
+                                .min_size(egui::vec2(60.0, 28.0));
+                            if ui.add(switch_btn).clicked() {
+                                *close = true;
+                                let _ = app.run("app.openLibrary", serde_json::json!({"path": r_path}));
+                            }
+                        });
+                    });
+                });
+            ui.add_space(4.0);
+        }
+    }
+    ui.add_space(8.0);
 }
 
 #[cfg(test)]

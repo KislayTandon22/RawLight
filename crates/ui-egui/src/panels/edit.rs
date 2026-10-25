@@ -14,7 +14,7 @@ use crate::icons::{Icon, paint};
 use crate::render::Slot;
 use crate::state::RightPanel;
 use crate::theme::Tokens;
-use crate::widgets::{BAND_COLORS, SliderOut, divider, flyout_row, hex, register, section_header, slider, text_button};
+use crate::widgets::{BAND_COLORS, SliderOut, divider, flyout_row, hex, register, section_header, segmented, slider, text_button};
 
 /// Commit a slider interaction: begin → live updates → end, so a drag is one undo step.
 pub fn apply_slider_out(
@@ -37,9 +37,20 @@ pub fn apply_slider_out(
 }
 
 pub(crate) fn control(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings, id: &str, enabled: bool) {
+    control_with_label(app, ui, d, id, enabled, None);
+}
+
+pub(crate) fn control_with_label(
+    app: &mut LightcraftApp,
+    ui: &mut egui::Ui,
+    d: &DevelopSettings,
+    id: &str,
+    enabled: bool,
+    label_override: Option<&str>,
+) {
     let Some(spec) = controls::find(id) else { return };
     let v = controls::get(d, id).unwrap_or(spec.default);
-    let out = slider(ui, spec, v, enabled, None);
+    let out = slider(ui, spec, v, enabled, label_override);
     apply_slider_out(app, spec, out, |app, v| app.run("develop.set", json!({"control": id, "value": v})));
 }
 
@@ -282,7 +293,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
         control(app, ui, d, "color.saturation", true);
         ui.add_space(6.0);
         let open = app.ui.flyout_open("mixer");
-        if flyout_row(ui, "mixer", if crate::is_bw(d) { "B&W Mixer" } else { "Color Mixer" }, Icon::Radial, open).clicked() {
+        let mixer_title = if crate::is_bw(d) { "B&W Mix" } else { "HSL / Color" };
+        if flyout_row(ui, "mixer", mixer_title, Icon::Radial, open).clicked() {
             app.ui.toggle_flyout("mixer");
         }
         if open {
@@ -573,7 +585,7 @@ fn steady_hdr_histogram(ctx: &egui::Context, id: PhotoId, hdr_edit: bool, hist: 
     }
 }
 
-fn histogram(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
+pub(crate) fn histogram(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();
     let hdr_edit = app.session.develop_of(id).is_some_and(|d| d.hdr.enabled);
@@ -942,6 +954,42 @@ fn curve_editor(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, d: &Dev
             })
             .collect();
         p.add(egui::Shape::line(pts, Stroke::new(2.0, Color32::from_gray(220))));
+        // Lightroom Classic parametric split threshold handles
+        let track_h = 16.0;
+        let (track_rect, _) = ui.allocate_exact_size(vec2(r.width(), track_h), Sense::hover());
+        let tr_p = ui.painter();
+        tr_p.line_segment([pos2(r.left(), track_rect.center().y), pos2(r.right(), track_rect.center().y)], Stroke::new(1.0, Color32::from_gray(60)));
+        let splits = [
+            ("curve.splitShadows", c.split_shadows, 10.0, 70.0, "Shadows Split"),
+            ("curve.splitMid", c.split_mid, 20.0, 80.0, "Midtones Split"),
+            ("curve.splitHighlights", c.split_highlights, 30.0, 90.0, "Highlights Split"),
+        ];
+        for (ctrl, val, min_v, max_v, label) in splits {
+            let x = r.left() + (val as f32 / 100.0) * r.width();
+            let center = pos2(x, track_rect.center().y);
+            let handle_rect = Rect::from_center_size(center, vec2(14.0, 14.0));
+            let handle_resp = ui.interact(handle_rect, egui::Id::new(("param-split", ctrl)), Sense::drag());
+            let is_drag = handle_resp.dragged();
+            let is_hover = handle_resp.hovered();
+
+            let diamond =
+                [pos2(center.x, center.y - 5.5), pos2(center.x + 4.5, center.y), pos2(center.x, center.y + 5.5), pos2(center.x - 4.5, center.y)];
+            tr_p.add(egui::Shape::convex_polygon(
+                diamond.to_vec(),
+                if is_drag || is_hover { Color32::WHITE } else { Color32::from_gray(180) },
+                Stroke::new(1.0, Color32::from_gray(30)),
+            ));
+
+            if is_drag {
+                let delta_x = handle_resp.drag_delta().x;
+                let delta_pct = (delta_x / r.width()) as f64 * 100.0;
+                let new_val = (val + delta_pct).clamp(min_v, max_v).round();
+                if (new_val - val).abs() >= 1.0 {
+                    let _ = app.run("develop.set", json!({"control": ctrl, "value": new_val}));
+                }
+            }
+            handle_resp.on_hover_text(format!("{}: {val:.0}", crate::i18n::tr(label)));
+        }
         curve_footer(app, ui, d);
         for c in ["curve.highlights", "curve.lights", "curve.darks", "curve.shadows"] {
             control(app, ui, d, c, true);
@@ -1206,62 +1254,193 @@ fn set_tat(app: &mut LightcraftApp, ctx: &egui::Context, tool: &str, active: boo
 
 // ------------------------------------------------------------------------------ colour mixer
 
+pub const BAND_NAMES: [&str; 8] = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"];
+
 fn mixer(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
     let t = Tokens::get(ui.ctx());
     let bands = lightcraft_develop::MIXER_BANDS;
-    let sel = bands.iter().position(|b| *b == app.ui.mixer_mode).unwrap_or(0);
-    egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 8, bottom: 4 }).show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 5.0;
-            for (i, b) in bands.iter().enumerate() {
-                let (r, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
-                register(ui.ctx(), format!("mixerBand:{b}"), r);
-                ui.painter().circle_filled(r.center(), 9.0, hex(BAND_COLORS[i]));
-                if i == sel {
-                    ui.painter().circle_stroke(r.center(), 10.5, Stroke::new(1.5, t.text));
-                    ui.painter().circle_filled(r.center(), 2.0, Color32::WHITE);
-                }
-                if resp.clicked() {
-                    app.ui.mixer_mode = b.to_string();
-                }
-            }
-        });
-    });
-    // targeted adjustment: pick the attribute, then drag on the photo
-    egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 2, bottom: 2 }).show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let (r, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
-            paint(ui.painter(), r, Icon::Target, t.icon);
-            let items: &[(&str, &str)] =
-                if crate::is_bw(d) { &[("lum", "B&W Mix")] } else { &[("hue", "Hue"), ("sat", "Saturation"), ("lum", "Luminance")] };
-            for (k, label) in items {
-                let tool = format!("tat:{k}");
+
+    // Backward-compatibility normalization
+    if matches!(app.ui.mixer_mode.as_str(), "hue" | "sat" | "saturation" | "lum" | "luminance" | "all") {
+        app.ui.mixer_hsl_tab = match app.ui.mixer_mode.as_str() {
+            "saturation" => "sat".into(),
+            "luminance" => "lum".into(),
+            other => other.into(),
+        };
+        app.ui.mixer_mode = "hsl".into();
+    } else if bands.contains(&app.ui.mixer_mode.as_str()) {
+        app.ui.mixer_band = app.ui.mixer_mode.clone();
+        app.ui.mixer_mode = "color".into();
+    } else if app.ui.mixer_mode != "hsl" && app.ui.mixer_mode != "color" {
+        app.ui.mixer_mode = "hsl".into();
+    }
+
+    if crate::is_bw(d) {
+        // Targeted adjustment and Auto buttons for B&W Mix
+        egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 6, bottom: 4 }).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                let (r, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
+                paint(ui.painter(), r, Icon::Target, t.icon);
+                let tool = "tat:lum";
                 let active = app.ui.tool == tool;
-                if text_button(ui, &format!("tatMixer-{k}"), crate::i18n::tr(label), active)
-                    .on_hover_text(crate::i18n::tr("Targeted adjustment: drag up/down on the photo to adjust the colours there"))
+                if text_button(ui, "tatMixer-lum", crate::i18n::tr("B&W Mix"), active)
+                    .on_hover_text(crate::i18n::tr("Targeted adjustment: drag up/down on the photo to adjust the mix of colours there"))
                     .clicked()
                 {
-                    set_tat(app, ui.ctx(), &tool, active);
+                    set_tat(app, ui.ctx(), tool, active);
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if text_button(ui, "bwAuto", crate::i18n::tr("Auto"), false)
+                        .on_hover_text(crate::i18n::tr("Set the mix from the photo's colours"))
+                        .clicked()
+                    {
+                        let _ = app.run("develop.autoBwMix", json!({}));
+                    }
+                });
+            });
+        });
+        for (i, b) in bands.iter().enumerate() {
+            control_with_label(app, ui, d, &format!("bw.{b}"), true, Some(BAND_NAMES[i]));
+        }
+        return;
+    }
+
+    // Color Treatment: Mode Tabs [ HSL | Color ]
+    let mode_items = [("HSL", "hsl"), ("Color", "color")];
+    let cur_mode = if app.ui.mixer_mode == "color" { 1 } else { 0 };
+    egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 6, bottom: 4 }).show(ui, |ui| {
+        if let Some(idx) = segmented(ui, "mixerMode", &mode_items, Some(cur_mode), 2) {
+            app.ui.mixer_mode = mode_items[idx].1.to_string();
+        }
+    });
+
+    if app.ui.mixer_mode == "hsl" {
+        // HSL subtabs: [ All | Hue | Saturation | Luminance ]
+        let hsl_tabs = [("All", "all"), ("Hue", "hue"), ("Saturation", "sat"), ("Luminance", "lum")];
+        let cur_tab = hsl_tabs.iter().position(|(_, k)| *k == app.ui.mixer_hsl_tab).unwrap_or(0);
+        egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 2, bottom: 4 }).show(ui, |ui| {
+            if let Some(idx) = segmented(ui, "hslTab", &hsl_tabs, Some(cur_tab), 4) {
+                app.ui.mixer_hsl_tab = hsl_tabs[idx].1.to_string();
+            }
+        });
+
+        // Targeted Adjustment Tool (TAT) row
+        egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 2, bottom: 4 }).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let (r, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
+                paint(ui.painter(), r, Icon::Target, t.icon);
+                let tat_items: &[(&str, &str)] = match app.ui.mixer_hsl_tab.as_str() {
+                    "hue" => &[("hue", "Hue")],
+                    "sat" => &[("sat", "Saturation")],
+                    "lum" => &[("lum", "Luminance")],
+                    _ => &[("hue", "Hue"), ("sat", "Saturation"), ("lum", "Luminance")],
+                };
+                for (k, label) in tat_items {
+                    let tool = format!("tat:{k}");
+                    let active = app.ui.tool == tool;
+                    if text_button(ui, &format!("tatMixer-{k}"), crate::i18n::tr(label), active)
+                        .on_hover_text(crate::i18n::tr("Targeted adjustment: drag up/down on the photo to adjust the colours there"))
+                        .clicked()
+                    {
+                        set_tat(app, ui.ctx(), &tool, active);
+                    }
+                }
+            });
+        });
+
+        match app.ui.mixer_hsl_tab.as_str() {
+            "hue" => {
+                for (i, b) in bands.iter().enumerate() {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.hue"), true, Some(BAND_NAMES[i]));
                 }
             }
-        });
-    });
-    let b = bands[sel];
-    if crate::is_bw(d) {
-        ui.horizontal(|ui| {
-            ui.add_space(24.0);
-            if crate::widgets::text_button(ui, "bwAuto", crate::i18n::tr("Auto"), false)
-                .on_hover_text(crate::i18n::tr("Set the mix from the photo's colours"))
-                .clicked()
-            {
-                let _ = app.run("develop.autoBwMix", json!({}));
+            "sat" => {
+                for (i, b) in bands.iter().enumerate() {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.sat"), true, Some(BAND_NAMES[i]));
+                }
             }
-        });
-        control(app, ui, d, &format!("bw.{b}"), true);
+            "lum" => {
+                for (i, b) in bands.iter().enumerate() {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.lum"), true, Some(BAND_NAMES[i]));
+                }
+            }
+            _ => {
+                // "all"
+                sub_title(ui, "Hue");
+                for (i, b) in bands.iter().enumerate() {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.hue"), true, Some(BAND_NAMES[i]));
+                }
+                sub_title(ui, "Saturation");
+                for (i, b) in bands.iter().enumerate() {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.sat"), true, Some(BAND_NAMES[i]));
+                }
+                sub_title(ui, "Luminance");
+                for (i, b) in bands.iter().enumerate() {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.lum"), true, Some(BAND_NAMES[i]));
+                }
+            }
+        }
     } else {
-        for k in ["hue", "sat", "lum"] {
-            control(app, ui, d, &format!("mixer.{b}.{k}"), true);
+        // "color" mode: swatches for each band
+        let sel_band_idx = bands.iter().position(|b| *b == app.ui.mixer_band).unwrap_or(0);
+        egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 4, bottom: 4 }).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                for (i, b) in bands.iter().enumerate() {
+                    let (r, resp) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::click());
+                    register(ui.ctx(), format!("mixerBand:{b}"), r);
+                    ui.painter().circle_filled(r.center(), 10.0, hex(BAND_COLORS[i]));
+                    if i == sel_band_idx && app.ui.mixer_band != "all" {
+                        ui.painter().circle_stroke(r.center(), 11.5, Stroke::new(1.5, t.text));
+                        ui.painter().circle_filled(r.center(), 2.5, Color32::WHITE);
+                    }
+                    if resp.on_hover_text(crate::i18n::tr(BAND_NAMES[i])).clicked() {
+                        app.ui.mixer_band = b.to_string();
+                    }
+                }
+                let all_active = app.ui.mixer_band == "all";
+                if text_button(ui, "mixerBand-all", crate::i18n::tr("All"), all_active)
+                    .on_hover_text(crate::i18n::tr("Show all color bands"))
+                    .clicked()
+                {
+                    app.ui.mixer_band = "all".to_string();
+                }
+            });
+        });
+
+        // Targeted adjustment tool row for color mode
+        egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 2, bottom: 2 }).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let (r, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
+                paint(ui.painter(), r, Icon::Target, t.icon);
+                for (k, label) in [("hue", "Hue"), ("sat", "Saturation"), ("lum", "Luminance")] {
+                    let tool = format!("tat:{k}");
+                    let active = app.ui.tool == tool;
+                    if text_button(ui, &format!("tatMixer-{k}"), crate::i18n::tr(label), active)
+                        .on_hover_text(crate::i18n::tr("Targeted adjustment: drag up/down on the photo to adjust the colours there"))
+                        .clicked()
+                    {
+                        set_tat(app, ui.ctx(), &tool, active);
+                    }
+                }
+            });
+        });
+
+        if app.ui.mixer_band == "all" {
+            for (i, b) in bands.iter().enumerate() {
+                sub_title(ui, BAND_NAMES[i]);
+                for (k, label) in [("hue", "Hue"), ("sat", "Saturation"), ("lum", "Luminance")] {
+                    control_with_label(app, ui, d, &format!("mixer.{b}.{k}"), true, Some(label));
+                }
+            }
+        } else {
+            let b = bands[sel_band_idx];
+            for (k, label) in [("hue", "Hue"), ("sat", "Saturation"), ("lum", "Luminance")] {
+                control_with_label(app, ui, d, &format!("mixer.{b}.{k}"), true, Some(label));
+            }
         }
     }
 }
@@ -1368,15 +1547,16 @@ fn hdr_row(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
 // ------------------------------------------------------------------------------ colour grading
 
 /// The colour grading tabs: key, tooltip, icon.
-const GRADING_TABS: [(&str, &str, Icon); 4] = [
+const GRADING_TABS: [(&str, &str, Icon); 5] = [
     ("3way", "3-Way", Icon::GradeAll),
     ("shadows", "Shadows", Icon::GradeShadows),
     ("midtones", "Midtones", Icon::GradeMidtones),
     ("highlights", "Highlights", Icon::GradeHighlights),
+    ("global", "Global", Icon::GradeGlobal),
 ];
 
 /// The wheels, in the order of `UiState::grading_hidden`.
-const GRADING_WHEELS: [(&str, &str); 3] = [("shadows", "Shadows"), ("midtones", "Midtones"), ("highlights", "Highlights")];
+const GRADING_WHEELS: [(&str, &str); 4] = [("shadows", "Shadows"), ("midtones", "Midtones"), ("highlights", "Highlights"), ("global", "Global")];
 
 fn grading(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings, photo: PhotoId) {
     let mode = GRADING_TABS.iter().find(|(k, ..)| *k == app.ui.grading_mode).map_or("3way", |(k, ..)| *k);
@@ -1433,6 +1613,7 @@ fn grading_wheel(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings
     let wh = match key {
         "shadows" => d.grading.shadows,
         "midtones" => d.grading.midtones,
+        "global" => d.grading.global,
         _ => d.grading.highlights,
     };
     let hidden = app.ui.grading_hidden_for(photo).get(i).copied().unwrap_or(false);

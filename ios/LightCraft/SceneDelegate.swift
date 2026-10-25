@@ -1,6 +1,9 @@
 import UIKit
 import ObjectiveC
 
+@_silgen_name("lightcraft_post_action")
+func lightcraft_post_action(_ action: Int32)
+
 @objc(SceneDelegate)
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -94,18 +97,43 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func bind(window: UIWindow, to windowScene: UIWindowScene) {
         let className = String(describing: type(of: window))
-        if className.contains("UITextEffects") || className.contains("SystemOverlay") {
+        if className.contains("UITextEffects") || className.contains("SystemOverlay") || className.contains("Keyboard") {
             return
         }
         if window.windowScene !== windowScene {
             window.windowScene = windowScene
             NSLog("[LightCraft-Swift] Attached window %@ to windowScene %@", window, windowScene)
         }
+        window.overrideUserInterfaceStyle = .dark
+        window.rootViewController?.overrideUserInterfaceStyle = .dark
         window.frame = windowScene.coordinateSpace.bounds
+        ios_update_safe_area()
         if self.window == nil {
             self.window = window
             window.makeKeyAndVisible()
         }
+
+        // Attach Apple Pencil double-tap interaction (iPadOS 12.1+)
+        if #available(iOS 12.1, *) {
+            var hasPencil = false
+            for interaction in window.interactions {
+                if interaction is UIPencilInteraction {
+                    hasPencil = true
+                    break
+                }
+            }
+            if !hasPencil {
+                let pencil = UIPencilInteraction()
+                pencil.delegate = self
+                window.addInteraction(pencil)
+                NSLog("[LightCraft-Swift] Attached UIPencilInteraction to window")
+            }
+            if !(window.gestureRecognizers ?? []).contains(where: { $0 is PencilStrokeRecognizer }) {
+                window.addGestureRecognizer(PencilStrokeRecognizer(target: nil, action: nil))
+                NSLog("[LightCraft-Swift] Attached Pencil stroke recognizer to window")
+            }
+        }
+
     }
 
     private func bindWindows(to windowScene: UIWindowScene) {
@@ -122,5 +150,14 @@ extension UIWindow {
             win.windowScene = ws
         }
         return win
+    }
+}
+
+
+extension SceneDelegate: UIPencilInteractionDelegate {
+    @available(iOS 12.1, *)
+    func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+        NSLog("[LightCraft-Swift] UIPencilInteraction double-tap -> posting ZoomToggle action (3)")
+        lightcraft_post_action(3)
     }
 }

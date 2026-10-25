@@ -43,7 +43,7 @@ fn test_file_type_classification() {
     let jpg = PathBuf::from("/photos/sample.jpg");
     let tif = PathBuf::from("/photos/sample.tif");
 
-    fn is_raw(p: &PathBuf) -> bool {
+    fn is_raw(p: &std::path::Path) -> bool {
         match p.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) {
             Some(ext) => matches!(ext.as_str(), "dng" | "arw" | "cr2" | "cr3" | "nef" | "raf" | "rw2" | "orf"),
             None => false,
@@ -343,9 +343,7 @@ fn test_feature_export_batch_core() {
     demo::load(&mut session);
 
     let id = PhotoId(1);
-    let mut opts = ExportOptions::default();
-    opts.format = ExportFormat::Jpeg;
-    opts.quality = 90;
+    let opts = ExportOptions { format: ExportFormat::Jpeg, quality: 90, ..ExportOptions::default() };
 
     let tmp = std::env::temp_dir()
         .join(format!("lc_test_export_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
@@ -375,12 +373,14 @@ fn test_feature_app_export_via_services() {
     let mut session = Session::new();
     demo::load(&mut session);
 
-    let mut services = Services::default();
-    services.write = Some(Box::new(lightcraft_engine::export::write_file));
-    services.write_shared = Some(std::sync::Arc::new(lightcraft_engine::export::write_file));
-    services.png = Some(Box::new(|img: &lightcraft_raster::Rgba8| {
-        lightcraft_codecs::encode_png(&lightcraft_codecs::EncodeImage::rgba8(img), &lightcraft_codecs::EncodeMeta::default()).unwrap_or_default()
-    }));
+    let services = Services {
+        write: Some(Box::new(lightcraft_engine::export::write_file)),
+        write_shared: Some(std::sync::Arc::new(lightcraft_engine::export::write_file)),
+        png: Some(Box::new(|img: &lightcraft_raster::Rgba8| {
+            lightcraft_codecs::encode_png(&lightcraft_codecs::EncodeImage::rgba8(img), &lightcraft_codecs::EncodeMeta::default()).unwrap_or_default()
+        })),
+        ..Services::default()
+    };
 
     let mut app = LightcraftApp::new(session, services);
     let id = PhotoId(1);
@@ -443,4 +443,249 @@ fn test_feature_export_presets_list_and_save() {
     let updated = session.execute("export.presets", &json!({})).unwrap();
     let found = updated.as_array().unwrap().iter().any(|p| p["name"] == "iPad Pro AirDrop");
     assert!(found, "New custom preset exists");
+}
+
+#[test]
+fn test_feature_masking_brush_stroke_workflow() {
+    use lightcraft_develop::MaskShape;
+    use lightcraft_engine::{Session, catalog::PhotoId, demo};
+
+    let mut session = Session::new();
+    demo::load(&mut session);
+
+    let id = PhotoId(1);
+    session.selection.active = Some(id);
+    session.selection.ids = vec![id];
+
+    // 1. Create a new Brush mask
+    let add_res = session.execute(
+        "mask.add",
+        &json!({
+            "kind": "brush",
+            "name": "Portrait Touch-up Brush"
+        }),
+    );
+    assert!(add_res.is_ok(), "mask.add brush succeeded: {:?}", add_res.err());
+
+    let mask_id = session.active_mask.expect("active mask must be set");
+
+    // 2. Add realistic touch/Apple Pencil brush strokes
+    let stroke_res = session.execute(
+        "mask.brushStroke",
+        &json!({
+            "id": mask_id,
+            "mode": "paint",
+            "size": 45.0,
+            "feather": 50.0,
+            "flow": 0.85,
+            "points": [
+                [0.45, 0.45],
+                [0.48, 0.48],
+                [0.50, 0.52],
+                [0.53, 0.55]
+            ]
+        }),
+    );
+    assert!(stroke_res.is_ok(), "mask.brushStroke succeeded: {:?}", stroke_res.err());
+
+    // 3. Verify stroke is stored in photo develop settings
+    let p = session.catalog.photo(id).expect("photo exists");
+    let mask = p.develop.masks.iter().find(|m| m.id == mask_id).expect("mask in develop");
+    assert_eq!(mask.name, "Portrait Touch-up Brush");
+    assert_eq!(mask.components.len(), 1);
+
+    if let MaskShape::Brush { strokes } = &mask.components[0].shape {
+        assert!(!strokes.is_empty(), "Brush strokes must be stored");
+        assert_eq!(strokes[0].points.len(), 4, "Stroke contains 4 touch dabs");
+    } else {
+        panic!("Component shape is not Brush");
+    }
+
+    // 4. Apply local adjustments: lift exposure and increase sharpness
+    let adj_res = session.execute(
+        "mask.adjust",
+        &json!({
+            "id": mask_id,
+            "values": {
+                "exposure": 1.25,
+                "clarity": 20.0,
+                "sharpness": 35.0
+            }
+        }),
+    );
+    assert!(adj_res.is_ok(), "mask.adjust succeeded");
+
+    let p = session.catalog.photo(id).expect("photo exists");
+    let mask = p.develop.masks.iter().find(|m| m.id == mask_id).expect("mask in develop");
+    assert!((mask.adjust.exposure - 1.25).abs() < 0.001);
+    assert!((mask.adjust.clarity - 20.0).abs() < 0.001);
+    assert!((mask.adjust.sharpness - 35.0).abs() < 0.001);
+}
+
+#[test]
+fn test_feature_masking_linear_gradient_and_local_adjustments() {
+    use lightcraft_develop::MaskShape;
+    use lightcraft_engine::{Session, catalog::PhotoId, demo};
+
+    let mut session = Session::new();
+    demo::load(&mut session);
+
+    let id = PhotoId(2);
+    session.selection.active = Some(id);
+    session.selection.ids = vec![id];
+
+    // 1. Create a Linear Gradient mask (e.g. darkening the sky)
+    let add_res = session.execute(
+        "mask.add",
+        &json!({
+            "kind": "linear",
+            "name": "Sky Gradient",
+            "start": [0.5, 0.0],
+            "end": [0.5, 0.45]
+        }),
+    );
+    assert!(add_res.is_ok(), "Linear mask creation succeeded");
+
+    let mask_id = session.active_mask.expect("active mask must be set");
+
+    // 2. Adjust local tone controls
+    let adj_res = session.execute(
+        "mask.adjust",
+        &json!({
+            "id": mask_id,
+            "values": {
+                "exposure": -0.85,
+                "highlights": -50.0,
+                "contrast": 15.0,
+                "saturation": -10.0
+            }
+        }),
+    );
+    assert!(adj_res.is_ok(), "mask.adjust on linear succeeded");
+
+    let p = session.catalog.photo(id).expect("photo exists");
+    let mask = p.develop.masks.iter().find(|m| m.id == mask_id).expect("mask exists");
+    assert!((mask.adjust.exposure - (-0.85)).abs() < 0.001);
+    assert!((mask.adjust.highlights - (-50.0)).abs() < 0.001);
+
+    if let MaskShape::Linear { start, end } = mask.components[0].shape {
+        assert_eq!(start.x, 0.5);
+        assert_eq!(start.y, 0.0);
+        assert_eq!(end.x, 0.5);
+        assert_eq!(end.y, 0.45);
+    } else {
+        panic!("Component is not Linear");
+    }
+}
+
+#[test]
+fn test_feature_masking_radial_gradient_invert_and_adjust() {
+    use lightcraft_develop::MaskShape;
+    use lightcraft_engine::{Session, catalog::PhotoId, demo};
+
+    let mut session = Session::new();
+    demo::load(&mut session);
+
+    let id = PhotoId(3);
+    session.selection.active = Some(id);
+    session.selection.ids = vec![id];
+
+    // 1. Create a Radial Vignette / Spotlight mask
+    let add_res = session.execute(
+        "mask.add",
+        &json!({
+            "kind": "radial",
+            "name": "Subject Spotlight",
+            "center": [0.5, 0.4],
+            "rx": 0.25,
+            "ry": 0.35,
+            "feather": 60.0,
+            "invert": true
+        }),
+    );
+    assert!(add_res.is_ok(), "Radial mask creation succeeded");
+
+    let mask_id = session.active_mask.expect("active mask must be set");
+
+    // 2. Adjust local controls
+    let adj_res = session.execute(
+        "mask.adjust",
+        &json!({
+            "id": mask_id,
+            "values": {
+                "exposure": -0.60
+            }
+        }),
+    );
+    assert!(adj_res.is_ok());
+
+    let p = session.catalog.photo(id).expect("photo exists");
+    let mask = p.develop.masks.iter().find(|m| m.id == mask_id).expect("mask exists");
+    if let MaskShape::Radial { center, rx, ry, invert, .. } = mask.components[0].shape {
+        assert_eq!(center.x, 0.5);
+        assert_eq!(center.y, 0.4);
+        assert_eq!(rx, 0.25);
+        assert_eq!(ry, 0.35);
+        assert!(invert, "Radial is inverted");
+    } else {
+        panic!("Component is not Radial");
+    }
+}
+
+#[test]
+fn test_feature_masking_duplicate_and_delete() {
+    use lightcraft_engine::{Session, catalog::PhotoId, demo};
+
+    let mut session = Session::new();
+    demo::load(&mut session);
+
+    let id = PhotoId(1);
+    session.selection.active = Some(id);
+    session.selection.ids = vec![id];
+
+    // Create mask
+    let _ = session.execute("mask.add", &json!({"kind": "brush", "name": "Temp Mask"}));
+    let mask_id = session.active_mask.unwrap();
+
+    // Duplicate mask
+    let dup_res = session.execute("mask.duplicate", &json!({"id": mask_id}));
+    assert!(dup_res.is_ok(), "mask.duplicate succeeded");
+
+    let p = session.catalog.photo(id).expect("photo exists");
+    assert_eq!(p.develop.masks.len(), 2, "Two masks after duplicate");
+    let dup_id = session.active_mask.unwrap();
+    assert_ne!(dup_id, mask_id);
+
+    // Delete mask
+    let del_res = session.execute("mask.delete", &json!({"id": dup_id}));
+    assert!(del_res.is_ok(), "mask.delete succeeded");
+
+    let p = session.catalog.photo(id).expect("photo exists");
+    assert_eq!(p.develop.masks.len(), 1, "One mask remains after delete");
+}
+
+#[test]
+fn test_feature_masking_visibility_toggle() {
+    use lightcraft_engine::{Session, catalog::PhotoId, demo};
+
+    let mut session = Session::new();
+    demo::load(&mut session);
+
+    let id = PhotoId(1);
+    session.selection.active = Some(id);
+    session.selection.ids = vec![id];
+
+    let _ = session.execute("mask.add", &json!({"kind": "linear", "name": "Gradient"}));
+    let mask_id = session.active_mask.unwrap();
+
+    // Mask is initially visible
+    let p = session.catalog.photo(id).unwrap();
+    assert!(p.develop.masks[0].visible);
+
+    // Toggle visibility to hidden
+    let vis_res = session.execute("mask.visible", &json!({"id": mask_id, "visible": false}));
+    assert!(vis_res.is_ok(), "mask.visible toggle succeeded");
+
+    let p = session.catalog.photo(id).unwrap();
+    assert!(!p.develop.masks[0].visible, "Mask is now hidden");
 }

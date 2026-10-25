@@ -20,6 +20,22 @@ pub enum ViewMode {
     People,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DevelopLeftMode {
+    #[default]
+    Develop,
+    Library,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportScope {
+    #[default]
+    Selected,
+    All,
+}
+
 /// The right-hand tool/panel shown next to the tool strip.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +43,7 @@ pub enum RightPanel {
     #[default]
     None,
     Edit,
+    QuickDevelop,
     Crop,
     Remove,
     Masking,
@@ -196,6 +213,7 @@ impl AppearanceMode {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DarkTheme {
+    Glass,
     #[default]
     Charcoal,
     Midnight,
@@ -211,9 +229,10 @@ pub enum LightTheme {
 }
 
 impl DarkTheme {
-    pub const ALL: [DarkTheme; 2] = [DarkTheme::Charcoal, DarkTheme::Midnight];
+    pub const ALL: [DarkTheme; 3] = [DarkTheme::Glass, DarkTheme::Charcoal, DarkTheme::Midnight];
     pub fn kind(self) -> crate::theme::ThemeKind {
         match self {
+            DarkTheme::Glass => crate::theme::ThemeKind::Glass,
             DarkTheme::Charcoal => crate::theme::ThemeKind::Charcoal,
             DarkTheme::Midnight => crate::theme::ThemeKind::Midnight,
         }
@@ -405,6 +424,7 @@ impl AppSettings {
     pub fn select_theme(&mut self, kind: crate::theme::ThemeKind) {
         use crate::theme::ThemeKind;
         match kind {
+            ThemeKind::Glass => self.dark_theme = DarkTheme::Glass,
             ThemeKind::Charcoal => self.dark_theme = DarkTheme::Charcoal,
             ThemeKind::Midnight => self.dark_theme = DarkTheme::Midnight,
             ThemeKind::Silver => self.light_theme = LightTheme::Silver,
@@ -506,6 +526,16 @@ pub struct UiState {
     pub unsaved_seen: bool,
     pub view: ViewMode,
     pub left_panel: bool,
+    #[serde(default)]
+    pub develop_left_mode: DevelopLeftMode,
+    #[serde(default = "default_true")]
+    pub develop_navigator_open: bool,
+    #[serde(default = "default_true")]
+    pub develop_presets_open: bool,
+    #[serde(default = "default_true")]
+    pub develop_snapshots_open: bool,
+    #[serde(default = "default_true")]
+    pub develop_history_open: bool,
     pub right: RightPanel,
     /// Widths of the left sidebar and of the right panel in points (dragging their inner edge
     /// resizes them; within [`LEFT_WIDTH`] / [`RIGHT_WIDTH`]).
@@ -516,6 +546,9 @@ pub struct UiState {
     /// Presets column: show a live thumbnail of the photo with each preset.
     pub preset_thumbs: bool,
     pub filmstrip: bool,
+    /// Multi-select mode (on iPad touch, single taps toggle selection and multi-action bar is visible).
+    #[serde(default)]
+    pub multi_select: bool,
     pub zoom: Zoom,
     /// Pan offset of the loupe when zoomed (image-normalized centre).
     pub pan: (f32, f32),
@@ -526,6 +559,18 @@ pub struct UiState {
     #[serde(skip)]
     pub zoom_anim: bool,
     pub before_after: BeforeAfter,
+    #[serde(skip)]
+    pub canvas_hold_before: bool,
+    #[serde(skip)]
+    pub canvas_press_start: Option<(f64, egui::Pos2)>,
+    /// A linear/radial mask is being created by dragging (one undo step for the drag).
+    pub mask_create_drag: bool,
+    /// The bottom bar had no room for the rating stars this frame: the canvas floats them instead.
+    pub rating_floating: bool,
+    /// Review tool: draw the component gallery over the window (`ui.set {"gallery": true}`).
+    pub gallery: bool,
+    #[serde(skip)]
+    pub canvas_suppress_click_zoom: bool,
     pub thumb_size: f32,
     /// Open Edit sections by id.
     pub open_sections: Vec<String>,
@@ -658,6 +703,10 @@ pub struct UiState {
     pub curve_channel: String,
     /// Selected mixer mode: "hue" | "saturation" | "luminance" | "all".
     pub mixer_mode: String,
+    #[serde(default = "default_mixer_hsl_tab")]
+    pub mixer_hsl_tab: String,
+    #[serde(default = "default_mixer_band")]
+    pub mixer_band: String,
     /// Selected colour grading tab: "3way" | "shadows" | "midtones" | "highlights".
     pub grading_mode: String,
     /// Colour grading wheels (shadows, midtones, highlights) hidden for viewing by their eye, and
@@ -961,6 +1010,8 @@ pub enum Dialog {
         preset_name: String,
         limit_kb: u32,
         dir: String,
+        #[serde(default)]
+        scope: ExportScope,
     },
     /// Photo Merge (HDR / Panorama / HDR Panorama) options; the preview lives in the app.
     Merge {
@@ -1018,10 +1069,24 @@ pub enum Dialog {
     },
     About,
     Shortcuts,
+    /// Welcome / Opening Page: landing screen to add/open libraries, import photos, or explore samples.
+    Welcome,
 }
 
 fn yes() -> bool {
     true
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_mixer_hsl_tab() -> String {
+    "all".into()
+}
+
+fn default_mixer_band() -> String {
+    "all".into()
 }
 
 /// How many changes a Synchronize Folder scan found, by kind.
@@ -1050,12 +1115,24 @@ impl Default for UiState {
             luminance_map_restore: None,
             view: ViewMode::Detail,
             left_panel: false,
+            develop_left_mode: DevelopLeftMode::Develop,
+            develop_navigator_open: true,
+            develop_presets_open: true,
+            develop_snapshots_open: true,
+            develop_history_open: true,
+            canvas_hold_before: false,
+            canvas_press_start: None,
+            mask_create_drag: false,
+            rating_floating: false,
+            gallery: false,
+            canvas_suppress_click_zoom: false,
             left_width: LEFT_WIDTH.default,
             right_width: RIGHT_WIDTH.default,
             right: RightPanel::Edit,
             presets: false,
             preset_thumbs: false,
             filmstrip: true,
+            multi_select: false,
             zoom: Zoom::Fit,
             pan: (0.5, 0.5),
             click_zoom: 100,
@@ -1116,6 +1193,8 @@ impl Default for UiState {
             dragging_section: None,
             curve_channel: "parametric".into(),
             mixer_mode: "hue".into(),
+            mixer_hsl_tab: "all".into(),
+            mixer_band: "all".into(),
             grading_mode: "3way".into(),
             grading_hidden: None,
             tool: String::new(),

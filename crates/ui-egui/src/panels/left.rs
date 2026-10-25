@@ -1,12 +1,13 @@
 //! The left "My Photos" panel: library sources, albums tree, and date groups.
 
-use egui::{Align2, Rect, Sense, pos2, vec2};
+use egui::{Align2, Color32, Rect, Sense, pos2, vec2};
 use lightcraft_catalog::{Album, AlbumId, FolderNode, KeywordNode};
 use lightcraft_engine::LibrarySource;
 use serde_json::json;
 
 use crate::LightcraftApp;
 use crate::icons::{Icon, paint};
+use crate::render::Slot;
 use crate::sidebar::SidebarSection;
 use crate::theme::Tokens;
 use crate::widgets::{icon_button, register};
@@ -22,7 +23,9 @@ pub(crate) fn content_width(ctx: &egui::Context) -> f32 {
 const MAX_NAME_NEED: f32 = 140.0;
 
 /// Height of a sidebar row.
-const ROW_HEIGHT: f32 = 29.0;
+fn row_h(ctx: &egui::Context) -> f32 {
+    if crate::theme::touch_ui(ctx) { 44.0 } else { 29.0 }
+}
 
 /// Temp-data key of the row (its widget id after `source:`, lower-case) the sidebar scrolls to
 /// this frame: set before the sections are drawn, cleared after.
@@ -82,7 +85,9 @@ fn row_sensed(
 ) -> egui::Response {
     let label = if matches!(id, "all" | "recentlyAdded" | "picks" | "missing" | "recentlyDeleted") { crate::i18n::tr(label) } else { label };
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), sense);
+    let touch = crate::theme::touch_ui(ui.ctx());
+    let h = row_h(ui.ctx());
+    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), h), sense);
     if scroll_asked(ui, id) {
         ui.scroll_to_rect_animation(r, None, egui::style::ScrollAnimation::none());
     }
@@ -98,12 +103,20 @@ fn row_sensed(
     // the panel's edge, not at the end of the (wider) content
     let visible_right: f32 = ui.data(|d| d.get_temp(egui::Id::new("left-visible-right"))).unwrap_or(f32::MAX);
     let edge = r.right().min(visible_right);
-    let inner = Rect::from_min_max(r.min + vec2(8.0, 0.0), pos2((r.right() - 8.0).min(edge - 8.0).max(r.left() + 8.0), r.bottom()));
+    let inner = Rect::from_min_max(
+        r.min + vec2(if touch { 6.0 } else { 8.0 }, if touch { 2.0 } else { 0.0 }),
+        pos2(
+            (r.right() - if touch { 6.0 } else { 8.0 }).min(edge - if touch { 6.0 } else { 8.0 }).max(r.left() + 8.0),
+            r.bottom() - if touch { 2.0 } else { 0.0 },
+        ),
+    );
     if selected {
-        ui.painter().rect_filled(inner, 4.0, t.canvas);
+        let touch_sel =
+            if ui.visuals().dark_mode { Color32::from_rgba_unmultiplied(255, 255, 255, 28) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 24) };
+        ui.painter().rect_filled(inner, if touch { 8.0 } else { 4.0 }, if touch { touch_sel } else { t.canvas });
         register(ui.ctx(), format!("highlight:{id}"), inner);
-    } else if resp.hovered() {
-        ui.painter().rect_filled(inner, 4.0, t.hover.gamma_multiply(0.6));
+    } else if resp.hovered() || resp.is_pointer_button_down_on() {
+        ui.painter().rect_filled(inner, if touch { 8.0 } else { 4.0 }, t.hover.gamma_multiply(0.6));
     }
     paint(
         ui.painter(),
@@ -147,7 +160,7 @@ fn row_sensed(
 /// and drawing them all every frame slows the whole app down (issue #1011). A row the sidebar is
 /// asked to scroll to is drawn. `label`, `count` and `mark` as for [`row_sensed`].
 fn out_of_sight(app: &LightcraftApp, ui: &mut egui::Ui, id: &str, label: &str, count: Option<usize>, indent: f32, mark: bool) -> bool {
-    let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), ROW_HEIGHT));
+    let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), row_h(ui.ctx())));
     if ui.is_rect_visible(r) || scroll_asked(ui, id) {
         return false;
     }
@@ -303,7 +316,7 @@ fn pinned_header(app: &mut LightcraftApp, ui: &mut egui::Ui, placed: &[PlacedSec
 /// `sidebarEmpty:<id>`), so the section stays where it is instead of disappearing.
 fn empty_hint(ui: &mut egui::Ui, section: SidebarSection) {
     let t = Tokens::get(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
+    let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), row_h(ui.ctx())), Sense::hover());
     register(ui.ctx(), format!("sidebarEmpty:{}", section.id()), r);
     let text = crate::i18n::tr(section.empty_hint());
     let galley = ui.painter().layout_no_wrap(text.to_string(), t.font(12.5), t.text_dim);
@@ -597,132 +610,573 @@ fn new_album_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
+    let is_develop = app.ui.right == crate::state::RightPanel::Edit
+        && matches!(
+            app.ui.view,
+            crate::state::ViewMode::Detail | crate::state::ViewMode::Compare | crate::state::ViewMode::Survey | crate::state::ViewMode::Reference
+        );
+
     let frame = egui::Frame::NONE.fill(t.chrome).stroke(egui::Stroke::new(1.0, t.divider));
     frame.show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        // the title offers the sections' menu too: where hidden sections come back from
-        let (hr, title) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
-        register(ui.ctx(), "sidebarTitle", hr);
-        title.context_menu(|ui| sections_menu(app, ui, None));
-        // the open library's name under the title, so nobody edits in the wrong one (issue #902)
-        let library = crate::panels::settings::open_library_name(app);
-        let title_y = if library.is_some() { hr.center().y - 7.0 } else { hr.center().y };
-        ui.painter().text(pos2(hr.left() + 18.0, title_y), Align2::LEFT_CENTER, crate::i18n::tr("My Photos"), t.semibold(15.0), t.text);
-        if let Some(name) = library {
-            ui.painter().with_clip_rect(hr.shrink2(vec2(18.0, 0.0))).text(
-                pos2(hr.left() + 18.0, hr.center().y + 10.0),
-                Align2::LEFT_CENTER,
-                name,
-                t.font(11.0),
-                t.text_dim,
+
+        if is_develop {
+            let (hr, title) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+            register(ui.ctx(), "sidebarTitle", hr);
+            title.context_menu(|ui| sections_menu(app, ui, None));
+
+            let is_dev_mode = app.ui.develop_left_mode == crate::state::DevelopLeftMode::Develop;
+            let title_text = if is_dev_mode { crate::i18n::tr("Develop") } else { crate::i18n::tr("My Photos") };
+            ui.painter().text(pos2(hr.left() + 18.0, hr.center().y), Align2::LEFT_CENTER, title_text, t.semibold(15.0), t.text);
+
+            let mut switch_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(Rect::from_min_max(
+                        pos2(hr.right() - if crate::theme::touch_ui(ui.ctx()) { 220.0 } else { 175.0 }, hr.top() + 4.0),
+                        pos2(hr.right() - 8.0, hr.bottom() - 4.0),
+                    ))
+                    .layout(egui::Layout::right_to_left(egui::Align::Center)),
             );
-            crate::widgets::register(ui.ctx(), "label:libraryName", hr);
-            if let Some(l) = app.session.library.as_ref() {
-                title.on_hover_text(l.dir.display().to_string());
+            if crate::theme::touch_ui(ui.ctx()) {
+                let close_btn = crate::panels::dialogs::apple_close_button(&mut switch_ui);
+                register(ui.ctx(), "button:leftPanelClose", close_btn.rect);
+                if close_btn.clicked() {
+                    app.ui.left_panel = false;
+                }
+                switch_ui.add_space(4.0);
+            }
+            let lib_btn = switch_ui.selectable_label(!is_dev_mode, crate::i18n::tr("Library"));
+            register(ui.ctx(), "button:developLeftMode-library", lib_btn.rect);
+            if lib_btn.clicked() {
+                app.ui.develop_left_mode = crate::state::DevelopLeftMode::Library;
+            }
+            let dev_btn = switch_ui.selectable_label(is_dev_mode, crate::i18n::tr("Develop"));
+            register(ui.ctx(), "button:developLeftMode-develop", dev_btn.rect);
+            if dev_btn.clicked() {
+                app.ui.develop_left_mode = crate::state::DevelopLeftMode::Develop;
+            }
+
+            crate::widgets::divider(ui);
+
+            if is_dev_mode {
+                show_develop_left_sidebar(app, ui);
+                return;
+            }
+        } else {
+            let (hr, title) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+            register(ui.ctx(), "sidebarTitle", hr);
+            title.context_menu(|ui| sections_menu(app, ui, None));
+            let library = crate::panels::settings::open_library_name(app);
+            let title_y = if library.is_some() { hr.center().y - 7.0 } else { hr.center().y };
+            ui.painter().text(pos2(hr.left() + 18.0, title_y), Align2::LEFT_CENTER, crate::i18n::tr("My Photos"), t.semibold(15.0), t.text);
+            if let Some(name) = library {
+                ui.painter().with_clip_rect(hr.shrink2(vec2(18.0, 0.0))).text(
+                    pos2(hr.left() + 18.0, hr.center().y + 10.0),
+                    Align2::LEFT_CENTER,
+                    name,
+                    t.font(11.0),
+                    t.text_dim,
+                );
+                crate::widgets::register(ui.ctx(), "label:libraryName", hr);
+                if let Some(l) = app.session.library.as_ref() {
+                    title.on_hover_text(l.dir.display().to_string());
+                }
+            }
+            let mut add_lib_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(Rect::from_min_max(
+                        pos2(hr.right() - if crate::theme::touch_ui(ui.ctx()) { 135.0 } else { 85.0 }, hr.top() + 4.0),
+                        pos2(hr.right() - 8.0, hr.bottom() - 4.0),
+                    ))
+                    .layout(egui::Layout::right_to_left(egui::Align::Center)),
+            );
+            if crate::theme::touch_ui(ui.ctx()) {
+                let close_btn = crate::panels::dialogs::apple_close_button(&mut add_lib_ui);
+                register(ui.ctx(), "button:leftPanelClose", close_btn.rect);
+                if close_btn.clicked() {
+                    app.ui.left_panel = false;
+                }
+                add_lib_ui.add_space(4.0);
+            }
+            if add_lib_ui.button(crate::i18n::tr("+ Library")).clicked() {
+                app.ui.dialog = Some(crate::state::Dialog::Welcome);
             }
         }
-        let counts = app.caches.counts(&app.session.catalog);
-        let (total, picks, deleted) = (counts.total, counts.picks, counts.deleted);
-        egui::ScrollArea::both().id_salt("left-scroll").auto_shrink([false, false]).show_viewport(ui, |ui, viewport| {
-            drag_auto_scroll(app, ui);
-            // where the visible part of the content starts (screen y), for the pinned header
-            let view_top = ui.cursor().top() + viewport.min.y;
-            ui.data_mut(|d| d.insert_temp(egui::Id::new("left-view-top"), view_top));
-            // rows are as wide as the widest one needs (last frame), at least the panel
-            let wide = viewport.width().max(content_width(ui.ctx()));
-            ui.set_min_width(wide);
-            ui.set_max_width(wide);
-            ui.data_mut(|d| {
-                d.insert_temp(egui::Id::new("left-content-width-next"), 0.0f32);
-                // where the visible part of the content ends (screen x), for what stays at the edge
-                d.insert_temp(egui::Id::new("left-visible-right"), ui.cursor().left() + viewport.max.x);
-            });
-            let src = app.session.source;
-            for (id, icon, label, count, s) in [
-                ("all", Icon::Photos, "All Photos", Some(total), LibrarySource::All),
-                ("recentlyAdded", Icon::Clock, "Recently Added", None, LibrarySource::RecentlyAdded),
-                ("picks", Icon::FlagPick, "Picks", Some(picks), LibrarySource::Picks),
-            ] {
-                if row(app, ui, id, icon, label, count, src == s, 0.0).clicked() {
-                    let _ = app.run("library.source", json!({"kind": id}));
-                }
-            }
-            // photos whose files can't be found (checked every few seconds, not every frame)
-            let missing = missing_count(app, ui);
-            if (missing > 0 || src == LibrarySource::Missing)
-                && row(app, ui, "missing", Icon::Folder, "Missing Photos", Some(missing), src == LibrarySource::Missing, 0.0).clicked()
-            {
-                let _ = app.run("library.source", json!({"kind": "missing"}));
-            }
-            if row(app, ui, "recentlyDeleted", Icon::Trash, "Recently Deleted", Some(deleted), src == LibrarySource::RecentlyDeleted, 0.0).clicked() {
-                let _ = app.run("library.source", json!({"kind": "recentlyDeleted"}));
-            }
-            // the album just made: the folders down to it open, once (also when the section is shut)
-            let reveal = app.ui.reveal_album.take();
-            if reveal.is_some() {
-                // …and Albums itself is shown and opened, so the new album can be seen
-                app.ui.sidebar.reveal(SidebarSection::Albums);
-            }
-            // the keyword just made from Keywords' header: the section and the keywords above it open
-            if let Some(path) = app.ui.reveal_keyword.take() {
-                app.ui.sidebar.reveal(SidebarSection::Keywords);
-                let mut above = String::new();
-                let mut names = path.split('|').peekable();
-                while let Some(name) = names.next().filter(|_| names.peek().is_some()) {
-                    if !above.is_empty() {
-                        above.push('|');
-                    }
-                    above.push_str(name);
-                    set_tree_open(ui, egui::Id::new(("kw-open", above.to_lowercase())), true);
-                }
-                // …and the sidebar scrolls to it
-                ui.data_mut(|d| d.insert_temp(egui::Id::new(SCROLL_TO_ROW), format!("keyword:{path}").to_lowercase()));
-            }
-            // Local keeps track of the folder being browsed whether or not it is drawn
-            let local = local_now(app, ui);
-            let shown: Vec<SidebarSection> = app.ui.sidebar.shown().collect();
-            let mut placed: Vec<PlacedSection> = Vec::with_capacity(shown.len());
-            for s in shown {
-                let at = match s {
-                    SidebarSection::Albums => {
-                        let rows = app.session.catalog.albums().filter(|a| a.parent.is_none()).count();
-                        section(app, ui, s, rows, |app, ui| albums_rows(app, ui, reveal))
-                    }
-                    SidebarSection::Local => {
-                        let Some(local) = &local else { continue };
-                        section(app, ui, s, local.places.places.len(), |app, ui| local_rows(app, ui, local))
-                    }
-                    SidebarSection::ByDate => {
-                        let rows = app.caches.date_groups(&app.session.catalog).len();
-                        section(app, ui, s, rows, date_rows)
-                    }
-                    SidebarSection::Folders => {
-                        let tree = app.caches.folder_tree(&app.session.catalog);
-                        section(app, ui, s, tree.len(), |app, ui| {
-                            reveal_chosen(app, ui, &tree);
-                            folder_rows(app, ui, &tree, 0.0);
-                        })
-                    }
-                    SidebarSection::Keywords => {
-                        let tree = app.caches.keyword_tree(&app.session.catalog);
-                        section(app, ui, s, tree.len(), |app, ui| keyword_rows(app, ui, &tree, 0.0))
-                    }
-                };
-                placed.push(at);
-            }
-            ui.data_mut(|d| d.remove::<String>(egui::Id::new(SCROLL_TO_ROW)));
-            // room below the last section (a section dragged to the end is dropped here)
-            ui.add_space(SECTION_GAP * 2.0);
-            pinned_header(app, ui, &placed, view_top);
-            section_drag(app, ui, &placed);
-            // what the rows asked for becomes next frame's width
-            let next = ui.data(|d| d.get_temp::<f32>(egui::Id::new("left-content-width-next"))).unwrap_or(0.0);
-            if (next - content_width(ui.ctx())).abs() > 0.5 {
-                ui.data_mut(|d| d.insert_temp(egui::Id::new("left-content-width"), next));
-                ui.ctx().request_repaint();
-            }
-        });
+
+        show_library_body(app, ui);
     });
+}
+
+fn show_library_body(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    let counts = app.caches.counts(&app.session.catalog);
+    let (total, picks, deleted) = (counts.total, counts.picks, counts.deleted);
+    egui::ScrollArea::both().id_salt("left-scroll").auto_shrink([false, false]).show_viewport(ui, |ui, viewport| {
+        drag_auto_scroll(app, ui);
+        // where the visible part of the content starts (screen y), for the pinned header
+        let view_top = ui.cursor().top() + viewport.min.y;
+        ui.data_mut(|d| d.insert_temp(egui::Id::new("left-view-top"), view_top));
+        // rows are as wide as the widest one needs (last frame), at least the panel
+        let wide = viewport.width().max(content_width(ui.ctx()));
+        ui.set_min_width(wide);
+        ui.set_max_width(wide);
+        ui.data_mut(|d| {
+            d.insert_temp(egui::Id::new("left-content-width-next"), 0.0f32);
+            // where the visible part of the content ends (screen x), for what stays at the edge
+            d.insert_temp(egui::Id::new("left-visible-right"), ui.cursor().left() + viewport.max.x);
+        });
+        let src = app.session.source;
+        for (id, icon, label, count, s) in [
+            ("all", Icon::Photos, "All Photos", Some(total), LibrarySource::All),
+            ("recentlyAdded", Icon::Clock, "Recently Added", None, LibrarySource::RecentlyAdded),
+            ("picks", Icon::FlagPick, "Picks", Some(picks), LibrarySource::Picks),
+        ] {
+            if row(app, ui, id, icon, label, count, src == s, 0.0).clicked() {
+                let _ = app.run("library.source", json!({"kind": id}));
+            }
+        }
+        // photos whose files can't be found (checked every few seconds, not every frame)
+        let missing = missing_count(app, ui);
+        if (missing > 0 || src == LibrarySource::Missing)
+            && row(app, ui, "missing", Icon::Folder, "Missing Photos", Some(missing), src == LibrarySource::Missing, 0.0).clicked()
+        {
+            let _ = app.run("library.source", json!({"kind": "missing"}));
+        }
+        if row(app, ui, "recentlyDeleted", Icon::Trash, "Recently Deleted", Some(deleted), src == LibrarySource::RecentlyDeleted, 0.0).clicked() {
+            let _ = app.run("library.source", json!({"kind": "recentlyDeleted"}));
+        }
+        // the album just made: the folders down to it open, once (also when the section is shut)
+        let reveal = app.ui.reveal_album.take();
+        if reveal.is_some() {
+            // …and Albums itself is shown and opened, so the new album can be seen
+            app.ui.sidebar.reveal(SidebarSection::Albums);
+        }
+        // the keyword just made from Keywords' header: the section and the keywords above it open
+        if let Some(path) = app.ui.reveal_keyword.take() {
+            app.ui.sidebar.reveal(SidebarSection::Keywords);
+            let mut above = String::new();
+            let mut names = path.split('|').peekable();
+            while let Some(name) = names.next().filter(|_| names.peek().is_some()) {
+                if !above.is_empty() {
+                    above.push('|');
+                }
+                above.push_str(name);
+                set_tree_open(ui, egui::Id::new(("kw-open", above.to_lowercase())), true);
+            }
+            // …and the sidebar scrolls to it
+            ui.data_mut(|d| d.insert_temp(egui::Id::new(SCROLL_TO_ROW), format!("keyword:{path}").to_lowercase()));
+        }
+        // Local keeps track of the folder being browsed whether or not it is drawn
+        let local = local_now(app, ui);
+        let shown: Vec<SidebarSection> = app.ui.sidebar.shown().collect();
+        let mut placed: Vec<PlacedSection> = Vec::with_capacity(shown.len());
+        for s in shown {
+            let at = match s {
+                SidebarSection::Albums => {
+                    let rows = app.session.catalog.albums().filter(|a| a.parent.is_none()).count();
+                    section(app, ui, s, rows, |app, ui| albums_rows(app, ui, reveal))
+                }
+                SidebarSection::Local => {
+                    let Some(local) = &local else { continue };
+                    section(app, ui, s, local.places.places.len(), |app, ui| local_rows(app, ui, local))
+                }
+                SidebarSection::ByDate => {
+                    let rows = app.caches.date_groups(&app.session.catalog).len();
+                    section(app, ui, s, rows, date_rows)
+                }
+                SidebarSection::Folders => {
+                    let tree = app.caches.folder_tree(&app.session.catalog);
+                    section(app, ui, s, tree.len(), |app, ui| {
+                        reveal_chosen(app, ui, &tree);
+                        folder_rows(app, ui, &tree, 0.0);
+                    })
+                }
+                SidebarSection::Keywords => {
+                    let tree = app.caches.keyword_tree(&app.session.catalog);
+                    section(app, ui, s, tree.len(), |app, ui| keyword_rows(app, ui, &tree, 0.0))
+                }
+            };
+            placed.push(at);
+        }
+        ui.data_mut(|d| d.remove::<String>(egui::Id::new(SCROLL_TO_ROW)));
+        // room below the last section (a section dragged to the end is dropped here)
+        ui.add_space(SECTION_GAP * 2.0);
+        pinned_header(app, ui, &placed, view_top);
+        section_drag(app, ui, &placed);
+        // what the rows asked for becomes next frame's width
+        let next = ui.data(|d| d.get_temp::<f32>(egui::Id::new("left-content-width-next"))).unwrap_or(0.0);
+        if (next - content_width(ui.ctx())).abs() > 0.5 {
+            ui.data_mut(|d| d.insert_temp(egui::Id::new("left-content-width"), next));
+            ui.ctx().request_repaint();
+        }
+    });
+}
+
+fn show_develop_left_sidebar(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    let active_id = app.session.active();
+    let photo = active_id.and_then(|id| app.session.catalog.photo(id).cloned());
+
+    egui::ScrollArea::vertical().id_salt("develop-left-scroll").auto_shrink([false, false]).show(ui, |ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+
+        // 1. Navigator
+        show_navigator_section(app, ui, active_id);
+
+        // 2. Presets
+        show_presets_section(app, ui);
+
+        // 3. Snapshots
+        show_snapshots_section(app, ui, photo.as_deref());
+
+        // 4. History
+        show_history_section(app, ui, photo.as_deref());
+
+        ui.add_space(30.0);
+    });
+}
+
+fn show_navigator_section(app: &mut LightcraftApp, ui: &mut egui::Ui, active_id: Option<lightcraft_catalog::PhotoId>) {
+    let t = Tokens::get(ui.ctx());
+    let open = app.ui.develop_navigator_open;
+
+    let (hr, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
+    register(ui.ctx(), "developSection:navigator", hr);
+    paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(hr.left() + 20.0, hr.center().y), vec2(12.0, 12.0)),
+        if open { Icon::ChevronDown } else { Icon::ChevronRight },
+        t.text_label,
+    );
+    ui.painter().text(pos2(hr.left() + 34.0, hr.center().y), Align2::LEFT_CENTER, crate::i18n::tr("Navigator"), t.semibold(13.0), t.text);
+
+    let mut btn_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(Rect::from_min_max(pos2(hr.right() - 110.0, hr.top() + 4.0), pos2(hr.right() - 8.0, hr.bottom() - 4.0)))
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    let is_fit = matches!(app.ui.zoom, crate::state::Zoom::Fit);
+    let is_100 = matches!(app.ui.zoom, crate::state::Zoom::Percent(p) if (p - 100.0).abs() < 1.0);
+
+    let btn_100 = btn_ui.selectable_label(is_100, "1:1");
+    register(ui.ctx(), "button:navigatorZoom100", btn_100.rect);
+    if btn_100.clicked() {
+        app.ui.zoom = crate::state::Zoom::Percent(100.0);
+    }
+    let btn_fit = btn_ui.selectable_label(is_fit, "FIT");
+    register(ui.ctx(), "button:navigatorZoomFit", btn_fit.rect);
+    if btn_fit.clicked() {
+        app.ui.zoom = crate::state::Zoom::Fit;
+    }
+
+    if resp.clicked() {
+        app.ui.develop_navigator_open = !open;
+    }
+
+    if open {
+        let (box_rect, box_resp) = ui.allocate_exact_size(vec2(ui.available_width(), 130.0), Sense::click_and_drag());
+        let inner_rect = box_rect.shrink2(vec2(12.0, 6.0));
+        ui.painter().rect_filled(inner_rect, 4.0, t.canvas);
+        ui.painter().rect_stroke(inner_rect, 4.0, egui::Stroke::new(1.0, t.divider), egui::StrokeKind::Inside);
+
+        let main_tex = app.renderer.textures.get(&Slot::Main);
+        let thumb_tex = active_id.and_then(|id| app.renderer.thumb(id));
+        let tex = main_tex.or(thumb_tex);
+
+        if let Some(tex) = tex {
+            let img_rect = crate::panels::detail::fit_texture_rect(inner_rect.shrink(6.0), tex.size);
+            ui.painter().image(tex.tex.id(), img_rect, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
+
+            // Pan interaction by dragging inside the navigator thumbnail
+            if (box_resp.dragged() || box_resp.clicked())
+                && img_rect.width() > 0.0
+                && img_rect.height() > 0.0
+                && let Some(pos) = box_resp.interact_pointer_pos()
+            {
+                let nx = ((pos.x - img_rect.left()) / img_rect.width()).clamp(0.0, 1.0);
+                let ny = ((pos.y - img_rect.top()) / img_rect.height()).clamp(0.0, 1.0);
+                app.ui.pan = (nx, ny);
+            }
+
+            // Draw zoom viewport frame when zoomed
+            if !is_fit {
+                let pan_x = app.ui.pan.0.clamp(0.0, 1.0);
+                let pan_y = app.ui.pan.1.clamp(0.0, 1.0);
+                let vw_w = (img_rect.width() * 0.4).min(img_rect.width());
+                let vw_h = (img_rect.height() * 0.4).min(img_rect.height());
+                let cx = img_rect.left() + pan_x * img_rect.width();
+                let cy = img_rect.top() + pan_y * img_rect.height();
+                let vw_rect = Rect::from_center_size(pos2(cx, cy), vec2(vw_w, vw_h)).intersect(img_rect);
+                ui.painter().rect_stroke(vw_rect, 1.0, egui::Stroke::new(1.5, egui::Color32::WHITE), egui::StrokeKind::Inside);
+            }
+        } else {
+            ui.painter().text(inner_rect.center(), Align2::CENTER_CENTER, crate::i18n::tr("No Photo"), t.font(12.0), t.text_dim);
+        }
+        ui.add_space(4.0);
+    }
+    crate::widgets::divider(ui);
+}
+
+fn show_presets_section(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
+    let open = app.ui.develop_presets_open;
+    let count = app.session.presets.len();
+
+    let (hr, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
+    register(ui.ctx(), "developSection:presets", hr);
+    paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(hr.left() + 20.0, hr.center().y), vec2(12.0, 12.0)),
+        if open { Icon::ChevronDown } else { Icon::ChevronRight },
+        t.text_label,
+    );
+    ui.painter().text(pos2(hr.left() + 34.0, hr.center().y), Align2::LEFT_CENTER, crate::i18n::tr("Presets"), t.semibold(13.0), t.text);
+    ui.painter().text(pos2(hr.left() + 90.0, hr.center().y), Align2::LEFT_CENTER, count.to_string(), t.font(11.0), t.text_dim);
+
+    let mut hdr = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(Rect::from_min_max(pos2(hr.right() - 80.0, hr.top()), hr.right_bottom()))
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    crate::panels::presets::show_presets_header_buttons(app, &mut hdr);
+
+    if resp.clicked() {
+        app.ui.develop_presets_open = !open;
+    }
+
+    if open {
+        crate::panels::presets::show_presets_body(app, ui, false);
+    }
+    crate::widgets::divider(ui);
+}
+
+fn show_snapshots_section(app: &mut LightcraftApp, ui: &mut egui::Ui, photo: Option<&lightcraft_catalog::Photo>) {
+    let t = Tokens::get(ui.ctx());
+    let open = app.ui.develop_snapshots_open;
+    let count = photo.map(|p| p.versions.len()).unwrap_or(0);
+
+    let (hr, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
+    register(ui.ctx(), "developSection:snapshots", hr);
+    paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(hr.left() + 20.0, hr.center().y), vec2(12.0, 12.0)),
+        if open { Icon::ChevronDown } else { Icon::ChevronRight },
+        t.text_label,
+    );
+    ui.painter().text(pos2(hr.left() + 34.0, hr.center().y), Align2::LEFT_CENTER, crate::i18n::tr("Snapshots"), t.semibold(13.0), t.text);
+    if count > 0 {
+        ui.painter().text(pos2(hr.left() + 105.0, hr.center().y), Align2::LEFT_CENTER, count.to_string(), t.font(11.0), t.text_dim);
+    }
+
+    let mut hdr = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(Rect::from_min_max(pos2(hr.right() - 40.0, hr.top()), hr.right_bottom()))
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    if icon_button(
+        &mut hdr,
+        "snapshotCreate",
+        Icon::Plus,
+        vec2(28.0, 28.0),
+        false,
+        app.session.active().is_some(),
+        crate::i18n::tr("Create Snapshot…"),
+    )
+    .clicked()
+    {
+        let name = format!("Snapshot {}", count + 1);
+        crate::panels::dialogs::prompt(app, "New Snapshot", "Snapshot name", &name, "version.create", json!({}), "name");
+    }
+
+    if resp.clicked() {
+        app.ui.develop_snapshots_open = !open;
+    }
+
+    if open {
+        if let Some(p) = photo {
+            if p.versions.is_empty() {
+                let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::hover());
+                ui.painter().text(
+                    pos2(r.left() + 34.0, r.center().y),
+                    Align2::LEFT_CENTER,
+                    crate::i18n::tr("No snapshots yet"),
+                    t.font(12.0),
+                    t.text_dim,
+                );
+            } else {
+                for (i, v) in p.versions.iter().enumerate().rev() {
+                    let row_h = 36.0;
+                    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click());
+                    register(ui.ctx(), format!("snapshot:{i}"), r);
+                    let current = *v.settings == *p.develop;
+                    if resp.hovered() {
+                        ui.painter().rect_filled(r, 4.0, t.hover.gamma_multiply(0.7));
+                    }
+                    paint(
+                        ui.painter(),
+                        Rect::from_center_size(pos2(r.left() + 24.0, r.center().y), vec2(14.0, 14.0)),
+                        Icon::Crop,
+                        if current { t.accent } else { t.icon },
+                    );
+                    let text_x = r.left() + 38.0;
+                    let title_y = r.top() + 11.0;
+                    ui.painter().text(
+                        pos2(text_x, title_y),
+                        Align2::LEFT_CENTER,
+                        &v.name,
+                        if current { t.semibold(13.0) } else { t.font(13.0) },
+                        if current { t.accent } else { t.text },
+                    );
+                    let time_str = crate::panels::right::short_time(&v.created);
+                    ui.painter().text(pos2(text_x, r.top() + 25.0), Align2::LEFT_CENTER, time_str, t.font(10.5), t.text_dim);
+
+                    if current {
+                        paint(ui.painter(), Rect::from_center_size(pos2(r.right() - 24.0, r.center().y), vec2(12.0, 12.0)), Icon::Check, t.accent);
+                    }
+
+                    if resp.hovered() && !current {
+                        app.hover_preview =
+                            Some(crate::HoverPreview { label: crate::i18n::tr_format!("Version: {}", v.name), settings: (*v.settings).clone() });
+                    }
+
+                    if resp.clicked() && !current {
+                        let _ = app.run("version.restore", json!({"index": i}));
+                    }
+
+                    resp.context_menu(|ui| {
+                        if ui.button(crate::i18n::tr("Restore Snapshot")).clicked() {
+                            let _ = app.run("version.restore", json!({"index": i}));
+                        }
+                        if ui.button(crate::i18n::tr("Update with Current Settings")).clicked() {
+                            let _ = app.run("version.update", json!({"index": i}));
+                        }
+                        if ui.button(crate::i18n::tr("Rename…")).clicked() {
+                            crate::panels::dialogs::prompt(
+                                app,
+                                "Rename Snapshot",
+                                "Snapshot name",
+                                &v.name,
+                                "version.rename",
+                                json!({"index": i}),
+                                "name",
+                            );
+                        }
+                        ui.separator();
+                        if ui.button(crate::i18n::tr("Delete Snapshot")).clicked() {
+                            let _ = app.run("version.delete", json!({"index": i}));
+                        }
+                    });
+                }
+            }
+        } else {
+            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::hover());
+            ui.painter().text(
+                pos2(r.left() + 34.0, r.center().y),
+                Align2::LEFT_CENTER,
+                crate::i18n::tr("No photo selected"),
+                t.font(12.0),
+                t.text_dim,
+            );
+        }
+    }
+    crate::widgets::divider(ui);
+}
+
+fn show_history_section(app: &mut LightcraftApp, ui: &mut egui::Ui, photo: Option<&lightcraft_catalog::Photo>) {
+    let t = Tokens::get(ui.ctx());
+    let open = app.ui.develop_history_open;
+    let count = photo.map(|p| p.history.len()).unwrap_or(0);
+
+    let (hr, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
+    register(ui.ctx(), "developSection:history", hr);
+    paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(hr.left() + 20.0, hr.center().y), vec2(12.0, 12.0)),
+        if open { Icon::ChevronDown } else { Icon::ChevronRight },
+        t.text_label,
+    );
+    ui.painter().text(pos2(hr.left() + 34.0, hr.center().y), Align2::LEFT_CENTER, crate::i18n::tr("History"), t.semibold(13.0), t.text);
+    if count > 0 {
+        ui.painter().text(pos2(hr.left() + 85.0, hr.center().y), Align2::LEFT_CENTER, count.to_string(), t.font(11.0), t.text_dim);
+    }
+
+    let mut hdr = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(Rect::from_min_max(pos2(hr.right() - 60.0, hr.top()), hr.right_bottom()))
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+    );
+    if count > 1 && hdr.button(crate::i18n::tr("Clear")).clicked() {
+        let _ = app.run("history.clear", json!({}));
+    }
+
+    if resp.clicked() {
+        app.ui.develop_history_open = !open;
+    }
+
+    if open {
+        if let Some(p) = photo {
+            if p.history.is_empty() {
+                let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::hover());
+                ui.painter().text(
+                    pos2(r.left() + 34.0, r.center().y),
+                    Align2::LEFT_CENTER,
+                    crate::i18n::tr("No edits yet"),
+                    t.font(12.0),
+                    t.text_dim,
+                );
+            } else {
+                let cursor = p.history_index();
+                for (i, h) in p.history.iter().enumerate().rev() {
+                    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+                    register(ui.ctx(), format!("history:{i}"), r);
+                    let row = crate::panels::right::history_row(i, cursor);
+                    if row == crate::panels::right::HistoryRow::Current {
+                        ui.painter().rect_filled(r, 3.0, t.pressed);
+                    } else if resp.hovered() {
+                        ui.painter().rect_filled(r, 3.0, t.hover);
+                    }
+                    let (icon_color, text_color) = if row == crate::panels::right::HistoryRow::Undone {
+                        (t.text_disabled, t.text_disabled)
+                    } else if row == crate::panels::right::HistoryRow::Current {
+                        (t.accent, t.text)
+                    } else {
+                        (t.icon, t.text_label)
+                    };
+                    paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 20.0, r.center().y), vec2(14.0, 14.0)), Icon::Clock, icon_color);
+                    ui.painter().text(
+                        pos2(r.left() + 34.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        crate::i18n::history_label(&h.label, &app.session.presets),
+                        if row == crate::panels::right::HistoryRow::Current { t.semibold(12.5) } else { t.font(12.5) },
+                        text_color,
+                    );
+                    if resp.clicked() {
+                        let _ = app.run("history.restore", json!({"index": i}));
+                    }
+                    resp.context_menu(|ui| {
+                        if ui.button(crate::i18n::tr("Copy History Step Settings to Before")).clicked() {
+                            let _ = app.run("beforeAfter.setBefore", json!({"source": "history", "index": i}));
+                        }
+                        if ui.button(crate::i18n::tr("Create Snapshot from Step")).clicked() {
+                            let _ = app.run("history.restore", json!({"index": i}));
+                            let _ = app.run("version.create", json!({"name": h.label}));
+                        }
+                        ui.separator();
+                        if ui.button(crate::i18n::tr("Clear History")).clicked() {
+                            let _ = app.run("history.clear", json!({}));
+                        }
+                    });
+                }
+            }
+        } else {
+            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::hover());
+            ui.painter().text(
+                pos2(r.left() + 34.0, r.center().y),
+                Align2::LEFT_CENTER,
+                crate::i18n::tr("No photo selected"),
+                t.font(12.0),
+                t.text_dim,
+            );
+        }
+    }
 }
 
 /// Albums: the tree of albums and the folders they are sorted into. `reveal`: an album just made,

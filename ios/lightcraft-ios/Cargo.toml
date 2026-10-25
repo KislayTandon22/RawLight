@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 lightcraft-engine = { path = "../../crates/engine", features = ["sam"] }
+lightcraft-segment = { path = "../../crates/segment" }
 lightcraft-ui-egui = { path = "../../crates/ui-egui" }
 lightcraft-codecs = { path = "../../crates/codecs" }
 lightcraft-raster = { path = "../../crates/raster" }

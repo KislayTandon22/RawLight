@@ -14,6 +14,8 @@ pub mod credits;
 pub mod date_picker;
 pub mod docking;
 pub mod export_task;
+pub mod gallery;
+pub mod glass;
 pub mod headless;
 pub mod i18n;
 pub mod icons;
@@ -26,6 +28,7 @@ pub mod menus;
 pub mod merge;
 mod model_setup;
 pub mod panels;
+pub mod pencil;
 pub mod pick;
 pub mod region;
 pub mod render;
@@ -38,6 +41,7 @@ pub mod tasks;
 pub mod text_field;
 pub mod theme;
 pub mod titlebar;
+pub mod touch;
 pub mod widgets;
 
 #[cfg(test)]
@@ -61,13 +65,19 @@ mod tests_curve;
 #[cfg(test)]
 mod tests_date_picker;
 #[cfg(test)]
+mod tests_develop_left;
+#[cfg(test)]
 mod tests_dialog_fit;
 #[cfg(test)]
 mod tests_dialogs;
 #[cfg(test)]
+mod tests_e2e_workflows;
+#[cfg(test)]
 mod tests_error_kinds;
 #[cfg(test)]
 mod tests_filmstrip;
+#[cfg(test)]
+mod tests_gestures;
 #[cfg(test)]
 mod tests_grading;
 #[cfg(test)]
@@ -99,15 +109,21 @@ mod tests_masking_layout;
 #[cfg(test)]
 mod tests_menubar;
 #[cfg(test)]
+mod tests_mixer;
+#[cfg(test)]
 mod tests_offline;
 #[cfg(test)]
 mod tests_open_lightroom;
+#[cfg(test)]
+mod tests_panel_audit;
 #[cfg(test)]
 mod tests_panels;
 #[cfg(test)]
 mod tests_preset_import;
 #[cfg(test)]
 mod tests_preview_limit;
+#[cfg(test)]
+mod tests_quick_develop;
 #[cfg(test)]
 mod tests_quit_unsaved;
 #[cfg(test)]
@@ -357,6 +373,7 @@ pub struct LightcraftApp {
     pub region_before_view: Option<region::RegionView>,
     /// The loupe's render sizes while a pinch or two-finger scroll runs.
     pub(crate) size_hold: region::SizeHold,
+    pub touch_tracker: touch::TouchGestureTracker,
     /// (photo, look, window frame size) a window was refused for: it reads more than one render holds.
     pub(crate) window_refused: Option<(lightcraft_catalog::PhotoId, u64, usize)>,
     pub(crate) region_tiles: std::collections::HashMap<(bool, u64), region::RegionView>,
@@ -463,6 +480,7 @@ impl LightcraftApp {
             region_view: None,
             region_before_view: None,
             size_hold: Default::default(),
+            touch_tracker: touch::TouchGestureTracker::new(),
             window_refused: None,
             region_tiles: Default::default(),
             compare_windows: [None; 2],
@@ -1101,6 +1119,20 @@ impl LightcraftApp {
         if self.fonts_ready {
             shortcuts::handle(self, ctx);
         }
+        let touch_events = ctx.input(|i| i.raw.events.clone());
+        let now = ctx.input(|i| i.time);
+        if let Some(action) = self.touch_tracker.process_events(now, &touch_events) {
+            match action {
+                touch::TouchAction::Undo => {
+                    let _ = self.run("edit.undo", serde_json::json!({}));
+                    self.toast(ctx, crate::i18n::tr("Undo"));
+                }
+                touch::TouchAction::Redo => {
+                    let _ = self.run("edit.redo", serde_json::json!({}));
+                    self.toast(ctx, crate::i18n::tr("Redo"));
+                }
+            }
+        }
         #[cfg(not(target_arch = "wasm32"))]
         {
             let dropped: Vec<String> =
@@ -1310,6 +1342,7 @@ impl LightcraftApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         i18n::set_language(self.ui.language);
         let ctx = ui.ctx().clone();
+        glass::paint_backdrop(&ctx);
         if !self.fonts_ready {
             ctx.request_repaint();
             return;
@@ -1342,6 +1375,8 @@ impl LightcraftApp {
         panels::library_problem::banner(self, ui);
         panels::strip::show(self, ui);
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| docking::show(self, ui));
+        panels::bottombar::floating_rating(self, &ctx);
+        gallery::show(self, &ctx);
         self.lights_out(&ctx);
         panels::second::show(self, &ctx);
         panels::notices::show(self, &ctx);

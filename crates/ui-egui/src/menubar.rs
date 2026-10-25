@@ -332,6 +332,7 @@ pub fn checked(app: &LightcraftApp, id: &str) -> Option<bool> {
         "view.fullScreenPreview" => Some(u.fullscreen),
         "view.lightsOut" => Some(u.lights_out != crate::state::LightsOut::On),
         "view.enterFullScreen" => Some(app.window_is_fullscreen),
+        "panel.quickDevelop" => panel(RightPanel::QuickDevelop),
         "panel.edit" => panel(RightPanel::Edit),
         "panel.profiles" => panel(RightPanel::Profiles),
         "panel.crop" => panel(RightPanel::Crop),
@@ -498,9 +499,9 @@ fn expanded(app: &LightcraftApp, name: &str) -> Option<Vec<MenuNode>> {
             .collect();
             v.push(item("view.appearance", Value::Null, "Next Appearance Mode", None, true, None));
             // the saved theme of each family is checked
-            for group in [[ThemeKind::Charcoal, ThemeKind::Midnight], [ThemeKind::Silver, ThemeKind::Paper]] {
+            for group in [&[ThemeKind::Glass, ThemeKind::Charcoal, ThemeKind::Midnight][..], &[ThemeKind::Silver, ThemeKind::Paper][..]] {
                 v.push(MenuNode::Separator);
-                for k in group {
+                for &k in group.iter() {
                     let on = if k.is_dark() { s.dark_theme.kind() == k } else { s.light_theme.kind() == k };
                     v.push(item("view.theme", json!({"theme": k.id()}), k.label(), None, true, Some(on)));
                 }
@@ -834,7 +835,9 @@ pub fn show_in_window(app: &mut LightcraftApp, ui: &mut egui::Ui, max_width: f32
     // Menus hang below the whole top bar and never grow past the window (#189): a tall menu
     // scrolls instead of egui sliding it up over the titles.
     let bar_bottom = Some(ui.max_rect().bottom());
-    if total <= max_width {
+    let touch = crate::theme::touch_ui(ui.ctx());
+    let compact = touch || total > max_width;
+    if !compact {
         let saved = ui.spacing().item_spacing.x;
         ui.spacing_mut().item_spacing.x = TITLE_GAP;
         // All titles first, then their popups, so a title the pointer moves onto can take over
@@ -863,7 +866,9 @@ pub fn show_in_window(app: &mut LightcraftApp, ui: &mut egui::Ui, max_width: f32
         }
         ui.spacing_mut().item_spacing.x = saved;
     } else {
-        let r = ui.add(egui::Button::new(egui::RichText::new(crate::i18n::tr("Menu")).font(font.clone()).color(t.text_label)).frame(false));
+        let menu_font = if touch { t.font(14.0) } else { font.clone() };
+        let menu_color = if touch { t.text } else { t.text_label };
+        let r = ui.add(egui::Button::new(egui::RichText::new(crate::i18n::tr("Menu")).font(menu_font).color(menu_color)).frame(false));
         crate::widgets::register(ui.ctx(), "menu:all", r.rect);
         egui::Popup::menu(&r).show(|ui| {
             crate::menu_level::level(ui, 1, bar_bottom, |ui| {
@@ -953,7 +958,8 @@ fn nodes_ui(ui: &mut egui::Ui, nodes: &[MenuNode], mac: bool, clicked: &mut Opti
             MenuNode::Item { id, params, label, shortcut, enabled, checked } => {
                 // a gutter for check marks, like native menus
                 let mut b = egui::Button::new(format!("      {}", display_item_label(id, params, label)));
-                if let Some(sc) = shortcut {
+                // (the iPad's menu is a touch menu: the desktop's Ctrl+… labels would only mislead there)
+                if let Some(sc) = shortcut.as_ref().filter(|_| !crate::theme::touch_ui(ui.ctx())) {
                     b = b.shortcut_text(shortcut_text(sc, mac));
                 }
                 let r = ui.add_enabled(*enabled, b);

@@ -202,7 +202,6 @@ pub const ALIASES: &[(&str, &str, &str)] = &[
     // Keep existing primary shortcuts and honour custom keymap assignments.
     ("F6", "view.filmstrip", "{}"),
     ("F7", "view.leftPanel", "{}"),
-    ("Shift+M", "version.create", "{}"),
     ("Shift+X", "photo.flag", r#"{"flag": "reject", "advance": true}"#),
     ("Shift+Z", "photo.flag", r#"{"flag": "pick", "advance": true}"#),
     ("Shift+U", "photo.flag", r#"{"flag": "none", "advance": true}"#),
@@ -565,8 +564,8 @@ pub fn handle(app: &mut LightcraftApp, ctx: &egui::Context) {
                 "photo.pick" => app.toast(ctx, crate::i18n::tr("Flagged as Pick")),
                 "photo.reject" => app.toast(ctx, crate::i18n::tr("Flagged as Reject")),
                 "photo.unflag" => app.toast(ctx, crate::i18n::tr("Unflagged")),
-                "edit.undo" => app.toast(ctx, crate::i18n::tr("Undo")),
-                "edit.redo" => app.toast(ctx, crate::i18n::tr("Redo")),
+                "edit.undo" | "input.twoFingerTap" => app.toast(ctx, crate::i18n::tr("Undo")),
+                "edit.redo" | "input.threeFingerTap" => app.toast(ctx, crate::i18n::tr("Redo")),
                 _ => {}
             }
         }

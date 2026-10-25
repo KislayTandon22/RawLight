@@ -157,3 +157,117 @@ fn gpu_status_never_moves_the_performance_controls() {
     let first = seen[0].1;
     assert!(seen.iter().all(|(_, r, _)| *r == first), "the memory buttons moved: {seen:?}");
 }
+
+#[test]
+fn export_dialog_touch_ui_fits_and_width_is_stable() {
+    let mut h = demo([1180.0, 820.0]);
+    crate::theme::set_touch_ui(&h.view.ctx, true);
+    open(&mut h, "dialog.export");
+    assert_fits(&h, "Export touch UI");
+    let dialog_initial = rect(&h, "dialog:window");
+    assert!(dialog_initial.width() <= 555.0, "dialog initial width should fit touch target: {}", dialog_initial.width());
+    for step in 0..10 {
+        // Scroll the dialog during frames to verify it never expands on scroll
+        h.view.ctx.input_mut(|i| {
+            i.events.push(egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -40.0),
+                modifiers: egui::Modifiers::default(),
+                phase: egui::TouchPhase::Move,
+            });
+        });
+        h.step();
+        let dialog_step = rect(&h, "dialog:window");
+        assert_eq!(
+            dialog_initial.width(),
+            dialog_step.width(),
+            "dialog width expanded on scroll step {step}: was {}, now {}",
+            dialog_initial.width(),
+            dialog_step.width()
+        );
+    }
+    let dialog_after = rect(&h, "dialog:window");
+    assert_eq!(dialog_initial.width(), dialog_after.width(), "dialog width did not remain stable across frames");
+    crate::theme::set_touch_ui(&h.view.ctx, false);
+}
+
+#[test]
+fn export_dialog_bulk_export_scope_selects_all_and_exports_all() {
+    let mut h = demo([1180.0, 820.0]);
+    crate::theme::set_touch_ui(&h.view.ctx, true);
+    open(&mut h, "dialog.export");
+    assert_fits(&h, "Export touch UI");
+    let total_photos = h.app.session.catalog.len();
+    assert!(total_photos > 1, "demo catalog has multiple photos");
+    let r_all = h.request("ui.clickWidget", json!({"id": "button:exportScope-1"}), T);
+    assert_eq!(r_all["ok"], true, "click All Photos button");
+    h.step();
+    if let Some(crate::state::Dialog::Export { scope, .. }) = &h.app.ui.dialog {
+        assert_eq!(*scope, crate::state::ExportScope::All);
+    } else {
+        panic!("Export dialog should remain open");
+    }
+    let r = h.request("ui.clickWidget", json!({"id": "button:dialogOk"}), T);
+    assert_eq!(r["ok"], true, "{r}");
+    h.step();
+    h.step();
+    assert!(h.app.ui.dialog.is_none(), "Export closed the dialog");
+    assert!(h.app.export.is_some() || h.app.last_export_result.is_some(), "Export started for all photos");
+    crate::theme::set_touch_ui(&h.view.ctx, false);
+}
+
+#[test]
+fn export_dialog_bulk_export_verifies_all_photos_exported() {
+    let mut h = demo([1180.0, 820.0]);
+    crate::theme::set_touch_ui(&h.view.ctx, true);
+    open(&mut h, "dialog.export");
+    assert_fits(&h, "Export touch UI");
+    let total_photos = h.app.session.catalog.len();
+    assert!(total_photos >= 2, "demo catalog has multiple photos");
+
+    // Click All Photos
+    let r_all = h.request("ui.clickWidget", json!({"id": "button:exportScope-1"}), T);
+    assert_eq!(r_all["ok"], true);
+    h.step();
+
+    // Confirm export
+    let r = h.request("ui.clickWidget", json!({"id": "button:dialogOk"}), T);
+    assert_eq!(r["ok"], true);
+    h.step();
+    h.step();
+
+    assert!(h.app.ui.dialog.is_none(), "dialog closed");
+    // Wait for export task to finish
+    assert!(h.step_until(Duration::from_secs(60), |h| h.app.export.is_none()));
+
+    // Verify last_export_result contains all photos
+    let result = h.app.last_export_result.as_ref().expect("last_export_result present");
+    let files = result["files"].as_array().expect("files array");
+    assert_eq!(files.len(), total_photos, "bulk export processed every single photo in the catalog");
+
+    crate::theme::set_touch_ui(&h.view.ctx, false);
+}
+
+#[test]
+fn bottombar_select_all_and_deselect_in_grid_view() {
+    let mut h = demo([1180.0, 820.0]);
+    crate::theme::set_touch_ui(&h.view.ctx, true);
+    // Switch to photo grid
+    let _ = h.app.run("view.grid", json!({}));
+    h.step();
+
+    let total = h.app.session.visible().len();
+    assert!(total > 1);
+
+    // Select all photos
+    let _ = h.app.run("library.selectAll", json!({}));
+    h.step();
+    assert_eq!(h.app.session.selection.ids.len(), total, "Select All selects every visible photo");
+
+    // Deselect all restores single active photo selection
+    let _ = h.app.run("library.selectNone", json!({}));
+    h.step();
+    assert_eq!(h.app.session.selection.ids.len(), 1, "Deselect restores single active photo selection");
+
+    crate::theme::set_touch_ui(&h.view.ctx, false);
+}

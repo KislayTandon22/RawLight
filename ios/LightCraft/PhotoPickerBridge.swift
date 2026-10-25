@@ -9,6 +9,7 @@
 import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
+import Vision
 
 public typealias PickerCompletion = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?) -> Void
 
@@ -46,7 +47,7 @@ final class PhotoPickerManager: NSObject, PHPickerViewControllerDelegate, UIDocu
         self.activeContext = context
         self.activeCompletion = completion
 
-        DispatchQueue.main.async { [weak self] in
+        let presentBlock = { [weak self] in
             guard let self = self else { return }
 
             guard let presenter = self.topViewController() else {
@@ -81,6 +82,12 @@ final class PhotoPickerManager: NSObject, PHPickerViewControllerDelegate, UIDocu
             default:
                 self.finish(with: [])
             }
+        }
+
+        if Thread.isMainThread {
+            presentBlock()
+        } else {
+            DispatchQueue.main.async(execute: presentBlock)
         }
     }
 
@@ -172,18 +179,66 @@ final class PhotoPickerManager: NSObject, PHPickerViewControllerDelegate, UIDocu
         presenter.present(picker, animated: true)
     }
 
+    private var activeSecurityScopedUrls: [URL] = []
+
+    // MARK: - Remembered folders
+    // Access to a folder outside the app (iCloud Drive, another app's files) lasts only for the session it was picked in.
+    // A bookmark of each picked folder is kept, and access is restored at launch, so photos added in place from it
+    // are still reachable after a restart and nothing has to be picked again.
+    private let bookmarkKey = "lightcraft.folderBookmarks"
+
+    private func rememberFolder(_ url: URL) {
+        guard let data = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) else {
+            NSLog("[PhotoPickerBridge] could not bookmark %@", url.path)
+            return
+        }
+        var all = UserDefaults.standard.dictionary(forKey: bookmarkKey) as? [String: Data] ?? [:]
+        all[url.path] = data
+        UserDefaults.standard.set(all, forKey: bookmarkKey)
+    }
+
+    /// Call once at launch, before the library opens.
+    func restoreRememberedFolders() {
+        guard let all = UserDefaults.standard.dictionary(forKey: bookmarkKey) as? [String: Data] else { return }
+        var kept = all
+        for (oldPath, data) in all {
+            var stale = false
+            guard let url = try? URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale) else {
+                NSLog("[PhotoPickerBridge] a remembered folder is gone: %@", oldPath)
+                kept[oldPath] = nil
+                continue
+            }
+            if url.startAccessingSecurityScopedResource() {
+                activeSecurityScopedUrls.append(url)
+            }
+            NSLog("[PhotoPickerBridge] restored access to %@", url.path)
+            if stale || url.path != oldPath {
+                kept[oldPath] = nil
+                if let fresh = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) {
+                    kept[url.path] = fresh
+                }
+            }
+        }
+        UserDefaults.standard.set(kept, forKey: bookmarkKey)
+    }
+
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         var paths: [String] = []
         for url in urls {
-            let shouldStop = url.startAccessingSecurityScopedResource()
-            defer {
-                if shouldStop { url.stopAccessingSecurityScopedResource() }
-            }
-
             if url.hasDirectoryPath {
+                if url.startAccessingSecurityScopedResource() {
+                    activeSecurityScopedUrls.append(url)
+                }
+                rememberFolder(url)
                 paths.append(url.path)
-            } else if let saved = copyToSandbox(from: url, prefix: "doc") {
-                paths.append(saved)
+            } else {
+                let shouldStop = url.startAccessingSecurityScopedResource()
+                if let saved = copyToSandbox(from: url, prefix: "doc") {
+                    paths.append(saved)
+                }
+                if shouldStop {
+                    url.stopAccessingSecurityScopedResource()
+                }
             }
         }
         finish(with: paths)
@@ -340,4 +395,248 @@ public func ios_log(_ cstr: UnsafePointer<CChar>?) {
     guard let cstr = cstr else { return }
     let str = String(cString: cstr)
     NSLog("%@", str)
+}
+
+// MARK: - Safe Area Insets FFI
+
+private var cachedSafeArea: UIEdgeInsets = UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0)
+
+@_cdecl("ios_update_safe_area")
+public func ios_update_safe_area() {
+    let block = {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
+        if let insets = window?.safeAreaInsets, insets.top > 0 || insets.bottom > 0 {
+            cachedSafeArea = insets
+        }
+    }
+    if Thread.isMainThread {
+        block()
+    } else {
+        DispatchQueue.main.async(execute: block)
+    }
+}
+
+@_cdecl("ios_get_safe_area")
+public func ios_get_safe_area(
+    top: UnsafeMutablePointer<Float>?,
+    bottom: UnsafeMutablePointer<Float>?,
+    left: UnsafeMutablePointer<Float>?,
+    right: UnsafeMutablePointer<Float>?
+) {
+    if Thread.isMainThread {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
+        if let insets = window?.safeAreaInsets, insets.top > 0 || insets.bottom > 0 {
+            cachedSafeArea = insets
+        }
+    }
+    top?.pointee = Float(cachedSafeArea.top)
+    bottom?.pointee = Float(cachedSafeArea.bottom)
+    left?.pointee = Float(cachedSafeArea.left)
+    right?.pointee = Float(cachedSafeArea.right)
+}
+
+
+@_cdecl("ios_toggle_keyboard")
+public func ios_toggle_keyboard(_ show: Bool) {
+    DispatchQueue.main.async {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first ?? UIApplication.shared.windows.first else {
+            return
+        }
+        window.overrideUserInterfaceStyle = .dark
+        window.rootViewController?.overrideUserInterfaceStyle = .dark
+        if show {
+            if let root = window.rootViewController?.view {
+                if let tf = root as? UITextField {
+                    tf.keyboardAppearance = .dark
+                }
+                _ = root.becomeFirstResponder()
+            }
+        } else {
+            window.endEditing(true)
+        }
+    }
+}
+
+
+@_cdecl("ios_get_system_theme")
+public func ios_get_system_theme() -> Int32 {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let style = scenes.first?.traitCollection.userInterfaceStyle ?? UITraitCollection.current.userInterfaceStyle
+    switch style {
+    case .light:
+        return 1
+    case .dark:
+        return 2
+    default:
+        return 0
+    }
+}
+
+
+// MARK: - Apple Vision masks (no model download)
+
+@_silgen_name("lightcraft_ios_set_segmenter")
+private func lightcraft_ios_set_segmenter(
+    _ cb: @convention(c) (UnsafePointer<UInt8>?, Int32, Int32, UInt64, UnsafePointer<Float>?, Int32, UnsafeMutablePointer<Float>?, Int32) -> Int32
+)
+
+/// Subject / object selection with `VNGenerateForegroundInstanceMaskRequest` (iPadOS 17+), on the
+/// Neural Engine. The instance map of the last photo is kept, so each tap only picks instances.
+@available(iOS 17.0, *)
+private final class VisionSegmenter {
+    private var key: UInt64 = .max
+    private var handler: VNImageRequestHandler?
+    private var observation: VNInstanceMaskObservation?
+    private let lock = NSLock()
+
+    func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
+                 out: UnsafeMutablePointer<Float>, side: Int) -> Int32 {
+        lock.lock(); defer { lock.unlock() }
+        if key != self.key || handler == nil {
+            guard let cg = Self.image(rgb: rgb, w: w, h: h) else { return -3 }
+            let request = VNGenerateForegroundInstanceMaskRequest()
+            let newHandler = VNImageRequestHandler(cgImage: cg, options: [:])
+            do { try newHandler.perform([request]) } catch { return -4 }
+            self.key = key
+            handler = newHandler
+            observation = request.results?.first
+        }
+        guard let observation, let handler else { return 0 }
+        var instances = IndexSet()
+        let include = clicks.filter { $0.2 }
+        if include.isEmpty {
+            instances = observation.allInstances
+        } else {
+            for c in include { if let i = instance(at: c, in: observation), i > 0 { instances.insert(i) } }
+            for c in clicks where !c.2 { if let i = instance(at: c, in: observation) { instances.remove(i) } }
+        }
+        if instances.isEmpty { return 0 }
+        guard let mask = try? observation.generateScaledMaskForImage(forInstances: instances, from: handler) else { return -5 }
+        Self.sample(mask, into: out, side: side)
+        return 1
+    }
+
+    /// The instance under a click, or the nearest one within a fingertip so taps near an edge still land.
+    private func instance(at c: (Float, Float, Bool), in o: VNInstanceMaskObservation) -> Int? {
+        let map = o.instanceMask
+        CVPixelBufferLockBaseAddress(map, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(map, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(map) else { return nil }
+        let mw = CVPixelBufferGetWidth(map), mh = CVPixelBufferGetHeight(map), rowBytes = CVPixelBufferGetBytesPerRow(map)
+        let cx = Int(max(0, min(1, c.0)) * Float(mw - 1)), cy = Int(max(0, min(1, c.1)) * Float(mh - 1))
+        let reach = max(2, max(mw, mh) / 22)
+        var best: (Int, Int)? = nil  // (distance², instance)
+        for dy in stride(from: -reach, through: reach, by: 2) {
+            for dx in stride(from: -reach, through: reach, by: 2) {
+                let x = cx + dx, y = cy + dy
+                if x < 0 || y < 0 || x >= mw || y >= mh { continue }
+                let v = Int(base.load(fromByteOffset: y * rowBytes + x, as: UInt8.self))
+                if v == 0 { continue }
+                let d = dx * dx + dy * dy
+                if best == nil || d < best!.0 { best = (d, v) }
+            }
+        }
+        return best?.1
+    }
+
+    private static func image(rgb: UnsafePointer<UInt8>, w: Int, h: Int) -> CGImage? {
+        var rgba = [UInt8](repeating: 255, count: w * h * 4)
+        for i in 0..<(w * h) {
+            rgba[i * 4] = rgb[i * 3]; rgba[i * 4 + 1] = rgb[i * 3 + 1]; rgba[i * 4 + 2] = rgb[i * 3 + 2]
+        }
+        guard let provider = CGDataProvider(data: Data(rgba) as CFData), let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        return CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4, space: space,
+                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue), provider: provider,
+                       decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+    }
+
+    /// Coverage 0...1 (one float per pixel) → `side × side` logits (±8) for the engine's soft mask.
+    private static func sample(_ buf: CVPixelBuffer, into out: UnsafeMutablePointer<Float>, side: Int) {
+        CVPixelBufferLockBaseAddress(buf, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buf, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(buf) else { return }
+        let bw = CVPixelBufferGetWidth(buf), bh = CVPixelBufferGetHeight(buf), rowBytes = CVPixelBufferGetBytesPerRow(buf)
+        for sy in 0..<side {
+            for sx in 0..<side {
+                var sum: Float = 0
+                for (ox, oy) in [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)] as [(Double, Double)] {
+                    let x = min(bw - 1, Int((Double(sx) + ox) / Double(side) * Double(bw)))
+                    let y = min(bh - 1, Int((Double(sy) + oy) / Double(side) * Double(bh)))
+                    sum += base.load(fromByteOffset: y * rowBytes + x * 4, as: Float.self)
+                }
+                out[sy * side + sx] = (sum / 4 - 0.5) * 16
+            }
+        }
+    }
+}
+
+@available(iOS 17.0, *)
+private let visionSegmenter = VisionSegmenter()
+
+private func visionSegmentEntry(
+    _ rgb: UnsafePointer<UInt8>?, _ w: Int32, _ h: Int32, _ key: UInt64,
+    _ clicks: UnsafePointer<Float>?, _ n: Int32, _ out: UnsafeMutablePointer<Float>?, _ side: Int32
+) -> Int32 {
+    guard #available(iOS 17.0, *) else { return -2 }
+    guard let rgb, let out, w > 0, h > 0, side > 0 else { return -1 }
+    var list: [(Float, Float, Bool)] = []
+    if let clicks { for i in 0..<Int(max(0, n)) { list.append((clicks[i * 3], clicks[i * 3 + 1], clicks[i * 3 + 2] > 0.5)) } }
+    return visionSegmenter.segment(rgb: rgb, w: Int(w), h: Int(h), key: key, clicks: list, out: out, side: Int(side))
+}
+
+/// Hand LightCraft the Vision segmenter (call once before `lightcraft_start`).
+func installVisionSegmenter() {
+    lightcraft_ios_set_segmenter(visionSegmentEntry)
+}
+
+// MARK: - Apple Pencil digit strokes
+
+@_silgen_name("lightcraft_ios_pencil_stroke")
+private func lightcraft_ios_pencil_stroke(_ xs: UnsafePointer<Float>, _ ys: UnsafePointer<Float>, _ n: Int32)
+
+/// Watches Pencil strokes only (never consumes them) and reports each finished stroke, so drawing
+/// 1-5 on the photo rates it. Fingers are not allowed, so touch gestures are untouched.
+final class PencilStrokeRecognizer: UIGestureRecognizer {
+    private var xs: [Float] = []
+    private var ys: [Float] = []
+
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        allowedTouchTypes = [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+    }
+
+    private func add(_ touch: UITouch, _ event: UIEvent?) {
+        guard let view = self.view else { return }
+        for t in event?.coalescedTouches(for: touch) ?? [touch] where xs.count < 4096 {
+            let p = t.location(in: view)
+            xs.append(Float(p.x)); ys.append(Float(p.y))
+        }
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        xs.removeAll(); ys.removeAll()
+        if let t = touches.first { add(t, event) }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let t = touches.first { add(t, event) }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let t = touches.first { add(t, event) }
+        if xs.count >= 2 { lightcraft_ios_pencil_stroke(xs, ys, Int32(xs.count)) }
+        xs.removeAll(); ys.removeAll()
+        state = .failed  // never "recognized": the stroke still reaches the app
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        xs.removeAll(); ys.removeAll()
+        state = .failed
+    }
 }

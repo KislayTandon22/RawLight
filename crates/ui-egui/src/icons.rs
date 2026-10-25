@@ -61,6 +61,8 @@ pub enum Icon {
     ProfileGrid,
     Close,
     Check,
+    Undo,
+    Redo,
     Brush,
     Linear,
     Radial,
@@ -91,6 +93,8 @@ pub enum Icon {
     GradeMidtones,
     /// Colour grading, highlights wheel: an open circle with rays.
     GradeHighlights,
+    /// Colour grading, global wheel: concentric circles.
+    GradeGlobal,
     /// Appearance Mode ▸ Auto (follow the system): a monitor on its stand.
     Monitor,
     /// Appearance Mode ▸ Light: a sun (a disc with eight rays).
@@ -298,6 +302,10 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, color: Color32, turn: Option<
                 pen.line(&[(10.0 + 6.0 * a.cos(), 10.0 + 6.0 * a.sin()), (10.0 + 8.0 * a.cos(), 10.0 + 8.0 * a.sin())]);
             }
         }
+        GradeGlobal => {
+            pen.circle(10.0, 10.0, 6.5);
+            pen.circle(10.0, 10.0, 3.0);
+        }
         EyeOff => {
             pen.arc(10.0, 16.0, 9.0, 212.0, 328.0);
             pen.arc(10.0, 4.0, 9.0, 32.0, 148.0);
@@ -369,15 +377,11 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, color: Color32, turn: Option<
             }
         }
         Circle => pen.circle(10.0, 10.0, 6.0),
-        FlagPick => {
-            pen.line(&[(5.0, 17.0), (5.0, 3.5)]);
-            pen.closed(&[(5.0, 3.5), (15.0, 3.5), (12.5, 7.0), (15.0, 10.5), (5.0, 10.5)]);
-        }
+        // pick = a tick, reject = a cross (the flag glyphs they replaced were too fine to tell apart on a touch bar)
+        FlagPick => pen.line(&[(3.5, 10.5), (8.0, 15.0), (16.5, 5.0)]),
         FlagReject => {
-            pen.line(&[(5.0, 17.0), (5.0, 3.5)]);
-            pen.closed(&[(5.0, 3.5), (15.0, 3.5), (12.5, 7.0), (15.0, 10.5), (5.0, 10.5)]);
-            pen.line(&[(8.0, 5.0), (12.0, 9.0)]);
-            pen.line(&[(12.0, 5.0), (8.0, 9.0)]);
+            pen.line(&[(4.5, 4.5), (15.5, 15.5)]);
+            pen.line(&[(15.5, 4.5), (4.5, 15.5)]);
         }
         Gear => {
             pen.circle(10.0, 10.0, 2.5);
@@ -472,6 +476,15 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, color: Color32, turn: Option<
             pen.line(&[(15.0, 5.0), (5.0, 15.0)]);
         }
         Check => pen.line(&[(4.0, 10.5), (8.5, 15.0), (16.0, 5.5)]),
+        // a curve that leaves from an arrowhead at the upper left and sweeps round to the right (Redo is its mirror)
+        Undo => {
+            pen.arc(10.0, 11.0, 5.5, 200.0, 385.0);
+            pen.line(&[(4.8, 5.0), (4.8, 9.1), (8.8, 9.1)]);
+        }
+        Redo => {
+            pen.arc(10.0, 11.0, 5.5, -205.0, -20.0);
+            pen.line(&[(15.2, 5.0), (15.2, 9.1), (11.2, 9.1)]);
+        }
         Brush => {
             pen.line(&[(16.5, 3.5), (9.0, 11.0)]);
             pen.closed(&[(9.0, 11.0), (6.0, 11.5), (4.0, 14.5), (3.5, 17.0), (6.0, 16.5), (8.5, 14.0)]);

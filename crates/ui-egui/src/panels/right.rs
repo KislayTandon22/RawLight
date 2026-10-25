@@ -32,9 +32,39 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             super::empty_message(ui, r, "No photo selected", "Select a photo to edit");
             return;
         };
+        if crate::theme::touch_ui(ui.ctx()) && app.ui.right != RightPanel::None {
+            let panel_title = match app.ui.right {
+                RightPanel::QuickDevelop => "Quick Develop",
+                RightPanel::Edit => "Edit",
+                RightPanel::Profiles => "Profiles",
+                RightPanel::Crop => "Crop & Rotate",
+                RightPanel::Remove => "Remove",
+                RightPanel::Masking => "Masking",
+                RightPanel::RedEye => "Red Eye",
+                RightPanel::Info => "Info",
+                RightPanel::Keywords => "Keywords",
+                RightPanel::Versions => "Versions",
+                RightPanel::Activity => "History & Activity",
+                RightPanel::None => "",
+            };
+            let (hr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 46.0), Sense::hover());
+            ui.painter().text(pos2(hr.left() + 20.0, hr.center().y), Align2::LEFT_CENTER, crate::i18n::tr(panel_title), t.semibold(15.0), t.text);
+            let mut close_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(Rect::from_min_max(pos2(hr.right() - 48.0, hr.top()), hr.right_bottom()))
+                    .layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight)),
+            );
+            let btn = crate::panels::dialogs::apple_close_button(&mut close_ui);
+            register(ui.ctx(), "button:rightPanelClose", btn.rect);
+            if btn.clicked() {
+                app.ui.right = RightPanel::None;
+            }
+            divider(ui);
+        }
         egui::ScrollArea::vertical().id_salt("right-scroll").auto_shrink([false, false]).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
             match app.ui.right {
+                RightPanel::QuickDevelop => super::quick_develop::show(app, ui, id),
                 RightPanel::Edit => super::edit::show(app, ui, id),
                 RightPanel::Profiles => super::profiles::show(app, ui, id),
                 RightPanel::Crop => crop(app, ui, id),
@@ -52,6 +82,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 }
 
 pub fn header(ui: &mut egui::Ui, title: &str) {
+    // on the iPad the panel's own title row already says this: don't repeat it as the first heading
+    if crate::theme::touch_ui(ui.ctx()) && matches!(title, "Keywords" | "Remove" | "Red Eye" | "Info" | "Versions" | "Masking") {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 46.0), Sense::hover());
     ui.painter().text(pos2(r.left() + 24.0, r.center().y + 2.0), Align2::LEFT_CENTER, crate::i18n::tr(title), t.semibold(15.0), t.text);
@@ -181,7 +215,14 @@ fn crop(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
             if text_button(ui, "cropFlipV", crate::i18n::tr("Flip V"), d.crop.flip_v).clicked() {
                 let _ = app.run("photo.flipVertical", json!({}));
             }
-            if text_button(ui, "cropSwapAspect", crate::i18n::tr("Swap Aspect (X)"), false).clicked() {
+            if text_button(
+                ui,
+                "cropSwapAspect",
+                crate::i18n::tr(if crate::theme::touch_ui(ui.ctx()) { "Swap Aspect" } else { "Swap Aspect (X)" }),
+                false,
+            )
+            .clicked()
+            {
                 let _ = app.run("crop.rotateAspect", json!({}));
             }
             if text_button(ui, "cropReset", crate::i18n::tr("Reset"), false).clicked() {
@@ -455,7 +496,7 @@ fn remove(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     // Visualize Spots (A): a black/white high-pass view that makes dust and specks stand out
     padded(ui, |ui| {
         let mut v = app.ui.visualize_spots;
-        if ui.checkbox(&mut v, crate::i18n::tr("Visualize Spots (A)")).changed() {
+        if ui.checkbox(&mut v, crate::i18n::tr(if crate::theme::touch_ui(ui.ctx()) { "Show Spots" } else { "Visualize Spots (A)" })).changed() {
             app.ui.visualize_spots = v;
         }
     });
@@ -980,7 +1021,14 @@ fn keyword_set(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     });
     let kws: Vec<String> = sets["keywords"].as_array().into_iter().flatten().filter_map(|k| k.as_str().map(str::to_string)).collect();
     if kws.is_empty() {
-        ui.label(egui::RichText::new(crate::i18n::tr("Keywords you add appear here; ⌥1–⌥9 apply them.")).color(t.text_dim));
+        ui.label(
+            egui::RichText::new(crate::i18n::tr(if crate::theme::touch_ui(ui.ctx()) {
+                "Keywords you add appear here for quick reuse."
+            } else {
+                "Keywords you add appear here; ⌥1–⌥9 apply them."
+            }))
+            .color(t.text_dim),
+        );
         return;
     }
     let bw = ((ui.available_width() - 8.0) / 3.0).floor().max(40.0);
@@ -1111,7 +1159,7 @@ fn versions(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
 }
 
 /// "Sep 30, 2026, 12:00 PM" from an ISO time.
-fn short_time(iso: &str) -> String {
+pub(crate) fn short_time(iso: &str) -> String {
     // Other languages use their own date patterns (`i18n::display_time`).
     if crate::i18n::language() != crate::i18n::Locale::En {
         return crate::i18n::display_time(iso);
@@ -1132,13 +1180,13 @@ fn short_time(iso: &str) -> String {
 /// How a History row is drawn: the step the settings are at is highlighted, the steps after it
 /// (still there to return to until a new edit) are greyed out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum HistoryRow {
+pub(crate) enum HistoryRow {
     Done,
     Current,
     Undone,
 }
 
-fn history_row(i: usize, cursor: Option<usize>) -> HistoryRow {
+pub(crate) fn history_row(i: usize, cursor: Option<usize>) -> HistoryRow {
     match cursor {
         Some(c) if i == c => HistoryRow::Current,
         Some(c) if i > c => HistoryRow::Undone,

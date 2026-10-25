@@ -88,7 +88,7 @@ fn the_editor_records_a_key_and_esc_cancels_without_closing() {
     assert_eq!(h.app.ui.view, ViewMode::Compare);
     // Reset All restores the declared keys
     h.app.run("app.resetShortcuts", json!({})).unwrap();
-    assert_eq!(crate::shortcuts::shortcut_of(&h.app.ui.settings.keymap, "view.compare"), Some("Shift+C"));
+    assert_eq!(crate::shortcuts::shortcut_of(&h.app.ui.settings.keymap, "view.compare"), Some("C"));
 }
 
 #[test]

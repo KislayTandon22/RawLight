@@ -79,6 +79,7 @@ USAGE:
         -o, --output OUT  PNG path (a final screenshot is written here if the script took none)
         --size WxH        window size in points (default 1600x1000)
         --scale S         pixels per point (default 1)
+        --touch           lay the UI out as on the iPad (touch sizes and safe-area insets)
   lightcraft-cli merge hdr|panorama|hdr-panorama [OPTIONS] FILES…
       Photo Merge: writes <first>-HDR.dng / -Pano.dng / -HDR-Pano.dng next to the first file and
       prints the result as JSON. Options:
@@ -738,10 +739,12 @@ fn snapshot(args: &[String]) -> Result<(), String> {
     let mut size = [1600.0f32, 1000.0];
     let mut scale = 1.0f32;
     let mut files = Vec::new();
+    let mut touch = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--demo" => {}
+            "--touch" => touch = true,
             "--library" => library = Some(take_value(args, &mut i, "--library")?.to_string()),
             "--script" => script = Some(take_value(args, &mut i, "--script")?.to_string()),
             "-o" | "--output" => output = Some(take_value(args, &mut i, "-o")?.to_string()),
@@ -792,6 +795,13 @@ fn snapshot(args: &[String]) -> Result<(), String> {
     // This UI state is session-local: the CLI neither loads nor saves desktop ui.json.
     app.ui.settings.gpu = false;
     let mut h = Headless::new(app, size, scale);
+    if touch {
+        // the iPad's layout: touch sizes, glass theme, and its status-bar / home-indicator insets
+        lightcraft_ui_egui::theme::set_touch_ui(&h.view.ctx, true);
+        lightcraft_ui_egui::theme::set_safe_area_insets(&h.view.ctx, 24.0, 20.0, 0.0, 0.0);
+        h.app.ui.right_width = 340.0;
+        h.app.ui.left_width = 300.0;
+    }
     let timeout = Duration::from_secs(60);
     let mut shots = 0usize;
     let next_path = |shots: &mut usize| -> Option<String> {
