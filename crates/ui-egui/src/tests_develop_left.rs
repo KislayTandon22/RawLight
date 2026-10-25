@@ -19,6 +19,7 @@ fn demo() -> Headless {
     let services = Services { png: None, ..Default::default() };
     let app = LightcraftApp::new(lightcraft_engine::Session::with_demo(), services);
     let mut h = Headless::new(app, [1400.0, 2400.0], 1.0);
+    crate::theme::set_touch_ui(&h.view.ctx, true);
     let r = h.request("ui.set", json!({"view": "detail", "right": "edit", "leftPanel": true}), T);
     assert_eq!(r["ok"], true, "{r}");
     h.settle(SETTLE);

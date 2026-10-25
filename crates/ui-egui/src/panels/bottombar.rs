@@ -39,21 +39,16 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     } else {
         egui::Frame::NONE
             .fill(t.chrome)
-            .stroke(Stroke::new(
-                1.0,
-                if crate::theme::touch_ui(ui.ctx()) {
-                    if ui.visuals().dark_mode {
-                        Color32::from_rgba_unmultiplied(255, 255, 255, 20)
-                    } else {
-                        Color32::from_rgba_unmultiplied(0, 0, 0, 24)
-                    }
-                } else {
-                    Color32::TRANSPARENT
-                },
-            ))
+            .stroke(if !crate::theme::touch_ui(ui.ctx()) {
+                Stroke::NONE
+            } else if ui.visuals().dark_mode {
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 20))
+            } else {
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(0, 0, 0, 24))
+            })
             .inner_margin(egui::Margin {
-                left: (14.0f32 + safe_left).round() as i8,
-                right: (14.0f32 + safe_right).round() as i8,
+                left: (if crate::theme::touch_ui(ui.ctx()) { 14.0f32 + safe_left } else { 12.0 }).round() as i8,
+                right: (if crate::theme::touch_ui(ui.ctx()) { 14.0f32 + safe_right } else { 12.0 }).round() as i8,
                 top: 0,
                 bottom: safe_bottom.round() as i8,
             })

@@ -32,7 +32,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 if icon_button(ui, "presets", Icon::Presets, sz, app.ui.presets, has_photo, "Presets (Shift+P)").clicked() {
                     let _ = app.run("panel.presets", json!({}));
                 }
-                let in_library = !matches!(app.ui.view, crate::state::ViewMode::Detail) && !app.ui.right.is_edit_tool();
+                let in_library =
+                    crate::theme::touch_ui(ui.ctx()) && !matches!(app.ui.view, crate::state::ViewMode::Detail) && !app.ui.right.is_edit_tool();
                 for (id, icon, panel, tip) in [
                     (
                         if in_library { "quickDevelop" } else { "edit" },

@@ -610,7 +610,9 @@ fn new_album_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
-    let is_develop = app.ui.right == crate::state::RightPanel::Edit
+    // (the Develop sidebar is the iPad's: the desktop keeps its Library sources in every view)
+    let is_develop = crate::theme::touch_ui(ui.ctx())
+        && app.ui.right == crate::state::RightPanel::Edit
         && matches!(
             app.ui.view,
             crate::state::ViewMode::Detail | crate::state::ViewMode::Compare | crate::state::ViewMode::Survey | crate::state::ViewMode::Reference
@@ -698,7 +700,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
                 add_lib_ui.add_space(4.0);
             }
-            if add_lib_ui.button(crate::i18n::tr("+ Library")).clicked() {
+            if crate::theme::touch_ui(ui.ctx()) && add_lib_ui.button(crate::i18n::tr("+ Library")).clicked() {
                 app.ui.dialog = Some(crate::state::Dialog::Welcome);
             }
         }

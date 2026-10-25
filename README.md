@@ -474,6 +474,46 @@ LightCraft supports iPad both as a native Apple Silicon iPadOS app and as an ins
 - **Installable Web PWA**:
   - Run as an installable Safari Home Screen app on iPad. Build with `cargo xtask web`, serve from a trusted HTTPS origin, then use **Share → Add to Home Screen** in Safari. Plain HTTP at a Mac LAN IP is not a secure context and may disable browser storage and GPU features. See [docs/ios/WEB-IPAD.md](docs/ios/WEB-IPAD.md) for exact setup and testing steps.
 
+### Building and installing the native iPad app
+
+**Prerequisites**
+- Mac with Xcode
+- Rust with targets `aarch64-apple-ios` and `aarch64-apple-ios-sim`
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+```
+
+**Simulator**
+Build, install, and launch on the iOS Simulator:
+
+```bash
+xcodebuild -project ios/LightCraftiPad.xcodeproj -scheme LightCraftiPad -sdk iphonesimulator -configuration Debug -derivedDataPath ios/DerivedDataSim -destination 'platform=iOS Simulator,name=<iPad name>' ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
+xcrun simctl install booted <app>
+xcrun simctl launch booted com.kislay.lightcraftpad
+```
+
+**A real iPad (`devicectl`)**
+1. Set your own `DEVELOPMENT_TEAM` and bundle id in `ios/project.yml` (or Signing in Xcode).
+2. Build for device:
+```bash
+xcodebuild -project ios/LightCraftiPad.xcodeproj -scheme LightCraftiPad -sdk iphoneos -configuration Debug -derivedDataPath ios/DerivedDataDevice -destination 'id=<UDID>' -allowProvisioningUpdates build
+```
+3. List devices, install, and launch:
+```bash
+xcrun devicectl list devices
+xcrun devicectl device install app --device <UDID> "ios/DerivedDataDevice/Build/Products/Debug-iphoneos/LightCraft iPad (fork).app"
+xcrun devicectl device process launch --device <UDID> com.kislay.lightcraftpad
+```
+
+**Xcode**
+1. Open `ios/LightCraftiPad.xcodeproj`.
+2. Select scheme `LightCraftiPad`.
+3. Pick iPad.
+4. Run (a Rust build phase automatically builds `liblightcraft_ios.a` for the target).
+
+The iPad changes are confined to `ios/`, `cfg(target_os = "ios")` and the touch layout; see [docs/ios-port.md](docs/ios-port.md) for what was added, how it is kept iPad-only and how it was tested.
+
 ## How it's built
 
 An engine-first Cargo workspace of small, tested crates with enforced layering (`cargo xtask layers`): `geom`,

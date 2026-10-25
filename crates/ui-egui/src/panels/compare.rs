@@ -549,23 +549,26 @@ pub fn show_survey(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         // remove from the survey (deselect) on hover or on touch devices (Lightroom Classic survey dismiss badge)
         let touch = crate::theme::touch_ui(ui.ctx());
         if (resp.hovered() || touch) && photos.len() > 1 {
-            let badge_sz = if touch { 32.0 } else { 22.0 };
-            let hit_sz = if touch { 44.0 } else { 26.0 };
-            let badge_rect = Rect::from_min_size(pos2(img.right() - badge_sz - 8.0, img.bottom() - badge_sz - 8.0), vec2(badge_sz, badge_sz));
-            let hit_rect = Rect::from_center_size(badge_rect.center(), vec2(hit_sz, hit_sz));
-            let xresp =
-                ui.interact(hit_rect, egui::Id::new(("survey-x", id.0)), Sense::click()).on_hover_text(crate::i18n::tr("Remove from survey (✕)"));
-            register(ui.ctx(), format!("survey-x:{}", id.0), hit_rect);
-            let bg_alpha = if xresp.is_pointer_button_down_on() {
-                255
-            } else if xresp.hovered() || touch {
-                220
+            // the iPad's badge sits at the bottom right with a 44pt target; the desktop keeps its top-right one
+            let (badge_sz, hit_sz) = if touch { (32.0, 44.0) } else { (20.0, 20.0) };
+            let badge_rect = if touch {
+                Rect::from_min_size(pos2(img.right() - badge_sz - 8.0, img.bottom() - badge_sz - 8.0), vec2(badge_sz, badge_sz))
             } else {
-                160
+                Rect::from_min_size(pos2(img.right() - badge_sz - 6.0, img.top() + 6.0), vec2(badge_sz, badge_sz))
             };
+            let hit_rect = Rect::from_center_size(badge_rect.center(), vec2(hit_sz, hit_sz));
+            let xresp = ui.interact(hit_rect, egui::Id::new(("survey-x", id.0)), Sense::click()).on_hover_text(crate::i18n::tr(if touch {
+                "Remove from survey (✕)"
+            } else {
+                "Remove from survey"
+            }));
+            register(ui.ctx(), format!("survey-x:{}", id.0), hit_rect);
+            let bg_alpha = if xresp.hovered() || touch { 230 } else { 160 };
             ui.painter().circle_filled(badge_rect.center(), badge_sz * 0.5, Color32::from_black_alpha(bg_alpha));
-            ui.painter().circle_stroke(badge_rect.center(), badge_sz * 0.5, Stroke::new(1.0, Color32::from_white_alpha(40)));
-            paint(ui.painter(), badge_rect.shrink(if touch { 7.0 } else { 5.0 }), Icon::Close, Color32::WHITE);
+            if touch {
+                ui.painter().circle_stroke(badge_rect.center(), badge_sz * 0.5, Stroke::new(1.0, Color32::from_white_alpha(40)));
+            }
+            paint(ui.painter(), badge_rect.shrink(if touch { 7.0 } else { 4.0 }), Icon::Close, if touch { Color32::WHITE } else { t.text });
             if xresp.clicked() {
                 let _ = app.run("library.select", json!({"ids": [id.0], "mode": "toggle"}));
             }

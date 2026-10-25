@@ -1346,6 +1346,7 @@ impl LightcraftApp {
         if theme::touch_ui(&ctx) && ctx.content_rect().width() < 900.0 && self.ui.right_width > 300.0 {
             self.ui.right_width = 300.0;
         }
+        icons::set_touch_glyphs(theme::touch_ui(&ctx));
         glass::paint_backdrop(&ctx);
         if !self.fonts_ready {
             ctx.request_repaint();

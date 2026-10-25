@@ -378,10 +378,20 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, color: Color32, turn: Option<
         }
         Circle => pen.circle(10.0, 10.0, 6.0),
         // pick = a tick, reject = a cross (the flag glyphs they replaced were too fine to tell apart on a touch bar)
-        FlagPick => pen.line(&[(3.5, 10.5), (8.0, 15.0), (16.5, 5.0)]),
-        FlagReject => {
+        FlagPick if touch_glyphs() => pen.line(&[(3.5, 10.5), (8.0, 15.0), (16.5, 5.0)]),
+        FlagPick => {
+            pen.line(&[(5.0, 17.0), (5.0, 3.5)]);
+            pen.closed(&[(5.0, 3.5), (15.0, 3.5), (12.5, 7.0), (15.0, 10.5), (5.0, 10.5)]);
+        }
+        FlagReject if touch_glyphs() => {
             pen.line(&[(4.5, 4.5), (15.5, 15.5)]);
             pen.line(&[(15.5, 4.5), (4.5, 15.5)]);
+        }
+        FlagReject => {
+            pen.line(&[(5.0, 17.0), (5.0, 3.5)]);
+            pen.closed(&[(5.0, 3.5), (15.0, 3.5), (12.5, 7.0), (15.0, 10.5), (5.0, 10.5)]);
+            pen.line(&[(8.0, 5.0), (12.0, 9.0)]);
+            pen.line(&[(12.0, 5.0), (8.0, 9.0)]);
         }
         Gear => {
             pen.circle(10.0, 10.0, 2.5);
@@ -588,6 +598,18 @@ fn paint_with(p: &Painter, rect: Rect, icon: Icon, color: Color32, turn: Option<
             }
         }
     }
+}
+
+static TOUCH_GLYPHS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The iPad draws pick / reject as a tick and a cross (flag glyphs are too fine to tell apart on a touch bar);
+/// set each frame from the layout.
+pub fn set_touch_glyphs(on: bool) {
+    TOUCH_GLYPHS.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn touch_glyphs() -> bool {
+    TOUCH_GLYPHS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 #[cfg(test)]
