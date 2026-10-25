@@ -421,8 +421,14 @@ pub fn slider(ui: &mut Ui, spec: &ControlSpec, value: f64, enabled: bool, label_
     } else {
         t.thumb
     };
-    p.circle_filled(pos2(tx, track_rect.center().y), ring, t.chrome);
-    p.circle_stroke(pos2(tx, track_rect.center().y), ring, Stroke::new(if is_touch { 2.5 } else { 2.0 }, ring_c));
+    if is_touch {
+        // a solid glass-white thumb with a soft shadow ring: reads as something to grab
+        p.circle_filled(pos2(tx, track_rect.center().y + 1.5), ring + 1.0, Color32::from_black_alpha(70));
+        p.circle_filled(pos2(tx, track_rect.center().y), ring, ring_c);
+    } else {
+        p.circle_filled(pos2(tx, track_rect.center().y), ring, t.chrome);
+        p.circle_stroke(pos2(tx, track_rect.center().y), ring, Stroke::new(2.0, ring_c));
+    }
     if hovered {
         ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
     }
@@ -698,7 +704,11 @@ pub fn toggle(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>)
     }
     let galley = label.into().into_galley(ui, Some(egui::TextWrapMode::Extend), ui.available_width() - 63.0, egui::TextStyle::Body);
     let (track_w, track_h, gap): (f32, f32, f32) = (51.0, 31.0, 12.0);
-    let size = vec2(track_w + gap + galley.size().x, track_h.max(galley.size().y).max(44.0));
+    let natural = track_w + gap + galley.size().x;
+    // in a column the switch sits at the trailing edge of its row, like a Settings row on the iPad
+    let trailing = !ui.layout().main_dir().is_horizontal();
+    let row_w = if trailing { ui.available_width().clamp(natural, 900.0) } else { natural };
+    let size = vec2(row_w, track_h.max(galley.size().y).max(44.0));
     let (rect, mut resp) = ui.allocate_exact_size(size, Sense::click());
     if resp.clicked() {
         *value = !*value;
@@ -708,7 +718,8 @@ pub fn toggle(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>)
     if ui.is_rect_visible(rect) {
         let t = Tokens::get(ui.ctx());
         let on = ui.ctx().animate_bool_responsive(resp.id, *value);
-        let track = Rect::from_min_size(pos2(rect.left(), rect.center().y - track_h / 2.0), vec2(track_w, track_h));
+        let track_x = if trailing { rect.right() - track_w } else { rect.left() };
+        let track = Rect::from_min_size(pos2(track_x, rect.center().y - track_h / 2.0), vec2(track_w, track_h));
         let off_fill = Color32::from_rgba_unmultiplied(120, 120, 128, 82);
         let on_fill = Color32::from_rgb(52, 199, 89);
         let p = ui.painter();
@@ -718,7 +729,8 @@ pub fn toggle(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>)
         p.circle_filled(pos2(cx, track.center().y + 1.5), r, Color32::from_black_alpha(55));
         p.circle_filled(pos2(cx, track.center().y), r, Color32::WHITE);
         let colour = if resp.enabled() { t.text } else { t.text_disabled };
-        p.galley(pos2(rect.left() + track_w + gap, rect.center().y - galley.size().y / 2.0), galley, colour);
+        let label_x = if trailing { rect.left() } else { rect.left() + track_w + gap };
+        p.galley(pos2(label_x, rect.center().y - galley.size().y / 2.0), galley, colour);
     }
     resp
 }

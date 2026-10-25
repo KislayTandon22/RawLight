@@ -415,14 +415,24 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
         }
     } else {
         // thumbnail size slider
-        let (r, resp) = child.allocate_exact_size(vec2(110.0, 20.0), Sense::click_and_drag());
+        let touch = crate::theme::touch_ui(child.ctx());
+        let (r, resp) = child.allocate_exact_size(if touch { vec2(120.0, 36.0) } else { vec2(110.0, 20.0) }, Sense::click_and_drag());
         register(child.ctx(), "slider:thumbSize", r);
         let p = child.painter();
         let y = r.center().y;
-        p.line_segment([pos2(r.left(), y), pos2(r.right(), y)], egui::Stroke::new(2.0, t.track));
         let f = (app.ui.thumb_size - 90.0) / (480.0 - 90.0);
         let x = r.left() + f * r.width();
-        p.rect_filled(Rect::from_center_size(pos2(x, y), vec2(3.0, 14.0)), 1.0, t.thumb_hover);
+        if touch {
+            // a capsule track filled up to a round glass thumb
+            let track = Rect::from_min_max(pos2(r.left(), y - 2.0), pos2(r.right(), y + 2.0));
+            p.rect_filled(track, 2.0, t.track);
+            p.rect_filled(Rect::from_min_max(track.min, pos2(x, track.bottom())), 2.0, t.accent);
+            p.circle_filled(pos2(x, y + 1.5), 11.0, Color32::from_black_alpha(70));
+            p.circle_filled(pos2(x, y), 10.0, t.thumb_hover);
+        } else {
+            p.line_segment([pos2(r.left(), y), pos2(r.right(), y)], egui::Stroke::new(2.0, t.track));
+            p.rect_filled(Rect::from_center_size(pos2(x, y), vec2(3.0, 14.0)), 1.0, t.thumb_hover);
+        }
         if let Some(pp) = resp.interact_pointer_pos()
             && (resp.dragged() || resp.clicked())
         {

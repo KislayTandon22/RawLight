@@ -36,7 +36,8 @@ const LABEL_W: f32 = 150.0;
 /// The dialog body for `tab` (the tab bar switches `tab`).
 pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, tab: &mut String) {
     let t = Tokens::get(ui.ctx());
-    ui.set_width((ui.ctx().content_rect().width() - 64.0).clamp(240.0, 560.0));
+    let max_w = if crate::theme::touch_ui(ui.ctx()) { 900.0 } else { 560.0 };
+    ui.set_width((ui.ctx().content_rect().width() - 64.0).clamp(240.0, max_w));
     if crate::theme::touch_ui(ui.ctx()) {
         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
     }

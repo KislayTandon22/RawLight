@@ -872,7 +872,12 @@ pub fn show_in_window(app: &mut LightcraftApp, ui: &mut egui::Ui, max_width: f32
     } else {
         let menu_font = if touch { t.font(14.0) } else { font.clone() };
         let menu_color = if touch { t.text } else { t.text_label };
-        let r = ui.add(egui::Button::new(egui::RichText::new(crate::i18n::tr("Menu")).font(menu_font).color(menu_color)).frame(false));
+        let mut menu_btn = egui::Button::new(egui::RichText::new(crate::i18n::tr("Menu")).font(menu_font).color(menu_color)).frame(touch);
+        if touch {
+            // a capsule like every other iPad button, not bare text
+            menu_btn = menu_btn.min_size(egui::vec2(72.0, 38.0)).corner_radius(19.0);
+        }
+        let r = ui.add(menu_btn);
         crate::widgets::register(ui.ctx(), "menu:all", r.rect);
         egui::Popup::menu(&r).show(|ui| {
             crate::menu_level::level(ui, 1, bar_bottom, |ui| {
