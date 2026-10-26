@@ -111,6 +111,12 @@ fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active:
         );
         register(pill_ui, format!("flag:{id}"), r);
         let on = flag == f && f != Flag::None;
+        let name = crate::i18n::tr(match f {
+            Flag::Pick => "Pick",
+            Flag::Reject => "Reject",
+            Flag::None => "Unflag",
+        });
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, name));
         let c = if on {
             if f == Flag::Reject { t.reject } else { t.pick }
         } else if resp.hovered() {
@@ -302,6 +308,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let copy_r = Rect::from_min_size(pos2(pill.right() + 10.0 + if undo_group { 78.0 } else { 0.0 }, pill.top()), vec2(copy_width, 30.0));
     let cresp = ui.interact(copy_r, egui::Id::unique("copy-settings"), Sense::click());
     register(ui, "button:copySettings", copy_r);
+    crate::widgets::announce(&cresp, label.to_string());
     ui.painter().rect_filled(copy_r, 15.0, if cresp.hovered() { t.hover } else { t.canvas });
     ui.painter().text(copy_r.center(), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
     if cresp.clicked() && active.is_some() {
@@ -312,6 +319,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let gear_r = Rect::from_min_size(pos2(copy_r.right() + 4.0, pill.top()), vec2(30.0, 30.0));
     let gresp = ui.interact(gear_r, egui::Id::unique("copy-gear"), Sense::click());
     register(ui, "icon:copyGear", gear_r);
+    crate::widgets::announce(&gresp, crate::i18n::tr("Copy settings options"));
     ui.painter().rect_filled(gear_r, 15.0, if gresp.hovered() { t.hover } else { t.canvas });
     paint(ui.painter(), gear_r.shrink(7.0), Icon::Gear, t.icon);
     if gresp.clicked() {

@@ -64,6 +64,7 @@ pub fn close_button(ui: &mut egui::Ui) -> egui::Response {
     let touch = crate::theme::touch_ui(ui.ctx());
     let hit_size = if touch { egui::vec2(44.0, 44.0) } else { egui::vec2(36.0, 36.0) };
     let (rect, resp) = ui.allocate_exact_size(hit_size, egui::Sense::click());
+    crate::widgets::announce(&resp, crate::i18n::tr("Close"));
     if ui.is_rect_visible(rect) {
         let center = rect.center();
         let circle_radius = if touch { 16.0 } else { 14.0 };

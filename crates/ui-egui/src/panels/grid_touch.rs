@@ -47,6 +47,7 @@ pub(super) fn empty_library_in(app: &mut LightcraftApp, ui: &mut egui::Ui, r: eg
     ] {
         let resp = ui.interact(rect, egui::Id::unique(id), Sense::click());
         register(ui, format!("button:{id}"), rect);
+        crate::widgets::announce(&resp, crate::i18n::tr(label));
         let fill = match (primary, resp.is_pointer_button_down_on(), resp.hovered()) {
             (true, true, _) => t.accent.gamma_multiply(0.8),
             (true, _, _) => t.accent,

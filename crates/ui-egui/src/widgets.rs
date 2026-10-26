@@ -896,9 +896,11 @@ pub fn icon_button(ui: &mut Ui, id: &str, icon: Icon, size: egui::Vec2, active: 
     let tooltip = crate::i18n::tr(tooltip);
     let t = Tokens::get(ui.ctx());
     let touch = crate::theme::touch_ui(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
+    let grows = touch && (size.x < 40.0 || size.y < 40.0);
+    // (when the hit area grows, only that one node is clickable: an unnamed twin behind it would be a ghost stop for VoiceOver)
+    let (r, resp) = ui.allocate_exact_size(size, if enabled && !grows { Sense::click() } else { Sense::hover() });
     // on the iPad a small icon still gets a 40pt target: the hit area grows around it, the layout does not
-    let resp = if touch && (size.x < 40.0 || size.y < 40.0) {
+    let resp = if grows {
         let hit = Rect::from_center_size(r.center(), vec2(size.x.max(40.0), size.y.max(40.0)));
         ui.interact(hit, resp.id.with("hit"), if enabled { Sense::click() } else { Sense::hover() })
     } else {
@@ -919,7 +921,8 @@ pub fn icon_button(ui: &mut Ui, id: &str, icon: Icon, size: egui::Vec2, active: 
     let c = if !enabled {
         t.text_disabled
     } else if active {
-        t.pick
+        // (green on the iPad's blue selection fill is too faint to read)
+        if touch { t.text } else { t.pick }
     } else if resp.hovered() || (touch && is_down) {
         t.text
     } else {
