@@ -832,13 +832,16 @@ pub struct UiState {
     #[serde(skip)]
     pub canvas_press_start: Option<(f64, egui::Pos2)>,
     /// A linear/radial mask is being created by dragging (one undo step for the drag).
+    #[serde(skip)]
     pub mask_create_drag: bool,
     /// The bottom bar had no room for the rating stars this frame: the canvas floats them instead.
+    #[serde(skip)]
     pub rating_floating: bool,
     /// The "originals not found" strip above the grid was dismissed for this session.
     #[serde(skip)]
     pub missing_banner_hidden: bool,
     /// Review tool: draw the component gallery over the window (`ui.set {"gallery": true}`).
+    #[serde(skip)]
     pub gallery: bool,
     #[serde(skip)]
     pub canvas_suppress_click_zoom: bool,

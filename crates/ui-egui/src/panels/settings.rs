@@ -294,7 +294,7 @@ fn general_tab(app: &mut LightcraftApp, ui: &mut egui::Ui, t: &Tokens) {
         );
     });
     // no folder dialog: the other libraries in this app's storage open from here
-    for dir in sandbox_libraries(app) {
+    for dir in sandbox_libraries(app, ui) {
         let name = library_name(&dir);
         row(ui, t, "", |ui| {
             let r = ui.button(format!("{} {name}", crate::i18n::tr("Open")));
@@ -1402,18 +1402,22 @@ pub fn sandbox_library_root(app: &LightcraftApp) -> Option<std::path::PathBuf> {
     app.session.library.as_ref().filter(|l| l.on_disk).and_then(|l| l.dir.parent().map(std::path::Path::to_path_buf))
 }
 
-/// The other libraries beside the open one in `sandbox_library_root`, by name.
-pub fn sandbox_libraries(app: &LightcraftApp) -> Vec<std::path::PathBuf> {
+/// The other libraries beside the open one in `sandbox_library_root`, by name (listed off the UI thread, refreshed every few seconds).
+pub fn sandbox_libraries(app: &LightcraftApp, ui: &egui::Ui) -> Vec<std::path::PathBuf> {
     let (Some(root), Some(open)) = (sandbox_library_root(app), app.session.library.as_ref().map(|l| l.dir.clone())) else {
         return Vec::new();
     };
-    let mut found: Vec<_> = std::fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|d| d.is_dir() && *d != open && lightcraft_engine::library::is_library(d))
-        .collect();
+    let mut found = super::left::fs_cached(ui, "sandbox-libraries", &root.to_string_lossy(), 3.0, |root| {
+        std::fs::read_dir(root)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|d| d.is_dir() && lightcraft_engine::library::is_library(d))
+            .collect::<Vec<std::path::PathBuf>>()
+    })
+    .unwrap_or_default();
+    found.retain(|d| *d != open);
     found.sort();
     found
 }

@@ -540,6 +540,8 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
             s.spacing.icon_width = 24.0;
             s.spacing.icon_width_inner = 14.0;
             s.spacing.icon_spacing = 10.0;
+            // dialog sliders: a round knob like the panel sliders, not egui's tall capsule
+            s.visuals.handle_shape = egui::style::HandleShape::Circle;
         }
         s.text_styles.insert(egui::TextStyle::Body, FontId::proportional(if touch_ui { 14.0 } else { 13.0 }));
         s.text_styles.insert(

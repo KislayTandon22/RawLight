@@ -95,8 +95,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
 fn header_with_badge(ui: &mut Ui, t: &Tokens, touch: bool, count: usize) {
     let h = if touch { 48.0 } else { 40.0 };
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
-    let title = crate::i18n::tr("Quick Develop");
-    ui.painter().text(pos2(r.left() + 20.0, r.center().y), Align2::LEFT_CENTER, title, t.semibold(14.0), t.text);
+    // (the panel's title row above already names it)
 
     let badge_text = if count == 1 { "1 photo".to_string() } else { format!("{count} photos (Batch)") };
     let badge_font = t.semibold(11.0);

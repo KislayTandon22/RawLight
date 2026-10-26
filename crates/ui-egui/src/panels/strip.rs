@@ -53,7 +53,12 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 ] {
                     let on = app.ui.right == panel || (panel == RightPanel::Edit && app.ui.right == RightPanel::Profiles);
                     if icon_button(ui, id, icon, sz, on, has_photo, tip).clicked() {
-                        let _ = app.run(&format!("panel.{id}"), json!({}));
+                        if id == "quickDevelop" {
+                            // (iPad Library mode: there is no `panel.quickDevelop` command, the rail toggles it directly)
+                            app.ui.right = if on { RightPanel::None } else { RightPanel::QuickDevelop };
+                        } else {
+                            let _ = app.run(&format!("panel.{id}"), json!({}));
+                        }
                     }
                     if id == "edit" || id == "quickDevelop" {
                         separator(ui, &t);

@@ -1314,7 +1314,14 @@ impl LightcraftApp {
         }
         let touch_events = ctx.input(|i| i.raw.events.clone());
         let now = ctx.input(|i| i.time);
-        if let Some(action) = self.touch_tracker.process_events(now, &touch_events) {
+        // (two- and three-finger taps are the iPad's undo / redo: a desktop touchscreen must not edit by accident)
+        let touch_action = if theme::touch_ui(ctx) {
+            self.touch_tracker.process_events(now, &touch_events)
+        } else {
+            self.touch_tracker = touch::TouchGestureTracker::new();
+            None
+        };
+        if let Some(action) = touch_action {
             match action {
                 touch::TouchAction::Undo => {
                     let _ = self.run("edit.undo", serde_json::json!({}));

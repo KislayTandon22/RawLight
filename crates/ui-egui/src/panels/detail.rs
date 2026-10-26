@@ -582,43 +582,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let resp = ui.interact(canvas, egui::Id::new("loupe"), Sense::click_and_drag());
     crate::widgets::announce(&resp, crate::i18n::tr("Photo"));
 
-    // Single-finger canvas press-and-hold: holding stationary for >= 350ms compares Before/After
-    let now = ui.input(|i| i.time);
-    let is_down = ui.input(|i| i.pointer.primary_down());
-    let pointer_pos = ui.input(|i| i.pointer.interact_pos().or(i.pointer.latest_pos()));
-
-    let pinching = ui.input(|i| i.multi_touch().is_some());
-    // (touch only: on a mouse, resting the button on the photo is not a request to compare)
-    if crate::theme::touch_ui(ui.ctx())
-        && resp.contains_pointer()
-        && is_down
-        && !pinching
-        && app.gesture.is_none()
-        && app.ui.tool.is_empty()
-        && !app.ui.right.is_edit_tool()
-    {
-        if let Some(pos) = pointer_pos {
-            if let Some((start_t, start_pos)) = app.ui.canvas_press_start {
-                if (pos - start_pos).length() > 18.0 {
-                    // Finger moved significantly: user is panning or performing a drag gesture.
-                    // Stay disarmed until release, or a pause mid-pan would show Before.
-                    app.ui.canvas_press_start = Some((f64::INFINITY, pos));
-                    app.ui.canvas_hold_before = false;
-                } else if now - start_t >= 0.35 {
-                    // Held stationary for >= 350ms: activate instantaneous Before view
-                    app.ui.canvas_hold_before = true;
-                    app.ui.canvas_suppress_click_zoom = true;
-                    ui.ctx().request_repaint();
-                }
-            } else {
-                app.ui.canvas_press_start = Some((now, pos));
-                app.ui.canvas_suppress_click_zoom = false;
-            }
-        }
-    } else if (!is_down || pinching) && app.ui.canvas_press_start.is_some() {
-        app.ui.canvas_press_start = None;
-        app.ui.canvas_hold_before = false;
-    }
+    super::detail_touch::canvas_hold(app, ui, &resp);
     let mut target_rect = fit_rect(main_area, display_aspect, app.ui.zoom, native, ppp, app.ui.pan);
     let mut img_rect = animated_rect(ui.ctx(), &mut app.ui.zoom_anim, target_rect);
     let in_pane = |pane: Rect, image: Rect| image.translate(pane.center() - main_area.center());
@@ -1739,12 +1703,7 @@ fn general_interaction(
     }
     // click toggles Fit ↔ the chosen click-zoom ratio at the clicked point; drag pans when zoomed
     let zoomed = img.width() > canvas.width() + 1.0 || img.height() > canvas.height() + 1.0;
-    // a hold that showed Before must not also zoom when the finger lifts: the flag lives until that click is seen
-    let suppress_zoom = if resp.clicked() || resp.double_clicked() {
-        std::mem::take(&mut app.ui.canvas_suppress_click_zoom)
-    } else {
-        app.ui.canvas_suppress_click_zoom
-    };
+    let suppress_zoom = super::detail_touch::suppress_click_zoom(app, resp);
     if !suppress_zoom && (resp.double_clicked() || (resp.clicked() && !zoomed)) {
         if let Some(q) = resp.interact_pointer_pos() {
             let u = ((q.x - img.left()) / img.width()).clamp(0.0, 1.0);
@@ -2513,16 +2472,7 @@ fn mask_overlay(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Respons
             }
         }
     }
-    // A second finger means pinch/pan: drop any half-made stroke or handle drag instead of
-    // letting the first finger keep painting.
-    if touch && ui.input(|i| i.multi_touch().is_some()) {
-        match app.gesture.take() {
-            Some(Gesture::MaskHandle { .. }) => {
-                let _ = app.run("develop.endInteraction", json!({}));
-            }
-            Some(Gesture::Brush { .. }) => app.brush_live = None,
-            other => app.gesture = other,
-        }
+    if super::detail_touch::cancel_on_multitouch(app, ui) {
         return;
     }
     // Colour Range "Pick": the Masking panel owns the loupe's clicks (general_interaction
@@ -2555,48 +2505,7 @@ fn mask_overlay(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Respons
         }
         return;
     }
-    // Direct linear / radial drag creation
-    if touch
-        && (app.ui.tool == "linear" || app.ui.tool == "radial")
-        && let Some(mid) = active
-    {
-        if resp.drag_started()
-            && let Some(q0) = ui.input(|i| i.pointer.press_origin()).or(resp.interact_pointer_pos())
-        {
-            let n0 = map.norm(q0);
-            let _ = app.run("develop.beginInteraction", json!({"label": "Add Mask"}));
-            app.ui.mask_create_drag = true;
-            if app.ui.tool == "linear" {
-                let _ = app.run("mask.update", json!({"id": mid, "component": 0, "shape": MaskShape::Linear { start: n0, end: n0 }}));
-            } else {
-                let _ = app.run("mask.update", json!({"id": mid, "component": 0, "shape": MaskShape::Radial { center: n0, rx: 0.02, ry: 0.02, angle: 0.0, feather: 50.0, invert: false }}));
-            }
-        }
-        if resp.dragged()
-            && let (Some(q0), Some(q)) = (ui.input(|i| i.pointer.press_origin()), resp.interact_pointer_pos())
-        {
-            let n0 = map.norm(q0);
-            let n = map.norm(q);
-            if app.ui.tool == "linear" {
-                let _ = app.run("mask.update", json!({"id": mid, "component": 0, "shape": MaskShape::Linear { start: n0, end: n }}));
-            } else {
-                let l = frame_long_norm(map);
-                let dx = (n.x - n0.x).abs() / l.0;
-                let dy = (n.y - n0.y).abs() / l.1;
-                let rx = dx.max(0.02);
-                let ry = dy.max(0.02);
-                let _ = app.run(
-                    "mask.update",
-                    json!({"id": mid, "component": 0, "shape": MaskShape::Radial { center: n0, rx, ry, angle: 0.0, feather: 50.0, invert: false }}),
-                );
-            }
-        }
-        if resp.drag_stopped() || resp.clicked() {
-            if std::mem::take(&mut app.ui.mask_create_drag) {
-                let _ = app.run("develop.endInteraction", json!({}));
-            }
-            app.ui.tool.clear();
-        }
+    if super::detail_touch::mask_create_drag(app, ui, resp, map, active) {
         return;
     }
     // brush tool
@@ -2767,7 +2676,7 @@ fn mask_keys(app: &mut LightcraftApp, ui: &mut egui::Ui, map: &CanvasMap, d: &De
 }
 
 /// Long-edge units → normalized units for x and y.
-fn frame_long_norm(map: &CanvasMap) -> (f64, f64) {
+pub(super) fn frame_long_norm(map: &CanvasMap) -> (f64, f64) {
     // derive from the mapping: 1 normalized unit in x and y in screen points
     let o = map.screen(Point::new(0.0, 0.0));
     let x = map.screen(Point::new(1.0, 0.0)).distance(o) as f64;
@@ -3151,20 +3060,7 @@ pub(crate) fn filmstrip(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect) {
                         super::grid::toggle_stack(app, ui.ctx(), *id);
                     }
                 }
-                if crate::theme::touch_ui(ui.ctx()) && (app.ui.multi_select || selected || app.session.selection.ids.len() > 1) {
-                    let center = fr.right_top() + vec2(-13.0, 13.0);
-                    let check_circle = Rect::from_center_size(center, vec2(20.0, 20.0));
-                    register(ui.ctx(), format!("film_select_circle:{}", id.0), check_circle);
-                    if selected {
-                        p.circle_filled(center, 9.0, t.accent);
-                        p.circle_stroke(center, 9.0, Stroke::new(1.0, Color32::WHITE));
-                        p.line_segment([center + vec2(-3.5, 0.0), center + vec2(-1.0, 2.8)], Stroke::new(2.0, Color32::WHITE));
-                        p.line_segment([center + vec2(-1.0, 2.8), center + vec2(3.8, -2.8)], Stroke::new(2.0, Color32::WHITE));
-                    } else {
-                        p.circle_filled(center, 9.0, Color32::from_rgba_unmultiplied(0, 0, 0, 100));
-                        p.circle_stroke(center, 9.0, Stroke::new(1.3, Color32::from_rgba_unmultiplied(255, 255, 255, 180)));
-                    }
-                }
+                super::detail_touch::film_select_circle(app, ui, p, &t, fr, *id, selected);
             }
             if resp.clicked() {
                 let m = ui.input(|i| i.modifiers);

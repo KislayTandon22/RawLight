@@ -125,6 +125,12 @@ pub fn missing_banner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 if crate::widgets::text_button(ui, "missingDismiss", "Dismiss", false).clicked() {
                     app.ui.missing_banner_hidden = true;
                 }
+                // pick the folder they are in now (Files / iCloud Drive) and relink every match by name and size
+                if crate::widgets::text_button(ui, "missingFind", "Find…", false).clicked()
+                    && let Err(e) = crate::menubar::run_item(app, "file.findMissing", json!({}))
+                {
+                    app.toast(ui.ctx(), e);
+                }
                 let label = if showing { "Show all photos" } else { "Show them" };
                 if crate::widgets::text_button(ui, "missingShow", label, showing).clicked() {
                     filter(app, json!({"only": if showing { json!([]) } else { json!(missing) }}));
@@ -152,7 +158,7 @@ fn show_touch(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 let label = if n == 5 { "5 stars".to_string() } else { format!("{n}+ stars") };
                 let on = f.rating == n;
                 if crate::widgets::text_button(ui, &format!("filterRating-{n}"), &label, on).clicked() {
-                    filter(app, json!({"rating": if on { 0 } else { n }, "ratingOp": if n == 5 { "exactly" } else { "atLeast" }}));
+                    filter(app, json!({"rating": if on { 0 } else { n }, "ratingOp": if n == 5 && !on { "exactly" } else { "atLeast" }}));
                 }
             }
             ui.add_space(6.0);

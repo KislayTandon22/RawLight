@@ -635,7 +635,9 @@ pub fn poll_scan(app: &mut LightcraftApp, ctx: &egui::Context) {
         })
         .collect();
     d.set_trashed(trashed);
-    d.copy = task.copy;
+    // iPad: photos picked from Files / iCloud Drive are copied into the library by default. In place they depend on
+    // folder access that iOS can withdraw between launches ("original not found"); photos already inside the app are not copied again.
+    d.copy = task.copy || (crate::theme::touch_ui(ctx) && task.sources.iter().any(|s| !s.contains("/Containers/Data/Application/")));
     // only an album the review offers (it may have been deleted while the scan ran)
     d.album = task.album.filter(|id| app.session.catalog.album(lightcraft_catalog::AlbumId(*id)).is_some_and(|a| !a.folder && !a.is_smart()));
     d.sources = task.sources;

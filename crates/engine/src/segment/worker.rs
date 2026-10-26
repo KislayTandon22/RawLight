@@ -464,7 +464,7 @@ fn platform_job(shared: &Shared, job: &mut Job, f: super::platform::PlatformFn) 
         // no zoomed-in pass: the platform's mask is already sharp
         Kind::Detail { .. } => return Ok(None),
         Kind::Text(_) => {
-            return Err("Describe needs the downloadable AI model; Sky, Subject and Background work without it, and Object picks by tapping".into());
+            return Err("Describe is not available on this device; Sky, Subject and Background work, and Object picks by tapping".into());
         }
         Kind::Clicks(c) => (c.iter().map(|c| [c.x, c.y, if c.positive { 1.0 } else { 0.0 }]).collect(), false),
         Kind::Prepare => (Vec::new(), true),

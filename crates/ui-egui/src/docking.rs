@@ -414,10 +414,7 @@ pub fn show(app: &mut crate::LightcraftApp, ui: &mut egui::Ui) {
     if crate::glass::active(ui.ctx()) {
         // panels float with a gap around them, on the same glass material as the bars
         style.gap = 10.0;
-        style.background = crate::glass::fill();
-        style.border = crate::glass::rim();
         style.tab_height = 34.0;
-        style.font = egui::FontId::proportional(13.0);
     }
     style.float_label = crate::i18n::tr("Float panel").into();
     style.close_label = crate::i18n::tr("Close panel").into();

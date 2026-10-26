@@ -105,10 +105,14 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     }
     // header: Edit + Auto / B&W / HDR
     let mut reset_clicked = false;
-    let (hr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::hover());
-    ui.painter().text(pos2(hr.left() + 24.0, hr.bottom() - 10.0), Align2::LEFT_CENTER, crate::i18n::tr("Edit"), t.semibold(15.0), t.text);
+    // (the iPad's panel title row already says "Edit")
+    if !crate::theme::touch_ui(ui.ctx()) {
+        let (hr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::hover());
+        ui.painter().text(pos2(hr.left() + 24.0, hr.bottom() - 10.0), Align2::LEFT_CENTER, crate::i18n::tr("Edit"), t.semibold(15.0), t.text);
+    }
     egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 8, bottom: 14 }).show(ui, |ui| {
-        ui.horizontal(|ui| {
+        let touch = crate::theme::touch_ui(ui.ctx());
+        let chips = |ui: &mut egui::Ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             if text_button(ui, "auto", crate::i18n::tr("Auto"), false).clicked() {
                 let _ = app.run("develop.auto", json!({}));
@@ -125,15 +129,26 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
             {
                 let _ = app.run("develop.hdr", json!({"enabled": !d.hdr.enabled}));
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let mut reset = |ui: &mut egui::Ui| {
                 if text_button(ui, "reset", crate::i18n::tr("Reset"), false)
                     .on_hover_text(reset_tip(&app.ui.settings.keymap, ui.ctx().os() == egui::os::OperatingSystem::Mac))
                     .clicked()
                 {
                     reset_clicked = true;
                 }
-            });
-        });
+            };
+            if touch {
+                // the chips wrap on the narrow iPad panel; Reset follows them instead of covering HDR
+                reset(ui);
+            } else {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), reset);
+            }
+        };
+        if touch {
+            ui.horizontal_wrapped(chips);
+        } else {
+            ui.horizontal(chips);
+        }
     });
     if let Some(why) = &preview_only {
         let reload = egui::Frame::NONE

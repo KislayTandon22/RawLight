@@ -137,7 +137,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         } else {
             0.0
         };
-        let right_reserved = (if touch { if narrow { 262.0 } else { 210.0 } } else { 320.0 }) + select_extra;
+        let right_reserved = (if touch { if narrow { 302.0 } else { 210.0 } } else { 320.0 }) + select_extra;
         let search_left_bound = left_cluster_end + if touch { 12.0 } else { 16.0 };
         let search_right_bound = (full.right() - right_reserved).max(search_left_bound + 100.0);
         let available_search_w = search_right_bound - search_left_bound;
@@ -201,7 +201,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let fr_size = if touch { vec2(34.0, 34.0) } else { vec2(28.0, 28.0) };
         let fr_x = if touch { (sr.right() + 20.0).min(full.right() - 170.0) } else { sr.right() + 22.0 };
         let fr = Rect::from_center_size(pos2(fr_x, sr.center().y), fr_size);
-        let fresp = ui.interact(fr, egui::Id::new("filter-btn"), Sense::click());
+        let fresp = ui.interact(touch_hit(fr), egui::Id::new("filter-btn"), Sense::click());
+        crate::widgets::announce(&fresp, crate::i18n::tr("Filters"));
         register(ui.ctx(), "icon:filter", fr);
         let filtering = app.session.filter != Default::default() || app.ui.filter_bar;
         paint(
@@ -265,7 +266,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         };
         for &(id, icon, tip, cmd) in icons_list {
             let r = Rect::from_center_size(pos2(x, full.center().y), icon_size);
-            let resp = ui.interact(r, egui::Id::new(("top", id)), Sense::click()).on_hover_text(crate::i18n::tr(tip));
+            let resp = ui.interact(touch_hit(r), egui::Id::new(("top", id)), Sense::click()).on_hover_text(crate::i18n::tr(tip));
+            crate::widgets::announce(&resp, crate::i18n::tr(tip));
             register(ui.ctx(), format!("icon:{id}"), r);
             let warn = id == "cloud" && unsaved.is_some();
             let colour = if warn {
@@ -302,7 +304,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let btn_w = 58.0;
             let btn_h = if touch { 32.0 } else { 28.0 };
             let r = Rect::from_center_size(pos2(x - btn_w / 2.0 + 8.0, full.center().y), vec2(btn_w, btn_h));
-            let resp = ui.interact(r, egui::Id::new("topbar:select_mode"), Sense::click());
+            let resp = ui.interact(touch_hit(r), egui::Id::new("topbar:select_mode"), Sense::click());
+            crate::widgets::announce(&resp, crate::i18n::tr(sel_label));
             register(ui.ctx(), "button:multiSelect", r);
             let (fill, stroke_rim, text_col) = if is_active {
                 (t.accent, Stroke::NONE, Color32::WHITE)
@@ -337,7 +340,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let (icon, mode) = appearance_icon(app.ui.settings.appearance_mode);
         let r = Rect::from_center_size(pos2(x, full.center().y), icon_size);
         let tip = format!("{}: {}", crate::i18n::tr("Appearance Mode"), crate::i18n::tr(mode));
-        let resp = ui.interact(r, egui::Id::new(("top", "appearance")), Sense::click()).on_hover_text(tip);
+        let resp = ui.interact(touch_hit(r), egui::Id::new(("top", "appearance")), Sense::click()).on_hover_text(tip.clone());
+        crate::widgets::announce(&resp, tip);
         register(ui.ctx(), "icon:appearance", r);
         paint(ui.painter(), r.shrink(icon_shrink), icon, if resp.hovered() { t.text } else { t.icon });
         if resp.clicked() {
@@ -398,8 +402,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let lib_rect = Rect::from_min_size(mod_rect.min + vec2(pad, pad), vec2(mod_w, pill_h));
             let dev_rect = Rect::from_min_size(pos2(lib_rect.right() + 2.0, lib_rect.top()), vec2(mod_w, pill_h));
 
-            let lib_resp = ui.interact(lib_rect, egui::Id::new("module-library"), Sense::click());
-            let dev_resp = ui.interact(dev_rect, egui::Id::new("module-develop"), Sense::click());
+            let lib_resp = ui.interact(touch_hit(lib_rect), egui::Id::new("module-library"), Sense::click());
+            let dev_resp = ui.interact(touch_hit(dev_rect), egui::Id::new("module-develop"), Sense::click());
+            crate::widgets::announce(&lib_resp, crate::i18n::tr("Library"));
+            crate::widgets::announce(&dev_resp, crate::i18n::tr("Develop"));
 
             register(ui.ctx(), "module:library", lib_rect);
             register(ui.ctx(), "module:develop", dev_rect);
@@ -478,4 +484,9 @@ pub fn appearance_icon(mode: crate::state::AppearanceMode) -> (Icon, &'static st
         AppearanceMode::Light => (Icon::Sun, "Light Mode"),
         AppearanceMode::Dark => (Icon::Moon, "Dark Mode"),
     }
+}
+
+/// A finger's target for a control painted at `r`: at least 44pt each way, centred on it (the painted size is unchanged).
+fn touch_hit(r: Rect) -> Rect {
+    Rect::from_center_size(r.center(), vec2(r.width().max(44.0), r.height().max(44.0)))
 }

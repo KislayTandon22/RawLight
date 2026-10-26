@@ -257,10 +257,12 @@ fn row(app: &mut LightcraftApp, ui: &mut egui::Ui, r: &Row, selection: &[PhotoId
     register(ui.ctx(), format!("keywordCount:{}", r.path), count_rect);
     ui.painter().galley(count_rect.min, count, t.text_dim);
     let arrow = Rect::from_center_size(pos2(count_rect.left() - 12.0, cy), vec2(16.0, 16.0));
-    let ar = ui.interact(arrow, egui::Id::new(("keyword-list-show", r.path.to_lowercase())), Sense::click());
-    crate::widgets::announce(&ar, crate::i18n::tr("Show photos"));
-    register(ui.ctx(), format!("keywordShow:{}", r.path), arrow);
     let touch = crate::theme::touch_ui(ui.ctx());
+    // a finger needs a 44pt target; the arrow is still painted at 16pt
+    let arrow_hit = if touch { Rect::from_center_size(arrow.center(), vec2(44.0, ROW_H)) } else { arrow };
+    let ar = ui.interact(arrow_hit, egui::Id::new(("keyword-list-show", r.path.to_lowercase())), Sense::click());
+    crate::widgets::announce(&ar, crate::i18n::tr("Show photos"));
+    register(ui.ctx(), format!("keywordShow:{}", r.path), arrow_hit);
     if resp.hovered() || ar.hovered() || touch {
         paint(ui.painter(), arrow, Icon::ChevronRight, if ar.hovered() || touch { t.text } else { t.text_dim });
     }
