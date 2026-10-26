@@ -406,7 +406,7 @@ public func ios_update_safe_area() {
     let block = {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
-        if let insets = window?.safeAreaInsets, insets.top > 0 || insets.bottom > 0 {
+        if let insets = lcRealSafeAreaInsets(of: window), insets.top > 0 || insets.bottom > 0 {
             cachedSafeArea = insets
         }
     }
@@ -427,7 +427,7 @@ public func ios_get_safe_area(
     if Thread.isMainThread {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
-        if let insets = window?.safeAreaInsets, insets.top > 0 || insets.bottom > 0 {
+        if let insets = lcRealSafeAreaInsets(of: window), insets.top > 0 || insets.bottom > 0 {
             cachedSafeArea = insets
         }
     }

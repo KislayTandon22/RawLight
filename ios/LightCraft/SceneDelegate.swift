@@ -27,6 +27,25 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             method_exchangeImplementations(m1, m2)
             NSLog("[LightCraft-Swift] Swizzled UIWindow initWithFrame")
         }
+
+        // winit's iOS `inner_size()` is the safe-area rectangle, and egui-wgpu sizes the Metal surface from it,
+        // while the CAMetalLayer fills the whole window: the frame is drawn into a drawable that is too short and
+        // stretched to the window. The app handles safe areas itself (`ios_get_safe_area`), so winit and egui see none.
+        let getSel = #selector(getter: UIView.safeAreaInsets)
+        let lcSel = #selector(UIWindow.lc_safeAreaInsets)
+        if let mine = class_getInstanceMethod(UIWindow.self, lcSel),
+           let own = class_getInstanceMethod(UIWindow.self, getSel) {
+            // UIWindow's getter may be inherited from UIView: give UIWindow its own copy first, never touch UIView
+            let inherited = class_getInstanceMethod(UIView.self, getSel).map { method_getImplementation($0) }
+            if inherited != nil, method_getImplementation(own) == inherited,
+               let enc = method_getTypeEncoding(own) {
+                _ = class_addMethod(UIWindow.self, getSel, method_getImplementation(own), enc)
+            }
+            if let own2 = class_getInstanceMethod(UIWindow.self, getSel) {
+                method_exchangeImplementations(own2, mine)
+                NSLog("[LightCraft-Swift] Hooked UIWindow safeAreaInsets (own=%d)", inherited == nil ? 1 : 0)
+            }
+        }
     }
 
     func scene(
@@ -143,7 +162,22 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
+/// True only while the host reads the real safe area; everyone else (winit, egui-winit) sees zero.
+var lcRealSafeArea = false
+
+func lcRealSafeAreaInsets(of window: UIWindow?) -> UIEdgeInsets? {
+    lcRealSafeArea = true
+    defer { lcRealSafeArea = false }
+    return window?.safeAreaInsets
+}
+
 extension UIWindow {
+    /// After the exchange, `lc_safeAreaInsets` is UIKit's own getter and `safeAreaInsets` is this body.
+    @objc func lc_safeAreaInsets() -> UIEdgeInsets {
+        let real = self.lc_safeAreaInsets()
+        return lcRealSafeArea ? real : .zero
+    }
+
     @objc func lc_initWithFrame(_ frame: CGRect) -> UIWindow {
         let win = self.lc_initWithFrame(frame)
         if let ws = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
