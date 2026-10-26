@@ -35,8 +35,9 @@ pub(super) fn empty_library_in(app: &mut LightcraftApp, ui: &mut egui::Ui, r: eg
         t.font(14.0),
         t.text_dim,
     );
-    let (w, h) = (210.0, 46.0);
     let gap = 12.0;
+    // two buttons side by side; narrower on a Split View / portrait panel so neither is clipped
+    let (w, h) = (210.0f32.min((r.width() - gap - 32.0) / 2.0).max(110.0), 46.0);
     let y = c.y + 2.0;
     let import_folder = Rect::from_min_size(pos2(c.x - w - gap / 2.0, y), vec2(w, h));
     let import_photos = Rect::from_min_size(pos2(c.x + gap / 2.0, y), vec2(w, h));

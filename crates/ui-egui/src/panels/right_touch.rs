@@ -49,6 +49,8 @@ pub(super) fn title_row(app: &mut LightcraftApp, ui: &mut egui::Ui, t: &Tokens) 
     register(ui, "button:rightPanelClose", btn.rect);
     if btn.clicked() {
         app.ui.right = RightPanel::None;
+        // a mask tool left armed would keep press-and-hold Before and the canvas drag from working
+        app.ui.tool.clear();
     }
     divider(ui);
 }
