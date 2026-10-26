@@ -72,8 +72,14 @@ pub fn menu_button<'a, R>(ui: &mut Ui, atoms: impl egui::IntoAtoms<'a>, contents
 /// The click that opens (or moves) the menu is not the one that closes it.
 pub fn context_menu(response: &Response, add_contents: impl FnOnce(&mut Ui)) -> Option<egui::InnerResponse<()>> {
     egui::Popup::context_menu(response).close_behavior(context_menu_close(response, egui::PopupCloseBehavior::CloseOnClick)).show(|ui| {
-        touch_menu_style(ui);
-        add_contents(ui)
+        if crate::theme::touch_ui(ui.ctx()) {
+            touch_menu_style(ui);
+            // a long menu scrolls instead of running off the screen
+            let max = (ui.ctx().content_rect().height() - 96.0).max(200.0);
+            egui::ScrollArea::vertical().max_height(max).auto_shrink([true, true]).show(ui, add_contents);
+        } else {
+            add_contents(ui);
+        }
     })
 }
 

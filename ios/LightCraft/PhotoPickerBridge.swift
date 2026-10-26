@@ -403,14 +403,23 @@ public func ios_log(_ cstr: UnsafePointer<CChar>?) {
 
 private var cachedSafeArea: UIEdgeInsets = UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0)
 
+/// Keeps the last real insets. A window that is attached to a scene and on screen may report zeros for real (a Stage
+/// Manager window, a Split View pane away from the screen edge), and those replace the cache; zeros from a window that is
+/// not attached yet (launch) do not.
+private func refreshSafeArea(from window: UIWindow?) {
+    guard let window = window, let insets = lcRealSafeAreaInsets(of: window) else { return }
+    let attached = window.windowScene != nil && window.bounds.width > 0 && window.bounds.height > 0
+    if insets.top > 0 || insets.bottom > 0 || attached {
+        cachedSafeArea = insets
+    }
+}
+
 @_cdecl("ios_update_safe_area")
 public func ios_update_safe_area() {
     let block = {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
-        if let insets = lcRealSafeAreaInsets(of: window), insets.top > 0 || insets.bottom > 0 {
-            cachedSafeArea = insets
-        }
+        refreshSafeArea(from: window)
     }
     if Thread.isMainThread {
         block()
@@ -429,9 +438,7 @@ public func ios_get_safe_area(
     if Thread.isMainThread {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let window = scenes.first?.windows.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
-        if let insets = lcRealSafeAreaInsets(of: window), insets.top > 0 || insets.bottom > 0 {
-            cachedSafeArea = insets
-        }
+        refreshSafeArea(from: window)
     }
     top?.pointee = Float(cachedSafeArea.top)
     bottom?.pointee = Float(cachedSafeArea.bottom)
