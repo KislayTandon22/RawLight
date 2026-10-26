@@ -90,7 +90,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 /// and 10-point padding at both ends.
 const PILL_W: f32 = 208.0;
 /// Wider on the iPad, where the pick / reject buttons are 30pt touch targets.
-const PILL_W_TOUCH: f32 = 276.0;
+const PILL_W_TOUCH: f32 = 324.0;
 
 /// The stars and the unflag / pick (tick) / reject (cross) buttons, laid out left to right in `pill_ui`.
 fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active: Option<&lightcraft_catalog::Photo>) {
@@ -106,7 +106,7 @@ fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active:
     let flag = active.map(|p| p.flag).unwrap_or_default();
     for (id, icon, f) in [("unflag", Icon::Circle, Flag::None), ("pick", Icon::FlagPick, Flag::Pick), ("reject", Icon::FlagReject, Flag::Reject)] {
         let (r, resp) = pill_ui.allocate_exact_size(
-            vec2(if crate::theme::touch_ui(pill_ui.ctx()) { 30.0 } else { 22.0 }, if crate::theme::touch_ui(pill_ui.ctx()) { 30.0 } else { 22.0 }),
+            vec2(if crate::theme::touch_ui(pill_ui.ctx()) { 36.0 } else { 22.0 }, if crate::theme::touch_ui(pill_ui.ctx()) { 36.0 } else { 22.0 }),
             Sense::click(),
         );
         register(pill_ui, format!("flag:{id}"), r);
@@ -259,7 +259,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let label = crate::i18n::tr(if has_clip { "Paste Edit Settings" } else { "Copy Edit Settings" });
     let copy_width = (ui.painter().layout_no_wrap(label.to_string(), t.font(13.0), t.text_label).size().x + 24.0).max(136.0);
     let pill_w = if crate::theme::touch_ui(ui.ctx()) { PILL_W_TOUCH } else { PILL_W };
-    let centre_width = pill_w + 10.0 + copy_width + 4.0 + 30.0 + if crate::theme::touch_ui(ui.ctx()) { 78.0 } else { 0.0 };
+    let centre_width = pill_w + 10.0 + copy_width + 4.0 + 30.0;
     let room = to - from;
     // no room for it in the bar: the canvas shows it as a floating capsule instead (touch layout)
     app.ui.rating_floating = room < pill_w && crate::theme::touch_ui(ui.ctx());
@@ -271,7 +271,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     // where it sits with room to spare (slightly left of centre), kept between the side groups
     let left = (full.center().x - 60.0 - pill_w / 2.0).clamp(from, to - w);
     let active = app.session.active().and_then(|id| app.session.catalog.photo(id).cloned());
-    let pill_h = if crate::theme::touch_ui(ui.ctx()) { 34.0 } else { 30.0 };
+    let pill_h = if crate::theme::touch_ui(ui.ctx()) { 40.0 } else { 30.0 };
     let pill = Rect::from_min_size(pos2(left, full.center().y - pill_h / 2.0), vec2(pill_w, pill_h));
     // (inside a glass bar the pill is only a faint inset: glass does not sit on opaque dark)
     ui.painter().rect_filled(pill, 15.0, if crate::glass::active(ui.ctx()) { Color32::from_white_alpha(14) } else { t.canvas });
@@ -282,7 +282,8 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     );
     rating_pill_contents(app, &mut pill_ui, active.as_deref());
     // Undo / Redo right after the rater (the top bar has them too), when there is room for them
-    let undo_group = crate::theme::touch_ui(ui.ctx()) && room >= pill_w + 84.0;
+    // (Copy Edit Settings matters more than a second pair of undo / redo buttons: they appear only when both fit)
+    let undo_group = crate::theme::touch_ui(ui.ctx()) && room >= centre_width + 78.0;
     if undo_group {
         let r = Rect::from_min_size(pos2(pill.right() + 8.0, pill.top()), vec2(72.0, pill_h));
         let mut cu = ui.new_child(egui::UiBuilder::new().max_rect(r).layout(egui::Layout::left_to_right(egui::Align::Center)));
@@ -681,7 +682,7 @@ mod tests {
                         .shapes
                         .iter()
                         .find_map(|shape| match &shape.shape {
-                            egui::Shape::Rect(rect) if rect.rect.contains(star.center()) && rect.rect.height() == 30.0 => Some(rect.rect),
+                            egui::Shape::Rect(rect) if rect.rect.contains(star.center()) && rect.rect.height() == 36.0 => Some(rect.rect),
                             _ => None,
                         })
                         .unwrap();

@@ -130,7 +130,7 @@ impl Rating {
         let t = Tokens::get(ui.ctx());
         // finger-sized stars on the iPad
         let touch = crate::theme::touch_ui(ui.ctx());
-        let cell = if touch { 30.0 } else { RatingSize::Large.cell() };
+        let cell = if touch { 36.0 } else { RatingSize::Large.cell() };
         let mut out = None;
         let mut hover_n = None;
         let mut focused_at = None;
@@ -182,7 +182,7 @@ impl Rating {
         }
         // The hovered star also gets the icon-button hover square, so hovering the current rating (where
         // the preview looks the same) still shows feedback.
-        let side = if touch { 22.0 } else { RatingSize::Large.icon() };
+        let side = if touch { 24.0 } else { RatingSize::Large.icon() };
         for (i, r) in (0..STARS).zip(cells) {
             if hover_n == Some(i + 1) {
                 ui.painter().rect_filled(r, 4.0, t.hover.gamma_multiply(0.7));
