@@ -415,7 +415,36 @@ pub fn specs() -> Vec<CommandSpec> {
                 Ok(json!({"mix": m}))
             }
         ),
-        cmd!("develop.auto", "Auto Settings", ["Photo"], Some("Shift+A"), "{}", has_active, |s, _| {
+        cmd!("develop.auto", "Auto Settings", ["Photo"], Some("Shift+A"), "{ids?}", has_active, |s, p| {
+            // `ids` (the iPad's Quick Develop): each photo gets its own Auto, in one undo step
+            if p.get("ids").is_some_and(|v| !v.is_null()) {
+                let targets = s.targets(p)?;
+                if !(targets.len() == 1 && s.active() == Some(targets[0])) {
+                    if targets.is_empty() {
+                        return Err(bad("develop.auto", "no photo"));
+                    }
+                    let ops: Vec<_> = targets
+                        .iter()
+                        .filter_map(|&id| {
+                            let src = s.source_now(id, SourceLevel::Thumb).ok()?;
+                            let info = s.source_info(id);
+                            let mut d = (*s.develop_of(id)?).clone();
+                            let a = lightcraft_pipeline::auto::auto_tone(&src, &info, &d);
+                            d.light.exposure = a.exposure;
+                            d.light.contrast = a.contrast;
+                            d.light.highlights = a.highlights;
+                            d.light.shadows = a.shadows;
+                            d.light.whites = a.whites;
+                            d.light.blacks = a.blacks;
+                            d.color.vibrance = a.vibrance;
+                            d.color.saturation = a.saturation;
+                            s.develop_op(id, d, "Auto")
+                        })
+                        .collect();
+                    s.commit("Auto", Op::Batch { ops })?;
+                    return ok();
+                }
+            }
             let id = active(s, "develop.auto")?;
             let src = s.source_now(id, SourceLevel::Thumb).map_err(|e| bad("develop.auto", e))?;
             let info = s.source_info(id);

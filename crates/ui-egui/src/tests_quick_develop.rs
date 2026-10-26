@@ -122,3 +122,24 @@ fn survey_dismiss_badge_drops_candidate() {
     );
     assert_eq!(h.app.session.selection.ids.len(), 2, "selection should now have 2 photos");
 }
+
+#[test]
+fn quick_develop_auto_tone_edits_every_selected_photo() {
+    let mut h = demo();
+    let vis: Vec<u64> = h.app.session.visible_cloned().iter().map(|p| p.0).collect();
+    assert!(vis.len() >= 3);
+    let targets = vec![vis[0], vis[1], vis[2]];
+    let r = h.request("engine.execute", json!({"command": "library.select", "params": {"ids": targets.clone(), "active": targets[0]}}), T);
+    assert_eq!(r["ok"], true);
+    let contrast = |h: &Headless, id: u64| h.app.session.develop_of(lightcraft_catalog::PhotoId(id)).map(|d| d.light.contrast).unwrap_or(0.0);
+    assert!(targets.iter().all(|&id| contrast(&h, id) != 68.0));
+
+    let r = h.request("engine.execute", json!({"command": "develop.auto", "params": {"ids": targets.clone()}}), T);
+    assert_eq!(r["ok"], true, "{r}");
+    assert!(targets.iter().all(|&id| contrast(&h, id) == 68.0), "Auto must reach every selected photo, not only the active one");
+
+    // one undo step reverts all three
+    let r = h.request("engine.execute", json!({"command": "edit.undo", "params": {}}), T);
+    assert_eq!(r["ok"], true, "{r}");
+    assert!(targets.iter().all(|&id| contrast(&h, id) != 68.0));
+}

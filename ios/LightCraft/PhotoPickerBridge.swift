@@ -204,8 +204,8 @@ final class PhotoPickerManager: NSObject, PHPickerViewControllerDelegate, UIDocu
         for (oldPath, data) in all {
             var stale = false
             guard let url = try? URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale) else {
-                NSLog("[PhotoPickerBridge] a remembered folder is gone: %@", oldPath)
-                kept[oldPath] = nil
+                // an external drive that is not plugged in does not resolve: keep its bookmark for the next launch
+                NSLog("[PhotoPickerBridge] a remembered folder is not reachable (drive unplugged?): %@", oldPath)
                 continue
             }
             if url.startAccessingSecurityScopedResource() {

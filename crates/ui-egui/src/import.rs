@@ -637,7 +637,11 @@ pub fn poll_scan(app: &mut LightcraftApp, ctx: &egui::Context) {
     d.set_trashed(trashed);
     // iPad: photos picked from Files / iCloud Drive are copied into the library by default. In place they depend on
     // folder access that iOS can withdraw between launches ("original not found"); photos already inside the app are not copied again.
-    d.copy = task.copy || (crate::theme::touch_ui(ctx) && task.sources.iter().any(|s| !s.contains("/Containers/Data/Application/")));
+    // A USB drive or network share is the opposite case: the iPad's storage is small, so the photos stay on the drive.
+    d.copy = task.copy
+        || (crate::theme::touch_ui(ctx)
+            && task.sources.iter().any(|s| !s.contains("/Containers/Data/Application/"))
+            && !task.sources.iter().all(|s| on_external_volume(s)));
     // only an album the review offers (it may have been deleted while the scan ran)
     d.album = task.album.filter(|id| app.session.catalog.album(lightcraft_catalog::AlbumId(*id)).is_some_and(|a| !a.folder && !a.is_smart()));
     d.sources = task.sources;
@@ -667,6 +671,12 @@ fn show_pending_review(app: &mut LightcraftApp, ctx: &egui::Context) {
 }
 
 /// Tests: a review scan that never ends while the returned value lives, so a drop meets it running.
+/// A path on a drive the iPad mounts for Files (USB storage, SD reader, SMB share): iPadOS exposes them under
+/// `.../LiveFiles/com.apple.filesystems.userfsd/`. Anywhere else (macOS, Windows, Linux) this is never true.
+fn on_external_volume(path: &str) -> bool {
+    path.contains("/LiveFiles/com.apple.filesystems.userfsd/")
+}
+
 #[cfg(test)]
 pub(crate) fn stall_scan(app: &mut LightcraftApp) -> Box<dyn std::any::Any> {
     stall_scan_of(app, false)
@@ -1860,5 +1870,17 @@ mod tests {
         d.last_clicked = Some(99);
         d.click(2, true);
         assert_eq!(d.checked, [true, true, false, false, true, true]);
+    }
+}
+
+#[cfg(test)]
+mod external_volume_tests {
+    use super::on_external_volume;
+
+    #[test]
+    fn usb_and_share_mounts_are_external_and_the_app_container_is_not() {
+        assert!(on_external_volume("/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/AbCd/DCIM/100CANON"));
+        assert!(!on_external_volume("/private/var/mobile/Containers/Data/Application/UUID/Documents/Photos"));
+        assert!(!on_external_volume("/Users/me/Pictures"));
     }
 }
