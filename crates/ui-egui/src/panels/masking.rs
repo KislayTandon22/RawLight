@@ -832,7 +832,9 @@ fn describe_field(app: &mut LightcraftApp, ui: &mut egui::Ui, new_mask: bool) {
     app.ui.describe = Some((op.clone(), text.clone()));
     if submit && !text.trim().is_empty() {
         let trimmed = text.trim().to_lowercase();
+        // iPad: a plain word names a ready-made mask; desktop always sends the text to the AI prompt
         let alias = match trimmed.as_str() {
+            _ if !crate::theme::touch_ui(ui.ctx()) => None,
             "sky" | "the sky" | "skies" => Some("sky"),
             "subject" | "the subject" | "person" | "people" => Some("subject"),
             "background" | "the background" | "bg" => Some("background"),

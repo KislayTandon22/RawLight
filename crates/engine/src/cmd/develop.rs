@@ -262,6 +262,9 @@ pub fn specs() -> Vec<CommandSpec> {
                             s.develop_op(id, d, spec.label)
                         })
                         .collect();
+                    if ops.is_empty() {
+                        return Err(bad("develop", "none of the photos could be edited"));
+                    }
                     s.commit(spec.label, Op::Batch { ops })?;
                     return ok();
                 }
@@ -423,26 +426,35 @@ pub fn specs() -> Vec<CommandSpec> {
                     if targets.is_empty() {
                         return Err(bad("develop.auto", "no photo"));
                     }
-                    let ops: Vec<_> = targets
-                        .iter()
-                        .filter_map(|&id| {
-                            let src = s.source_now(id, SourceLevel::Thumb).ok()?;
-                            let info = s.source_info(id);
-                            let mut d = (*s.develop_of(id)?).clone();
-                            let a = lightcraft_pipeline::auto::auto_tone(&src, &info, &d);
-                            d.light.exposure = a.exposure;
-                            d.light.contrast = a.contrast;
-                            d.light.highlights = a.highlights;
-                            d.light.shadows = a.shadows;
-                            d.light.whites = a.whites;
-                            d.light.blacks = a.blacks;
-                            d.color.vibrance = a.vibrance;
-                            d.color.saturation = a.saturation;
-                            s.develop_op(id, d, "Auto")
-                        })
-                        .collect();
-                    s.commit("Auto", Op::Batch { ops })?;
-                    return ok();
+                    let mut ops = Vec::new();
+                    let mut unreadable = 0usize;
+                    for &id in &targets {
+                        let Ok(src) = s.source_now(id, SourceLevel::Thumb) else {
+                            unreadable += 1;
+                            continue;
+                        };
+                        let info = s.source_info(id);
+                        let Some(mut d) = s.develop_of(id).map(|d| (*d).clone()) else { continue };
+                        let a = lightcraft_pipeline::auto::auto_tone(&src, &info, &d);
+                        d.light.exposure = a.exposure;
+                        d.light.contrast = a.contrast;
+                        d.light.highlights = a.highlights;
+                        d.light.shadows = a.shadows;
+                        d.light.whites = a.whites;
+                        d.light.blacks = a.blacks;
+                        d.color.vibrance = a.vibrance;
+                        d.color.saturation = a.saturation;
+                        ops.extend(s.develop_op(id, d, "Auto"));
+                    }
+                    if !ops.is_empty() {
+                        s.commit("Auto", Op::Batch { ops })?;
+                    }
+                    // the readable photos are edited either way; say so when some could not be
+                    return if unreadable > 0 {
+                        Err(bad("develop.auto", format!("{unreadable} photo(s) could not be read and were left as they were")))
+                    } else {
+                        ok()
+                    };
                 }
             }
             let id = active(s, "develop.auto")?;
@@ -505,6 +517,9 @@ pub fn specs() -> Vec<CommandSpec> {
                                 s.develop_op(id, d, "White Balance")
                             })
                             .collect();
+                        if ops.is_empty() {
+                            return Err(bad("develop.wb", "none of the photos could be edited"));
+                        }
                         s.commit("White Balance", Op::Batch { ops })?;
                         return ok();
                     }

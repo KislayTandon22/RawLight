@@ -818,7 +818,7 @@ pub struct UiState {
     pub preset_thumbs: bool,
     pub filmstrip: bool,
     /// Multi-select mode (on iPad touch, single taps toggle selection and multi-action bar is visible).
-    #[serde(default)]
+    #[serde(skip)]
     pub multi_select: bool,
     pub zoom: Zoom,
     /// Pan offset of the loupe when zoomed (image-normalized centre).

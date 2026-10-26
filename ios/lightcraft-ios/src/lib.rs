@@ -66,6 +66,7 @@ impl log::Log for OsLogger {
             return;
         }
         let msg = format!("[LightCraft-Rust] [{}] {}\0", record.level(), record.args());
+        // SAFETY: `msg` ends in NUL and lives until the call returns; Swift's `ios_log` only reads it.
         unsafe {
             ios_log(msg.as_ptr() as *const c_char);
         }
@@ -207,6 +208,7 @@ impl IosApp {
         let wants_kb = ctx.egui_wants_keyboard_input() || self.app.text_focus;
         if wants_kb != self.last_wants_kb {
             self.last_wants_kb = wants_kb;
+            // SAFETY: `ios_toggle_keyboard` is defined by the Swift host linked into this app and takes a plain bool.
             unsafe {
                 ios_toggle_keyboard(wants_kb);
             }

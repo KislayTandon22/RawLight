@@ -927,14 +927,17 @@ fn xmp_warning_text(warning: &ImportWarning) -> String {
     }
 }
 
-fn xmp_warnings_text(warnings: &[ImportWarning]) -> String {
-    let mut shown: Vec<String> = warnings.iter().take(2).map(xmp_warning_text).map(|text| shorten_paths(&text)).collect();
-
-    if warnings.len() > 2 {
-        let remaining = warnings.len().saturating_sub(2);
-        shown.push(format!("…and {remaining} more"));
-    }
-
+fn xmp_warnings_text(warnings: &[ImportWarning], touch: bool) -> String {
+    // The iPad's toast is small: two warnings, file names instead of paths. Desktop lists every warning in full.
+    let shown: Vec<String> = if touch {
+        let mut shown: Vec<String> = warnings.iter().take(2).map(xmp_warning_text).map(|text| shorten_paths(&text)).collect();
+        if warnings.len() > 2 {
+            shown.push(crate::i18n::tr_format!("…and {n} more", n = warnings.len() - 2));
+        }
+        shown
+    } else {
+        warnings.iter().map(xmp_warning_text).collect()
+    };
     crate::i18n::tr_format!("Import warnings ({n}):\n{warnings}", n = warnings.len(), warnings = shown.join("\n"),)
 }
 
@@ -1003,7 +1006,7 @@ fn finish(app: &mut LightcraftApp, ctx: &egui::Context, task: ImportTask) {
     app.session.merge_undo(steps, &label);
     if task.auto {
         if !task.warnings.is_empty() {
-            app.toast_for(ctx, xmp_warnings_text(&task.warnings), 8.0);
+            app.toast_for(ctx, xmp_warnings_text(&task.warnings, crate::theme::touch_ui(ctx)), 8.0);
         } else if task.imported > 0 {
             app.toast(ctx, crate::i18n::tr_format!("Auto Import: added {} photo{}", task.imported, if task.imported == 1 { "" } else { "s" }));
         }
@@ -1011,7 +1014,7 @@ fn finish(app: &mut LightcraftApp, ctx: &egui::Context, task: ImportTask) {
     }
     if task.browse {
         if !task.warnings.is_empty() {
-            app.toast_for(ctx, xmp_warnings_text(&task.warnings), 8.0);
+            app.toast_for(ctx, xmp_warnings_text(&task.warnings, crate::theme::touch_ui(ctx)), 8.0);
         } else if task.failed > 0 {
             app.toast(ctx, crate::i18n::tr_format!("{} photo{} not readable", task.failed, if task.failed == 1 { "" } else { "s" }));
         }
@@ -1067,7 +1070,7 @@ fn finish(app: &mut LightcraftApp, ctx: &egui::Context, task: ImportTask) {
         app.toast(ctx, msg);
     } else {
         msg.push_str("\n\n");
-        msg.push_str(&xmp_warnings_text(&task.warnings));
+        msg.push_str(&xmp_warnings_text(&task.warnings, crate::theme::touch_ui(ctx)));
         app.toast_for(ctx, msg, 8.0);
     }
 }

@@ -1571,16 +1571,10 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
             let prev = app.session.last_export.clone().unwrap_or_default();
             let u = |k: &str, d: u64| prev.get(k).and_then(Value::as_u64).unwrap_or(d);
             #[allow(unused_mut)]
-            let mut dir = prev
-                .get("dir")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .map(str::to_string)
-                .unwrap_or_else(crate::control::default_export_dir);
+            let mut dir = prev.get("dir").and_then(Value::as_str).map(str::to_string).unwrap_or_else(crate::control::default_export_dir);
             #[cfg(target_os = "ios")]
             {
-                if !std::path::Path::new(&dir).exists() && std::fs::create_dir_all(&dir).is_err() {
+                if dir.trim().is_empty() || (!std::path::Path::new(&dir).exists() && std::fs::create_dir_all(&dir).is_err()) {
                     dir = crate::control::default_export_dir();
                 }
             }

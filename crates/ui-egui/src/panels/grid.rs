@@ -927,7 +927,7 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         let m = ui.input(|i| i.modifiers);
         let mode = if m.shift {
             "range"
-        } else if m.command || app.ui.multi_select {
+        } else if m.command || (app.ui.multi_select && crate::theme::touch_ui(ui.ctx())) {
             "toggle"
         } else {
             "replace"

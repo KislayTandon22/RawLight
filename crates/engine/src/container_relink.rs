@@ -54,6 +54,9 @@ impl Session {
             self.commit("Remove Demo Photos", Op::Batch { ops })?;
             self.undo.clear();
             self.redo.clear();
+            // the restored selection may name a demo photo that is now gone
+            self.selection.ids.retain(|id| self.catalog.photo(*id).is_some());
+            self.selection.active = self.selection.active.filter(|id| self.catalog.photo(*id).is_some());
         }
         Ok(n)
     }

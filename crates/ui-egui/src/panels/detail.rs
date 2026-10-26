@@ -225,7 +225,7 @@ fn wheel_notches(events: &[egui::Event]) -> f32 {
 
 /// Native pinch (also modifier-wheel zoom) and two-finger scroll, scoped to this image view.
 pub(crate) fn navigate_gesture(app: &mut LightcraftApp, ui: &mut egui::Ui, resp: &egui::Response, area: Rect, img: Rect, native: [usize; 2]) -> bool {
-    let touches_here = ui.input(|i| i.multi_touch().is_some_and(|touch| area.contains(touch.center_pos)));
+    let touches_here = crate::theme::touch_ui(ui.ctx()) && ui.input(|i| i.multi_touch().is_some_and(|touch| area.contains(touch.center_pos)));
     if !resp.hovered() && !touches_here {
         return false;
     }
@@ -3081,7 +3081,7 @@ pub(crate) fn filmstrip(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect) {
                     // ⌘/Ctrl- and Shift-clicks change the selection; the pair on screen stays (#187)
                     super::compare::select_with_modifier(app, *id, !m.command)
                 } else {
-                    let mode = if m.command || app.ui.multi_select {
+                    let mode = if m.command || (app.ui.multi_select && crate::theme::touch_ui(ui.ctx())) {
                         "toggle"
                     } else if m.shift {
                         "range"

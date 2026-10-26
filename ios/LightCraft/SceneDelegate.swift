@@ -98,6 +98,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
         NSLog("[LightCraft-Swift] sceneWillEnterForeground")
         bindWindows(to: windowScene)
+        // a USB drive plugged in while the app was away: bring its remembered folders back
+        PhotoPickerManager.shared.restoreRememberedFolders()
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {

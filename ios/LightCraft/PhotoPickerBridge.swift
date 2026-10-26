@@ -208,7 +208,9 @@ final class PhotoPickerManager: NSObject, PHPickerViewControllerDelegate, UIDocu
                 NSLog("[PhotoPickerBridge] a remembered folder is not reachable (drive unplugged?): %@", oldPath)
                 continue
             }
-            if url.startAccessingSecurityScopedResource() {
+            // restoring runs again each time the app comes back to the foreground (a drive may have been plugged in
+            // meanwhile), so a folder already held open is not opened twice
+            if !activeSecurityScopedUrls.contains(where: { $0.path == url.path }), url.startAccessingSecurityScopedResource() {
                 activeSecurityScopedUrls.append(url)
             }
             NSLog("[PhotoPickerBridge] restored access to %@", url.path)
