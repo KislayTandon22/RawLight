@@ -1177,7 +1177,11 @@ pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
         let y = |key: &str| m.get_temp::<f32>(egui::Id::unique(key));
         y(CONTENT_BOTTOM).zip(y(GRID_BOTTOM)).map(|(content, grid)| content - grid)
     });
-    let grid_h = grid_height(ui.available_height(), below.unwrap_or(DEFAULT_BELOW_GRID), cell + 26.0);
+    let mut grid_h = grid_height(ui.available_height(), below.unwrap_or(DEFAULT_BELOW_GRID), cell + 26.0);
+    if crate::theme::touch_ui(ui.ctx()) {
+        // iPad: no more room than the rows need, and never more than a third of the screen: the options below stay in reach
+        grid_h = grid_h.min(rows as f32 * (cell + 26.0)).min(ui.ctx().content_rect().height() * 0.34).max(cell + 26.0);
+    }
     let grid =
         egui::ScrollArea::vertical().id_salt("import-grid").max_height(grid_h).auto_shrink([false, false]).show_viewport(ui, |ui, viewport| {
             let (area, _) = ui.allocate_exact_size(vec2(avail, rows as f32 * (cell + 26.0)), Sense::hover());
@@ -1392,7 +1396,7 @@ pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
             let mut extra = None;
             let empty = crate::i18n::tr(if d.new_album.is_empty() { "None" } else { "New album" });
             let response = crate::album_picker::AlbumPicker::new("import-album", &mut chosen, &albums)
-                .width(ui.available_width())
+                .width(if crate::theme::touch_ui(ui.ctx()) { ui.available_width().min(320.0) } else { ui.available_width() })
                 .empty_text(empty)
                 .show_with_choices(ui, |ui| {
                     let none = ui.selectable_label(d.album.is_none() && d.new_album.is_empty(), crate::i18n::tr("None"));

@@ -298,7 +298,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
     // The import review can be resized (its photo grid takes the room); it keeps a window id of its
     // own so the size it is given doesn't carry over to the other dialogs. Its content scrolls
     // rather than growing the window when the options below the grid get taller (e.g. Copy).
-    let import = matches!(dlg, Dialog::Import { .. });
+    // iPad: the Import review fits the screen like the other dialogs (its options scroll, the title and the button row stay
+    // put) instead of a desktop-sized window whose Import button ends up below the screen edge.
+    let import_fits = matches!(dlg, Dialog::Import { .. }) && crate::theme::touch_ui(ctx);
+    let import = matches!(dlg, Dialog::Import { .. }) && !import_fits;
     // The Print dialog sizes itself to the window and scrolls its settings column on its own.
     let print = matches!(dlg, Dialog::Print);
     let window_id = window_id(&dlg);
@@ -329,6 +332,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
         .anchor(if settings { egui::Align2::CENTER_TOP } else { egui::Align2::CENTER_CENTER }, [0.0, if settings { top } else { 0.0 }])
         .min_width(widest)
         .default_width(match dlg {
+            Dialog::Import { .. } if import_fits => crate::import::DIALOG_SIZE[0].min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN),
             Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
             Dialog::SmartRules { .. } => 680.0,
             Dialog::AllMetadata { .. } => 620.0,
