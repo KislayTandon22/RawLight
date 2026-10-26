@@ -2573,6 +2573,21 @@ impl LightcraftApp {
         if theme::touch_ui(&ctx) && ctx.content_rect().width() < 900.0 && self.ui.right_width > 300.0 {
             self.ui.right_width = 300.0;
         }
+        // iPad: landscape and portrait have their own panel arrangement; switching orientation swaps them
+        {
+            let r = ctx.content_rect();
+            let portrait = theme::touch_ui(&ctx) && r.height() > r.width();
+            if docking::set_portrait(portrait, (r.height() * 0.46).clamp(300.0, 560.0)) {
+                std::mem::swap(&mut self.ui.docking, &mut self.ui.docking_other);
+            }
+        }
+        // iPad, nothing imported yet: one centred empty state, not an empty sidebar and tool panel beside it
+        if theme::touch_ui(&ctx) && self.session.catalog.is_empty() {
+            self.ui.left_panel = false;
+            self.ui.presets = false;
+            self.ui.right = state::RightPanel::None;
+            self.ui.docking = None;
+        }
         icons::set_touch_glyphs(theme::touch_ui(&ctx));
         glass::paint_backdrop(&ctx);
         if !self.fonts_ready {

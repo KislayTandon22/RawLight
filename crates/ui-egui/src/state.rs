@@ -786,6 +786,9 @@ pub struct UiState {
     pub window: Option<crate::window_place::WindowPlace>,
     /// Shared panel arrangement; absent in legacy settings until their first layout.
     pub docking: Option<crate::docking::Workspace>,
+    /// The arrangement of the other orientation (iPad: landscape and portrait are laid out separately).
+    #[serde(skip)]
+    pub docking_other: Option<crate::docking::Workspace>,
     /// The arrangement generation `docking` was saved in ([`crate::docking::DOCKING_VERSION`]);
     /// settings files are read through [`crate::docking::drop_outdated`].
     pub docking_version: u32,
@@ -1512,6 +1515,7 @@ impl Default for UiState {
         UiState {
             window: None,
             docking: None,
+            docking_other: None,
             docking_version: crate::docking::DOCKING_VERSION,
             language: crate::i18n::default_language(),
             preview_build_seen: None,

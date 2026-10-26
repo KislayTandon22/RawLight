@@ -53,6 +53,26 @@ impl Panel {
 
 const PRESETS_WIDTH: f32 = 300.0;
 
+/// iPad portrait is its own layout, not the landscape one squeezed: the tool panel is a sheet under the photo and the
+/// library a narrow drawer at the left edge. The window's orientation (and the sheet's height) is set once per frame.
+static PORTRAIT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static PORTRAIT_SHEET: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+fn portrait() -> bool {
+    PORTRAIT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn sheet_height() -> f32 {
+    let h = f32::from_bits(PORTRAIT_SHEET.load(std::sync::atomic::Ordering::Relaxed));
+    if h.is_finite() && h > 0.0 { h } else { 420.0 }
+}
+
+/// Records the window's orientation; true when it changed (the caller swaps in the other orientation's arrangement).
+pub fn set_portrait(on: bool, sheet: f32) -> bool {
+    PORTRAIT_SHEET.store(sheet.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    PORTRAIT.swap(on, std::sync::atomic::Ordering::Relaxed) != on
+}
+
 /// The arrangement generation saved as `UiState::docking_version`. Settings without it hold the
 /// side panels in split frames; they start again from [`default_workspace`].
 pub const DOCKING_VERSION: u32 = 1;
@@ -105,13 +125,43 @@ fn docked(left: f32, right: f32) -> Workspace {
     })
 }
 
+/// Portrait: the library as a drawer on the left, the photo above, the tool panel as a sheet below it.
+fn docked_portrait(left: f32, sheet: f32) -> Workspace {
+    let start = Node::Dock { side: Side::Start, columns: vec![column(Panel::Library, left)] };
+    Workspace::new(Layout {
+        root: Some(split(
+            SplitAxis::Horizontal,
+            SplitSize::FixedFirst(left),
+            start,
+            split(SplitAxis::Vertical, SplitSize::FixedSecond(sheet), tabs(Panel::Canvas), tabs(Panel::Tools)),
+        )),
+        floating: Vec::new(),
+    })
+}
+
 pub fn default_workspace() -> Workspace {
+    if portrait() {
+        return docked_portrait(crate::state::LEFT_WIDTH.default, sheet_height());
+    }
     docked(crate::state::LEFT_WIDTH.default, crate::state::RIGHT_WIDTH.default)
 }
 
 /// Where a panel without a usable recorded place opens: its own column at its dock's window
 /// edge, or Presets on the photo side of Tools while Tools is in the end dock.
 fn home(workspace: &Workspace, panel: Panel) -> Location<Panel> {
+    if portrait() && matches!(panel, Panel::Tools | Panel::Presets) {
+        // the sheet under the photo; Presets is a tab of it
+        let tools = panel == Panel::Presets && workspace.layout.contains(&Panel::Tools);
+        return Location {
+            floating: None,
+            anchor: Some(if tools { Panel::Tools } else { Panel::Canvas }),
+            placement: if tools { Placement::Tab { before: None } } else { Placement::Split(Zone::Bottom) },
+            size: (!tools).then_some(SplitSize::FixedSecond(sheet_height())),
+            stack: None,
+            sibling: Vec::new(),
+            group: Some(GroupLocation { minimized: false, height: None, column: None }),
+        };
+    }
     let column = ColumnLocation { side: panel.home_side(), width: panel.home_width(), iconic: false, iconic_width: None };
     let docked_at =
         |other: Panel| workspace.layout.location(&other).ok().and_then(|location| location.group).and_then(|group| group.column).map(|c| c.side);
@@ -230,6 +280,9 @@ fn run(workspace: &mut Workspace, params: &Value) -> Result<(), String> {
 }
 
 fn from_ui(app: &crate::LightcraftApp) -> Workspace {
+    if portrait() {
+        return docked_portrait(crate::state::LEFT_WIDTH.clamp(app.ui.left_width), sheet_height());
+    }
     docked(crate::state::LEFT_WIDTH.clamp(app.ui.left_width), crate::state::RIGHT_WIDTH.clamp(app.ui.right_width))
 }
 
