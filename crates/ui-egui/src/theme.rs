@@ -420,7 +420,7 @@ pub const WHEEL_STRIP_SHARE: f32 = 1.0 / 3.0;
 pub const WHEEL_ZOOM_PER_POINT: f32 = 40.0 / 200.0 / WHEEL_LINE_POINTS;
 
 fn theme_id() -> egui::Id {
-    egui::Id::new("lightcraft-theme")
+    egui::Id::unique("lightcraft-theme")
 }
 
 /// The theme `ctx` is styled with (none before the first [`apply_kind`]).
@@ -435,22 +435,22 @@ pub fn apply(ctx: &egui::Context) {
 
 /// Enable larger controls for touch-first hosts before the first frame.
 pub fn set_touch_ui(ctx: &egui::Context, enabled: bool) {
-    ctx.data_mut(|data| data.insert_persisted(egui::Id::new("lightcraft-touch-ui"), enabled));
+    ctx.data_mut(|data| data.insert_persisted(egui::Id::unique("lightcraft-touch-ui"), enabled));
 }
 
 /// Whether this host asks for touch-sized controls.
 pub fn touch_ui(ctx: &egui::Context) -> bool {
-    ctx.data_mut(|data| data.get_persisted::<bool>(egui::Id::new("lightcraft-touch-ui"))).unwrap_or(false)
+    ctx.data_mut(|data| data.get_persisted::<bool>(egui::Id::unique("lightcraft-touch-ui"))).unwrap_or(false)
 }
 
 /// Record host safe-area insets: [top, bottom, left, right] in points.
 pub fn set_safe_area_insets(ctx: &egui::Context, top: f32, bottom: f32, left: f32, right: f32) {
-    ctx.data_mut(|data| data.insert_persisted(egui::Id::new("lightcraft-safe-area-insets"), [top, bottom, left, right]));
+    ctx.data_mut(|data| data.insert_persisted(egui::Id::unique("lightcraft-safe-area-insets"), [top, bottom, left, right]));
 }
 
 /// Retrieve the host safe-area insets: [top, bottom, left, right] in points.
 pub fn safe_area_insets(ctx: &egui::Context) -> [f32; 4] {
-    ctx.data_mut(|data| data.get_persisted::<[f32; 4]>(egui::Id::new("lightcraft-safe-area-insets"))).unwrap_or([0.0, 0.0, 0.0, 0.0])
+    ctx.data_mut(|data| data.get_persisted::<[f32; 4]>(egui::Id::unique("lightcraft-safe-area-insets"))).unwrap_or([0.0, 0.0, 0.0, 0.0])
 }
 
 /// Style `ctx` with `kind`. The visuals go to both of egui's styles, so egui following the

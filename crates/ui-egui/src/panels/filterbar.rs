@@ -33,7 +33,7 @@ fn toggle(ui: &mut egui::Ui, id: &str, on: bool, tip: &str, draw: impl FnOnce(&e
     let t = Tokens::get(ui.ctx());
     let (r, resp) = ui.allocate_exact_size(vec2(26.0, 26.0), Sense::click());
     crate::widgets::announce_selected(&resp, crate::i18n::tr(tip), on);
-    register(ui.ctx(), format!("filter:{id}"), r);
+    register(ui, format!("filter:{id}"), r);
     let p = ui.painter();
     if on {
         p.rect_filled(r, 5.0, t.tool_active);
@@ -138,7 +138,7 @@ pub fn missing_banner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             });
         });
     });
-    register(ui.ctx(), "missingBanner", out.response.rect);
+    register(ui, "missingBanner", out.response.rect);
 }
 
 /// The iPad's filter bar: capsule chips that wrap, one tap each (rating, flag, label, edited, original missing).
@@ -186,7 +186,7 @@ fn show_touch(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 let on = chosen.contains(&l);
                 let name = format!("{l:?}").to_lowercase();
                 let (r, resp) = ui.allocate_exact_size(vec2(38.0, 38.0), Sense::click());
-                register(ui.ctx(), format!("filter:label-{name}"), r);
+                register(ui, format!("filter:label-{name}"), r);
                 ui.painter().circle_filled(r.center(), 19.0, if on { t.pressed } else { t.button });
                 ui.painter().circle_filled(r.center(), 8.0, label_color(l));
                 if on {
@@ -218,7 +218,7 @@ fn show_touch(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             }
         });
     });
-    register(ui.ctx(), "filterbar", out.response.rect);
+    register(ui, "filterbar", out.response.rect);
     ui.painter().line_segment([out.response.rect.left_bottom(), out.response.rect.right_bottom()], Stroke::new(1.0, t.divider));
 }
 
@@ -233,7 +233,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let (bar, _) = ui.allocate_exact_size(vec2(ui.available_width(), if two_rows { 2.0 * HEIGHT - 8.0 } else { HEIGHT }), Sense::hover());
     ui.painter().rect_filled(bar, 0.0, t.chrome);
     ui.painter().line_segment([bar.left_bottom(), bar.right_bottom()], Stroke::new(1.0, t.divider));
-    register(ui.ctx(), "filterbar", bar);
+    register(ui, "filterbar", bar);
     let f = app.session.filter.clone();
     let row = |ui: &mut egui::Ui, i: f32| {
         let r = Rect::from_min_size(bar.min + vec2(16.0, 4.0 + i * (HEIGHT - 8.0)), vec2(bar.width() - 32.0, HEIGHT - 8.0));
@@ -386,19 +386,19 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     ui.add_space(14.0);
     let filtering = app.session.filter != Default::default();
     let save = ui.add_enabled(filtering, egui::Button::new(egui::RichText::new(crate::i18n::tr("Save as Smart Album…")).font(t.font(12.5))));
-    register(ui.ctx(), "button:filterSave", save.rect);
+    register(ui, "button:filterSave", save.rect);
     if save.clicked() {
         let _ = app.run("dialog.newSmartAlbum", json!({}));
     }
     let clear = ui.add_enabled(filtering, egui::Button::new(egui::RichText::new(crate::i18n::tr("Clear")).font(t.font(12.5))));
-    register(ui.ctx(), "button:filterClear", clear.rect);
+    register(ui, "button:filterClear", clear.rect);
     if clear.clicked() {
         app.ui.search.clear();
         let _ = app.run("library.clearFilter", json!({}));
     }
     // filter presets: apply one, save the current filter, delete
     let presets = crate::widgets::dropdown(ui, "filterPresets", crate::i18n::tr("Presets"), t.font(12.5), t.text);
-    register(ui.ctx(), "button:filterPresets", presets.rect);
+    register(ui, "button:filterPresets", presets.rect);
     egui::Popup::menu(&presets).show(|ui| {
         let names: Vec<String> = app.session.filter_presets.iter().map(|f| f.name.clone()).collect();
         for n in &names {

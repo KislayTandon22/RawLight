@@ -126,7 +126,7 @@ pub(super) fn film_select_circle(app: &LightcraftApp, ui: &egui::Ui, p: &egui::P
         return;
     }
     let center: Pos2 = cell.right_top() + vec2(-13.0, 13.0);
-    register(ui.ctx(), format!("film_select_circle:{}", id.0), Rect::from_center_size(center, vec2(20.0, 20.0)));
+    register(ui, format!("film_select_circle:{}", id.0), Rect::from_center_size(center, vec2(20.0, 20.0)));
     if selected {
         p.circle_filled(center, 9.0, t.accent);
         p.circle_stroke(center, 9.0, Stroke::new(1.0, Color32::WHITE));

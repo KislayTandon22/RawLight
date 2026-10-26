@@ -46,7 +46,7 @@ pub(super) fn title_row(app: &mut LightcraftApp, ui: &mut egui::Ui, t: &Tokens) 
             .layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight)),
     );
     let btn = crate::glass::close_button(&mut close_ui);
-    register(ui.ctx(), "button:rightPanelClose", btn.rect);
+    register(ui, "button:rightPanelClose", btn.rect);
     if btn.clicked() {
         app.ui.right = RightPanel::None;
     }

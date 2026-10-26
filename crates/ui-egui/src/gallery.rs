@@ -104,7 +104,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context) {
     }
     let t = Tokens::get(ctx);
     let screen = ctx.content_rect();
-    egui::Area::new(egui::Id::new("component-gallery")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
+    egui::Area::new(egui::Id::unique("component-gallery")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
         ui.set_clip_rect(screen);
         ui.painter().rect_filled(screen, 0.0, t.canvas);
         let inner = screen.shrink2(vec2(16.0, 10.0));

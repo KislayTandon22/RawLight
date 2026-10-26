@@ -258,7 +258,7 @@ impl eframe::App for IosApp {
 
     fn raw_input_hook(&mut self, ctx: &Context, raw: &mut RawInput) {
         self.monkey.on_raw_input(ctx, raw);
-        self.app.raw_input_hook(raw);
+        self.app.raw_input_hook(ctx, raw);
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {

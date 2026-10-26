@@ -44,8 +44,8 @@ pub(super) fn empty_library_in(app: &mut LightcraftApp, ui: &mut egui::Ui, r: eg
         (import_folder, "emptyImportFolder", "Import from Folder", "file.addFolder", true),
         (import_photos, "emptyImportPhotos", "Import Photos", "file.addPhotos", false),
     ] {
-        let resp = ui.interact(rect, egui::Id::new(id), Sense::click());
-        register(ui.ctx(), format!("button:{id}"), rect);
+        let resp = ui.interact(rect, egui::Id::unique(id), Sense::click());
+        register(ui, format!("button:{id}"), rect);
         let fill = match (primary, resp.is_pointer_button_down_on(), resp.hovered()) {
             (true, true, _) => t.accent.gamma_multiply(0.8),
             (true, _, _) => t.accent,
@@ -77,7 +77,7 @@ pub(super) fn missing_badge(app: &LightcraftApp, ui: &egui::Ui, p: &egui::Painte
     p.rect_filled(br, 10.0, Color32::from_rgba_unmultiplied(40, 30, 10, 220));
     paint(p, Rect::from_center_size(pos2(br.left() + 11.0, br.center().y), vec2(13.0, 13.0)), Icon::Info, t.caution);
     p.galley(pos2(br.left() + 20.0, br.center().y - g.size().y / 2.0), g, Color32::WHITE);
-    register(ui.ctx(), format!("badge:missing:{}", id.0), br);
+    register(ui, format!("badge:missing:{}", id.0), br);
 }
 
 /// Apple-style circular multiselect checkbox (multi-select mode, or more than one photo selected).
@@ -87,7 +87,7 @@ pub(super) fn select_circle(app: &LightcraftApp, ui: &egui::Ui, p: &egui::Painte
     }
     let center = img_rect.right_top() + vec2(-18.0, 18.0);
     let check_circle = Rect::from_center_size(center, vec2(26.0, 26.0));
-    register(ui.ctx(), format!("select_circle:{}", id.0), check_circle);
+    register(ui, format!("select_circle:{}", id.0), check_circle);
     if selected {
         p.circle_filled(center, 12.0, t.accent);
         p.circle_stroke(center, 12.0, Stroke::new(1.0, Color32::WHITE));

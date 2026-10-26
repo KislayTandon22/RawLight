@@ -8,38 +8,13 @@ use crate::icons::{Icon, paint};
 use crate::theme::Tokens;
 use crate::widgets::{icon_button, register};
 
-/// The bar doubles as the window's title bar: dragging its empty space moves the window and a
-/// double-click zooms or restores it. Registered before the bar's widgets so they win the click.
-fn window_handle(app: &LightcraftApp, ui: &mut egui::Ui, content: Rect, margin_left: f32, margin_right: f32) {
-    use crate::titlebar::{Gesture, WindowState, command_for};
+/// The bar doubles as the window's title bar (a no-op drag area on the iPad, which has no windows to move); made before
+/// the bar's widgets so they win the click.
+fn window_handle(_app: &LightcraftApp, ui: &mut egui::Ui, content: Rect, margin_left: f32, margin_right: f32) {
     let bar = Rect::from_min_max(pos2(content.left() - margin_left, content.top()), pos2(content.right() + margin_right, content.bottom()));
-    register(ui.ctx(), "region:titlebar", bar);
-    let handle = egui::Id::new("titlebar-handle");
-    let resp = ui.interact(bar, handle, Sense::click_and_drag());
-    // a press that began on a button or the search field is theirs: dragging off it must not move the window
-    // (while pressing, egui hovers every widget under the pointer; once the drag starts, only the dragged one)
-    let ctx = ui.ctx().clone();
-    let memo = egui::Id::new("titlebar-press-on-widget");
-    if resp.is_pointer_button_down_on() && ctx.input(|i| i.pointer.primary_pressed()) {
-        let hovered = ctx.interaction_snapshot(|s| s.hovered.clone());
-        let on_widget =
-            hovered.iter().any(|id| *id != handle && ctx.read_response(*id).is_some_and(|r| r.sense.senses_click() || r.sense.senses_drag()));
-        ctx.data_mut(|d| d.insert_temp(memo, on_widget));
-    }
-    let on_widget = ctx.data(|d| d.get_temp::<bool>(memo)).unwrap_or(false);
-    let gesture = if resp.double_clicked_by(egui::PointerButton::Primary) {
-        Some(Gesture::DoubleClicked)
-    } else if resp.drag_started_by(egui::PointerButton::Primary) && !on_widget {
-        Some(Gesture::DragStarted)
-    } else {
-        None
-    };
-    if let Some(g) = gesture {
-        let window = WindowState { maximized: ui.input(|i| i.viewport().maximized).unwrap_or(false), fullscreen: app.window_is_fullscreen };
-        if let Some(cmd) = command_for(g, window) {
-            ui.ctx().send_viewport_cmd(cmd);
-        }
-    }
+    register(ui, "region:titlebar", bar);
+    let resp = craft_window::title_bar::empty_area(ui, bar);
+    crate::widgets::announce(&resp, crate::i18n::tr("Title bar"));
 }
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
@@ -201,9 +176,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let fr_size = if touch { vec2(34.0, 34.0) } else { vec2(28.0, 28.0) };
         let fr_x = if touch { (sr.right() + 20.0).min(full.right() - 170.0) } else { sr.right() + 22.0 };
         let fr = Rect::from_center_size(pos2(fr_x, sr.center().y), fr_size);
-        let fresp = ui.interact(touch_hit(fr), egui::Id::new("filter-btn"), Sense::click());
+        let fresp = ui.interact(touch_hit(fr), egui::Id::unique("filter-btn"), Sense::click());
         crate::widgets::announce(&fresp, crate::i18n::tr("Filters"));
-        register(ui.ctx(), "icon:filter", fr);
+        register(ui, "icon:filter", fr);
         let filtering = app.session.filter != Default::default() || app.ui.filter_bar;
         paint(
             ui.painter(),
@@ -266,9 +241,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         };
         for &(id, icon, tip, cmd) in icons_list {
             let r = Rect::from_center_size(pos2(x, full.center().y), icon_size);
-            let resp = ui.interact(touch_hit(r), egui::Id::new(("top", id)), Sense::click()).on_hover_text(crate::i18n::tr(tip));
+            let resp = ui.interact(touch_hit(r), egui::Id::unique(("top", id)), Sense::click()).on_hover_text(crate::i18n::tr(tip));
             crate::widgets::announce(&resp, crate::i18n::tr(tip));
-            register(ui.ctx(), format!("icon:{id}"), r);
+            register(ui, format!("icon:{id}"), r);
             let warn = id == "cloud" && unsaved.is_some();
             let colour = if warn {
                 t.caution
@@ -282,7 +257,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 let c = r.right_top() + vec2(-5.0, 6.0);
                 ui.painter().circle_filled(c, 6.0, t.reject);
                 ui.painter().text(c, Align2::CENTER_CENTER, "!", t.semibold(9.5), t.canvas);
-                register(ui.ctx(), "indicator:unsaved", r);
+                register(ui, "indicator:unsaved", r);
             }
             if touch && id == "share" && app.session.selection.ids.len() > 1 {
                 let sel_n = app.session.selection.ids.len();
@@ -304,9 +279,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let btn_w = 58.0;
             let btn_h = if touch { 32.0 } else { 28.0 };
             let r = Rect::from_center_size(pos2(x - btn_w / 2.0 + 8.0, full.center().y), vec2(btn_w, btn_h));
-            let resp = ui.interact(touch_hit(r), egui::Id::new("topbar:select_mode"), Sense::click());
+            let resp = ui.interact(touch_hit(r), egui::Id::unique("topbar:select_mode"), Sense::click());
             crate::widgets::announce(&resp, crate::i18n::tr(sel_label));
-            register(ui.ctx(), "button:multiSelect", r);
+            register(ui, "button:multiSelect", r);
             let (fill, stroke_rim, text_col) = if is_active {
                 (t.accent, Stroke::NONE, Color32::WHITE)
             } else if resp.hovered() || resp.is_pointer_button_down_on() {
@@ -340,16 +315,16 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let (icon, mode) = appearance_icon(app.ui.settings.appearance_mode);
         let r = Rect::from_center_size(pos2(x, full.center().y), icon_size);
         let tip = format!("{}: {}", crate::i18n::tr("Appearance Mode"), crate::i18n::tr(mode));
-        let resp = ui.interact(touch_hit(r), egui::Id::new(("top", "appearance")), Sense::click()).on_hover_text(tip.clone());
+        let resp = ui.interact(touch_hit(r), egui::Id::unique(("top", "appearance")), Sense::click()).on_hover_text(tip.clone());
         crate::widgets::announce(&resp, tip);
-        register(ui.ctx(), "icon:appearance", r);
+        register(ui, "icon:appearance", r);
         paint(ui.painter(), r.shrink(icon_shrink), icon, if resp.hovered() { t.text } else { t.icon });
         if resp.clicked() {
             let _ = app.run("view.appearance", json!({}));
         }
         resp.context_menu(|ui| {
             let settings = ui.button(crate::i18n::tr("Appearance Settings…"));
-            register(ui.ctx(), "menu:appearanceSettings", settings.rect);
+            register(ui, "menu:appearanceSettings", settings.rect);
             if settings.clicked() {
                 let _ = app.run("app.settings", json!({"tab": "interface"}));
                 ui.close();
@@ -363,7 +338,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
                 for kind in group {
                     let r = ui.selectable_label(app.ui.settings.theme(app.system_theme(ui.ctx())) == *kind, crate::i18n::tr(kind.label()));
-                    register(ui.ctx(), format!("menu:themeFavorite-{}", kind.id()), r.rect);
+                    register(ui, format!("menu:themeFavorite-{}", kind.id()), r.rect);
                     if r.clicked() {
                         let _ = app.run("view.theme", json!({"theme": kind.id()}));
                         ui.close();
@@ -402,13 +377,13 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let lib_rect = Rect::from_min_size(mod_rect.min + vec2(pad, pad), vec2(mod_w, pill_h));
             let dev_rect = Rect::from_min_size(pos2(lib_rect.right() + 2.0, lib_rect.top()), vec2(mod_w, pill_h));
 
-            let lib_resp = ui.interact(touch_hit(lib_rect), egui::Id::new("module-library"), Sense::click());
-            let dev_resp = ui.interact(touch_hit(dev_rect), egui::Id::new("module-develop"), Sense::click());
+            let lib_resp = ui.interact(touch_hit(lib_rect), egui::Id::unique("module-library"), Sense::click());
+            let dev_resp = ui.interact(touch_hit(dev_rect), egui::Id::unique("module-develop"), Sense::click());
             crate::widgets::announce(&lib_resp, crate::i18n::tr("Library"));
             crate::widgets::announce(&dev_resp, crate::i18n::tr("Develop"));
 
-            register(ui.ctx(), "module:library", lib_rect);
-            register(ui.ctx(), "module:develop", dev_rect);
+            register(ui, "module:library", lib_rect);
+            register(ui, "module:develop", dev_rect);
 
             let active_fill = if touch {
                 if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 48) } else { Color32::from_rgba_unmultiplied(255, 255, 255, 230) }

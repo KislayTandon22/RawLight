@@ -123,8 +123,8 @@ fn auto_tone_button(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: boo
     let w = (ui.available_width() - 40.0).max(100.0);
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), h + 6.0), Sense::hover());
     let btn_rect = Rect::from_center_size(r.center(), vec2(w, h));
-    let btn_resp = ui.interact(btn_rect, egui::Id::new("quick_dev_auto_tone"), Sense::click());
-    register(ui.ctx(), "button:quickDevelopAutoTone", btn_rect);
+    let btn_resp = ui.interact(btn_rect, egui::Id::unique("quick_dev_auto_tone"), Sense::click());
+    register(ui, "button:quickDevelopAutoTone", btn_rect);
 
     let fill = if btn_resp.is_pointer_button_down_on() {
         t.accent.gamma_multiply(0.35)
@@ -154,8 +154,8 @@ fn wb_preset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, 
 
     for (i, (name, mode)) in presets.iter().enumerate() {
         let chip_rect = Rect::from_min_size(pos2(content_rect.left() + i as f32 * (col_w + 6.0), content_rect.top()), vec2(col_w, h));
-        let chip_resp = ui.interact(chip_rect, egui::Id::new(("wb_preset", *name)), Sense::click());
-        register(ui.ctx(), format!("chip:wbPreset:{name}"), chip_rect);
+        let chip_resp = ui.interact(chip_rect, egui::Id::unique(("wb_preset", *name)), Sense::click());
+        register(ui, format!("chip:wbPreset:{name}"), chip_rect);
 
         let bg = if chip_resp.is_pointer_button_down_on() {
             t.pressed
@@ -197,8 +197,8 @@ fn crop_ratio_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: boo
 
     for (i, (label, aspect)) in ratios.iter().enumerate() {
         let chip_rect = Rect::from_min_size(pos2(content_rect.left() + i as f32 * (col_w + 5.0), content_rect.top()), vec2(col_w, h));
-        let chip_resp = ui.interact(chip_rect, egui::Id::new(("crop_ratio", *label)), Sense::click());
-        register(ui.ctx(), format!("chip:cropRatio:{label}"), chip_rect);
+        let chip_resp = ui.interact(chip_rect, egui::Id::unique(("crop_ratio", *label)), Sense::click());
+        register(ui, format!("chip:cropRatio:{label}"), chip_rect);
 
         let bg = if chip_resp.is_pointer_button_down_on() {
             t.pressed
@@ -241,8 +241,8 @@ fn preset_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, t
 
     for (i, (label, values)) in presets.iter().enumerate() {
         let chip_rect = Rect::from_min_size(pos2(content_rect.left() + i as f32 * (col_w + 6.0), content_rect.top()), vec2(col_w, h));
-        let chip_resp = ui.interact(chip_rect, egui::Id::new(("preset_quick", *label)), Sense::click());
-        register(ui.ctx(), format!("chip:quickPreset:{label}"), chip_rect);
+        let chip_resp = ui.interact(chip_rect, egui::Id::unique(("preset_quick", *label)), Sense::click());
+        register(ui, format!("chip:quickPreset:{label}"), chip_rect);
 
         let bg = if chip_resp.is_pointer_button_down_on() {
             t.pressed
@@ -298,8 +298,8 @@ fn nudge_row(
     for (i, (delta, blabel)) in buttons.iter().enumerate() {
         let bx = content.left() + i as f32 * (btn_w + 6.0);
         let b_rect = Rect::from_min_size(pos2(bx, content.top() + label_h), vec2(btn_w, row_h));
-        let b_resp = ui.interact(b_rect, egui::Id::new(("nudge", control, i)), Sense::click());
-        register(ui.ctx(), format!("nudge:{control}:{i}"), b_rect);
+        let b_resp = ui.interact(b_rect, egui::Id::unique(("nudge", control, i)), Sense::click());
+        register(ui, format!("nudge:{control}:{i}"), b_rect);
 
         let bg = if b_resp.is_pointer_button_down_on() {
             t.pressed
@@ -332,8 +332,8 @@ fn reset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, targ
     let row_rect = ui.allocate_exact_size(vec2(ui.available_width(), h + 12.0), Sense::hover()).0;
     let w = (row_rect.width() - 40.0).max(100.0);
     let btn_rect = Rect::from_center_size(row_rect.center(), vec2(w, h));
-    let resp = ui.interact(btn_rect, egui::Id::new("quick_develop_reset_all"), Sense::click());
-    register(ui.ctx(), "button:quickDevelopResetAll", btn_rect);
+    let resp = ui.interact(btn_rect, egui::Id::unique("quick_develop_reset_all"), Sense::click());
+    register(ui, "button:quickDevelopResetAll", btn_rect);
 
     let bg = if resp.is_pointer_button_down_on() {
         t.pressed

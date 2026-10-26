@@ -67,7 +67,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                     bar_contents(app, &mut inner, strip);
                 });
             // a fade and a chevron at each end that has more beyond it: the bar visibly slides
-            let (offset, view_w) = (out.state.offset.x, out.inner_rect.width());
+            let (offset, view_w) = (out.state.clamped_offset().x, out.inner_rect.width());
             let painter = ui.painter();
             let fade_w = 34.0;
             if offset > 1.0 {
@@ -109,7 +109,7 @@ fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active:
             vec2(if crate::theme::touch_ui(pill_ui.ctx()) { 30.0 } else { 22.0 }, if crate::theme::touch_ui(pill_ui.ctx()) { 30.0 } else { 22.0 }),
             Sense::click(),
         );
-        register(pill_ui.ctx(), format!("flag:{id}"), r);
+        register(pill_ui, format!("flag:{id}"), r);
         let on = flag == f && f != Flag::None;
         let c = if on {
             if f == Flag::Reject { t.reject } else { t.pick }
@@ -299,8 +299,8 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
         return;
     }
     let copy_r = Rect::from_min_size(pos2(pill.right() + 10.0 + if undo_group { 78.0 } else { 0.0 }, pill.top()), vec2(copy_width, 30.0));
-    let cresp = ui.interact(copy_r, egui::Id::new("copy-settings"), Sense::click());
-    register(ui.ctx(), "button:copySettings", copy_r);
+    let cresp = ui.interact(copy_r, egui::Id::unique("copy-settings"), Sense::click());
+    register(ui, "button:copySettings", copy_r);
     ui.painter().rect_filled(copy_r, 15.0, if cresp.hovered() { t.hover } else { t.canvas });
     ui.painter().text(copy_r.center(), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
     if cresp.clicked() && active.is_some() {
@@ -309,8 +309,8 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
         app.toast(ui.ctx(), crate::i18n::tr(msg));
     }
     let gear_r = Rect::from_min_size(pos2(copy_r.right() + 4.0, pill.top()), vec2(30.0, 30.0));
-    let gresp = ui.interact(gear_r, egui::Id::new("copy-gear"), Sense::click());
-    register(ui.ctx(), "icon:copyGear", gear_r);
+    let gresp = ui.interact(gear_r, egui::Id::unique("copy-gear"), Sense::click());
+    register(ui, "icon:copyGear", gear_r);
     ui.painter().rect_filled(gear_r, 15.0, if gresp.hovered() { t.hover } else { t.canvas });
     paint(ui.painter(), gear_r.shrink(7.0), Icon::Gear, t.icon);
     if gresp.clicked() {
@@ -412,7 +412,7 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
         // thumbnail size slider
         let touch = crate::theme::touch_ui(child.ctx());
         let (r, resp) = child.allocate_exact_size(if touch { vec2(120.0, 36.0) } else { vec2(110.0, 20.0) }, Sense::click_and_drag());
-        register(child.ctx(), "slider:thumbSize", r);
+        register(&child, "slider:thumbSize", r);
         let p = child.painter();
         let y = r.center().y;
         let f = (app.ui.thumb_size - 90.0) / (480.0 - 90.0);
@@ -474,7 +474,7 @@ fn sort_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     // a view that holds its photos shows what matches now when asked to
     if app.session.hold_view {
         let r = ui.button(crate::i18n::tr("Refresh View"));
-        crate::widgets::register(ui.ctx(), "button:refreshView", r.rect);
+        crate::widgets::register(ui, "button:refreshView", r.rect);
         if r.clicked() {
             let _ = app.run("library.refresh", json!({}));
         }
@@ -550,7 +550,7 @@ mod visual_regressions {
                     harness.run_steps(4);
                     let stem = format!("lightcraft-bottom-{view:?}-{width}-{scale}x");
                     harness.render().unwrap().save(directory.join(format!("{stem}.png"))).unwrap();
-                    let panel = egui::containers::panel::PanelState::load(&harness.ctx, egui::Id::new("bottom_bar")).unwrap().outer_rect;
+                    let panel = egui::containers::panel::PanelState::load(&harness.ctx, egui::Id::unique("bottom_bar")).unwrap().outer_rect;
                     let controls: serde_json::Map<String, serde_json::Value> = crate::widgets::take_registry(&harness.ctx)
                         .into_iter()
                         .map(|(id, r)| (id, json!([r.left(), r.top(), r.width(), r.height()])))
@@ -713,7 +713,7 @@ pub fn floating_rating(app: &mut LightcraftApp, ctx: &egui::Context) {
     // at the top of the photo area: the bottom edge holds the loupe's notices ("Rendering…", "Original offline")
     let pos = pos2(canvas.center().x - size.x / 2.0, canvas.top() + 12.0);
     // draggable: the capsule keeps wherever it is dropped (kept inside the photo area); it starts at the top centre
-    egui::Area::new(egui::Id::new("floating-rating"))
+    egui::Area::new(egui::Id::unique("floating-rating"))
         .order(egui::Order::Foreground)
         .default_pos(pos)
         .movable(true)
