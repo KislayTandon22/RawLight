@@ -115,8 +115,32 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
         let chips = |ui: &mut egui::Ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             if text_button(ui, "auto", crate::i18n::tr("Auto"), false).clicked() {
-                let _ = app.run("develop.auto", json!({}));
-                app.toast(ui.ctx(), crate::i18n::tr("Auto settings applied"));
+                let applied = app.run("develop.auto", json!({}));
+                // iPad: say what Auto moved, so the sliders' new positions make sense
+                let msg = match applied {
+                    Ok(a) if touch => {
+                        let part = |key: &str, label: &str, d: usize| {
+                            a.get(key).and_then(|v| v.as_f64()).map(|v| format!("{} {v:+.d$}", crate::i18n::tr(label)))
+                        };
+                        let parts: Vec<String> = [
+                            part("exposure", "Exposure", 2),
+                            part("contrast", "Contrast", 0),
+                            part("highlights", "Highlights", 0),
+                            part("shadows", "Shadows", 0),
+                            part("vibrance", "Vibrance", 0),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        .collect();
+                        if parts.is_empty() {
+                            crate::i18n::tr("Auto settings applied").to_string()
+                        } else {
+                            format!("{}: {}", crate::i18n::tr("Auto"), parts.join(" · "))
+                        }
+                    }
+                    _ => crate::i18n::tr("Auto settings applied").to_string(),
+                };
+                app.toast(ui.ctx(), msg);
             }
             let bw = crate::is_bw(&d);
             if text_button(ui, "bw", crate::i18n::tr("B&W"), bw).clicked() {

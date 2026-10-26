@@ -307,10 +307,12 @@ fn track_stops(track: &Track) -> Option<Vec<Color32>> {
     })
 }
 
-fn paint_track(ui: &Ui, rect: Rect, track: &Track, t: &Tokens, thumb_x: f32, ring: f32) {
+fn paint_track(ui: &Ui, rect: Rect, track: &Track, t: &Tokens, thumb_x: f32, origin_x: f32, ring: f32) {
     let p = ui.painter();
     let y = rect.center().y;
-    let h = 1.0;
+    let touch = crate::theme::touch_ui(ui.ctx());
+    // iPad: a thicker track, filled with the accent from the control's neutral value to the thumb
+    let h = if touch { 2.0 } else { 1.0 };
     if let Some(stops) = track_stops(track) {
         // gradient: segments between stops
         let n = stops.len().max(2) - 1;
@@ -326,6 +328,10 @@ fn paint_track(ui: &Ui, rect: Rect, track: &Track, t: &Tokens, thumb_x: f32, rin
         }
     } else {
         p.rect_filled(Rect::from_min_max(pos2(rect.left(), y - h), pos2(rect.right(), y + h)), 1.0, t.track);
+        if touch && (thumb_x - origin_x).abs() > 1.0 {
+            let (x0, x1) = (origin_x.min(thumb_x), origin_x.max(thumb_x));
+            p.rect_filled(Rect::from_min_max(pos2(x0, y - h), pos2(x1, y + h)), 1.0, t.accent);
+        }
     }
     // gap around the hollow thumb
     p.rect_filled(
@@ -707,7 +713,7 @@ pub fn slider(ui: &mut Ui, spec: &ControlSpec, value: f64, enabled: bool, label_
     }
     let ring = if is_touch { 10.0 } else { THUMB_RING };
     let tx = to_x(v);
-    paint_track(ui, track_rect, &spec.track, &t, tx, ring);
+    paint_track(ui, track_rect, &spec.track, &t, tx, to_x(spec.default), ring);
     let p = ui.painter();
     let ring_c = if !enabled {
         t.text_disabled
