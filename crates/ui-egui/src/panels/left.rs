@@ -559,7 +559,10 @@ fn show_header_button(app: &mut LightcraftApp, ui: &mut egui::Ui, header: Rect, 
             }
         }
         HeaderAction::Menu(items) => {
-            egui::Popup::menu(&resp).show(|ui| items(app, ui));
+            egui::Popup::menu(&resp).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                items(app, ui)
+            });
         }
     }
 }
@@ -939,7 +942,10 @@ fn local_rows(app: &mut LightcraftApp, ui: &mut egui::Ui, now: &LocalNow) {
                 let _ = app.run("local.restoreHidden", json!({"path": only}));
             }
         } else {
-            egui::Popup::menu(&resp).show(|ui| hidden_menu(app, ui, &now.hidden));
+            egui::Popup::menu(&resp).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                hidden_menu(app, ui, &now.hidden)
+            });
         }
     }
 }

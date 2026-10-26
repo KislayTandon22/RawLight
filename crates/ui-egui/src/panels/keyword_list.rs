@@ -15,6 +15,12 @@ use crate::widgets::register;
 
 /// Rows are this tall; each level is indented this much.
 const ROW_H: f32 = 24.0;
+/// iPad: a finger-sized row.
+const ROW_H_TOUCH: f32 = 44.0;
+
+fn row_h(ctx: &egui::Context) -> f32 {
+    if crate::theme::touch_ui(ctx) { ROW_H_TOUCH } else { ROW_H }
+}
 const INDENT: f32 = 14.0;
 
 /// The Keyword List section: a filter box, then the rows.
@@ -168,7 +174,7 @@ fn drop_keyword(app: &mut LightcraftApp, ctx: &egui::Context, keyword: &str, par
 /// `can_fold`: the triangle opens and closes the level (not while a filter opens it).
 fn row(app: &mut LightcraftApp, ui: &mut egui::Ui, r: &Row, selection: &[PhotoId], ticks: &Ticks, can_fold: bool) {
     let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click_and_drag());
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h(ui.ctx())), Sense::click_and_drag());
     crate::widgets::announce(&resp, r.path.clone());
     register(ui, format!("keywordRow:{}", r.path), rect);
     if resp.drag_started() {
@@ -262,7 +268,7 @@ fn row(app: &mut LightcraftApp, ui: &mut egui::Ui, r: &Row, selection: &[PhotoId
     let arrow = Rect::from_center_size(pos2(count_rect.left() - 12.0, cy), vec2(16.0, 16.0));
     let touch = crate::theme::touch_ui(ui.ctx());
     // a finger needs a 44pt target; the arrow is still painted at 16pt
-    let arrow_hit = if touch { Rect::from_center_size(arrow.center(), vec2(44.0, ROW_H)) } else { arrow };
+    let arrow_hit = if touch { Rect::from_center_size(arrow.center(), vec2(44.0, row_h(ui.ctx()))) } else { arrow };
     let ar = ui.interact(arrow_hit, egui::Id::unique(("keyword-list-show", r.path.to_lowercase())), Sense::click());
     crate::widgets::announce(&ar, crate::i18n::tr("Show photos"));
     register(ui, format!("keywordShow:{}", r.path), arrow_hit);

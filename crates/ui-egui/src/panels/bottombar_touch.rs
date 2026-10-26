@@ -156,7 +156,10 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 ui.painter().rect_filled(sep, 0.0, t.button_border);
                 ui.add_space(10.0);
                 let sort = icon_button(ui, "sort", Icon::Sort, vec2(30.0, 30.0), false, true, "Sort");
-                egui::Popup::menu(&sort).show(|ui| sort_menu(app, ui));
+                egui::Popup::menu(&sort).show(|ui| {
+                    crate::widgets::touch_menu_style(ui);
+                    sort_menu(app, ui)
+                });
                 if crate::theme::touch_ui(ui.ctx()) {
                     bulk_buttons(app, ui, &t);
                 }
@@ -165,6 +168,7 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 let more = icon_button(ui, "viewOptions", current_icon, vec2(40.0, 32.0), true, true, "View");
                 paint(ui.painter(), Rect::from_center_size(more.rect.right_bottom() - vec2(5.0, 5.0), vec2(7.0, 7.0)), Icon::ChevronDown, t.text);
                 egui::Popup::menu(&more).show(|ui| {
+                    crate::widgets::touch_menu_style(ui);
                     for &(id, _, mode, label) in VIEW_MODES {
                         if ui.selectable_label(app.ui.view == mode, crate::i18n::tr(label)).clicked() {
                             let _ = app.run(&format!("view.{id}"), json!({}));
@@ -358,6 +362,7 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
         if condensed {
             let more = icon_button(&mut child, "viewMore", Icon::More, vec2(30.0, 30.0), false, true, "More view options");
             egui::Popup::menu(&more).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
                 if ui.selectable_label(app.ui.before_after.is_layout(), crate::i18n::tr("Before / After")).clicked() {
                     let _ = app.run("view.beforeAfter", json!({}));
                     ui.close();
@@ -397,6 +402,7 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
         };
         let zr = crate::widgets::dropdown(&mut child, "zoom", crate::i18n::tr(&zoom_label), t.font(13.0), t.text_label);
         egui::Popup::menu(&zr).show(|ui| {
+            crate::widgets::touch_menu_style(ui);
             for (label, z) in [
                 ("Fit", Zoom::Fit),
                 ("Fill", Zoom::Fill),
@@ -415,7 +421,10 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
             child.add_space(6.0);
             let zoom_label = click_zoom_label(app.ui.click_zoom / 100, crate::theme::touch_ui(child.ctx()));
             let cz = crate::widgets::dropdown(&mut child, "clickZoom", &zoom_label, t.font(13.0), t.text_label);
-            egui::Popup::menu(&cz).show(|ui| click_zoom_menu(app, ui));
+            egui::Popup::menu(&cz).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                click_zoom_menu(app, ui)
+            });
         }
     } else {
         // thumbnail size slider

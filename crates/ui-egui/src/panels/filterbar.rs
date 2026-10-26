@@ -70,6 +70,7 @@ fn picker(app: &mut LightcraftApp, ui: &mut egui::Ui, id: &str, current: &str, a
     }
     let mut chosen = None;
     egui::Popup::menu(&r).show(|ui| {
+        crate::widgets::touch_menu_style(ui);
         egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
             for (label, patch, sel) in &items {
                 if ui
@@ -400,6 +401,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let presets = crate::widgets::dropdown(ui, "filterPresets", crate::i18n::tr("Presets"), t.font(12.5), t.text);
     register(ui, "button:filterPresets", presets.rect);
     egui::Popup::menu(&presets).show(|ui| {
+        crate::widgets::touch_menu_style(ui);
         let names: Vec<String> = app.session.filter_presets.iter().map(|f| f.name.clone()).collect();
         for n in &names {
             let r = ui.button(n);

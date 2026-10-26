@@ -53,7 +53,10 @@ pub fn arrow_button<'a>(ui: &mut Ui, text: impl egui::IntoAtoms<'a>, icon: Icon,
 /// Keep egui's submenu interaction and layout, using our vector chevron instead of a font glyph.
 pub fn menu_button<'a, R>(ui: &mut Ui, atoms: impl egui::IntoAtoms<'a>, contents: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<Option<R>> {
     if !egui::containers::menu::is_in_menu(ui) {
-        return ui.menu_button(atoms, contents);
+        return ui.menu_button(atoms, |ui| {
+            touch_menu_style(ui);
+            contents(ui)
+        });
     }
     let button = egui::Button::new(atoms.into_atoms()).right_text("    ");
     let (response, inner) = egui::containers::menu::SubMenuButton::from_button(button).ui(ui, contents);
@@ -68,7 +71,22 @@ pub fn menu_button<'a, R>(ui: &mut Ui, atoms: impl egui::IntoAtoms<'a>, contents
 /// reopened the menu at the pointer and closed it again on the same frame, a one-frame flash.
 /// The click that opens (or moves) the menu is not the one that closes it.
 pub fn context_menu(response: &Response, add_contents: impl FnOnce(&mut Ui)) -> Option<egui::InnerResponse<()>> {
-    egui::Popup::context_menu(response).close_behavior(context_menu_close(response, egui::PopupCloseBehavior::CloseOnClick)).show(add_contents)
+    egui::Popup::context_menu(response).close_behavior(context_menu_close(response, egui::PopupCloseBehavior::CloseOnClick)).show(|ui| {
+        touch_menu_style(ui);
+        add_contents(ui)
+    })
+}
+
+/// iPad: egui's menu style squeezes a menu's rows to 2pt of side padding; give them finger-sized room and a minimum width.
+/// Desktop menus are left as egui styles them.
+pub fn touch_menu_style(ui: &mut Ui) {
+    if !crate::theme::touch_ui(ui.ctx()) {
+        return;
+    }
+    let spacing = &mut ui.style_mut().spacing;
+    spacing.button_padding = vec2(16.0, 10.0);
+    spacing.item_spacing.y = 2.0;
+    ui.set_min_width(180.0);
 }
 
 /// How a context menu on `response` closes this frame: `default`, except on the frame of the
@@ -944,7 +962,7 @@ pub fn dropdown_within(ui: &mut Ui, id: &str, text: &str, font: egui::FontId, co
     let t = Tokens::get(ui.ctx());
     let galley = one_line(ui.painter(), text, font, color, max - 20.0);
     let elided = galley.elided;
-    let min_h = if crate::theme::touch_ui(ui.ctx()) { 34.0 } else { 20.0 };
+    let min_h = if crate::theme::touch_ui(ui.ctx()) { 44.0 } else { 20.0 };
     let size = vec2(galley.size().x + 20.0, galley.size().y.max(min_h));
     let (r, resp) = ui.allocate_exact_size(size, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, text));

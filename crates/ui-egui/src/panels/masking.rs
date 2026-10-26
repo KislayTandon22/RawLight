@@ -295,10 +295,16 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                     ui.add_space(if touch { 12.0 } else { 30.0 });
                     let plus = text_button(ui, &format!("maskPlus:{}", m.id), if touch { "+ Add" } else { "+" }, false)
                         .on_hover_text(crate::i18n::tr("Add to this mask"));
-                    egui::Popup::menu(&plus).show(|ui| component_menu(app, ui, "add"));
+                    egui::Popup::menu(&plus).show(|ui| {
+                        crate::widgets::touch_menu_style(ui);
+                        component_menu(app, ui, "add")
+                    });
                     let minus = text_button(ui, &format!("maskMinus:{}", m.id), if touch { "− Subtract" } else { "−" }, false)
                         .on_hover_text(crate::i18n::tr("Subtract from this mask"));
-                    egui::Popup::menu(&minus).show(|ui| component_menu(app, ui, "subtract"));
+                    egui::Popup::menu(&minus).show(|ui| {
+                        crate::widgets::touch_menu_style(ui);
+                        component_menu(app, ui, "subtract")
+                    });
                 });
                 describe_field(app, ui, false);
             }
@@ -360,7 +366,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let more = ui.small_button("…").on_hover_text(crate::i18n::tr("Component options"));
                     register(ui, format!("button:componentMenu{i}"), more.rect);
-                    egui::Popup::menu(&more).show(|ui| component_row_menu(app, ui, m.id, i, &label, m.components.len()));
+                    egui::Popup::menu(&more).show(|ui| {
+                        crate::widgets::touch_menu_style(ui);
+                        component_row_menu(app, ui, m.id, i, &label, m.components.len())
+                    });
                 });
             });
             range_controls(app, ui, i, &c.shape);
@@ -370,11 +379,20 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.y = 6.0;
             let add = text_button(ui, "maskAddComp", crate::i18n::tr("Add"), false);
-            egui::Popup::menu(&add).show(|ui| component_menu(app, ui, "add"));
+            egui::Popup::menu(&add).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                component_menu(app, ui, "add")
+            });
             let sub = text_button(ui, "maskSubComp", crate::i18n::tr("Subtract"), false);
-            egui::Popup::menu(&sub).show(|ui| component_menu(app, ui, "subtract"));
+            egui::Popup::menu(&sub).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                component_menu(app, ui, "subtract")
+            });
             let int = text_button(ui, "maskIntComp", crate::i18n::tr("Intersect"), false);
-            egui::Popup::menu(&int).show(|ui| component_menu(app, ui, "intersect"));
+            egui::Popup::menu(&int).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                component_menu(app, ui, "intersect")
+            });
             if text_button(ui, "maskInvert", crate::i18n::tr("Invert"), m.invert).clicked() {
                 let _ = app.run("mask.invert", json!({}));
             }
@@ -467,6 +485,7 @@ fn overlay_options(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         ui.label(egui::RichText::new(crate::i18n::tr("Overlay")).color(t.text_dim));
         let r = crate::widgets::dropdown(ui, "maskOverlayMode", menu_label(view.label()), t.font(12.5), t.text_label);
         egui::Popup::menu(&r).show(|ui| {
+            crate::widgets::touch_menu_style(ui);
             for v in MaskView::ALL {
                 if ui.selectable_label(v == view, menu_label(v.label())).clicked() {
                     let _ = app.run("view.maskOverlayMode", json!({"mode": v.name()}));

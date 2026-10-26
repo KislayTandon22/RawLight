@@ -186,7 +186,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
             let max = ui.available_width() - 28.0 - ui.spacing().item_spacing.x;
             let r = crate::widgets::dropdown_within(ui, "profile", crate::i18n::profile_label(&d.profile.id, name), t.font(15.0), t.text_label, max);
             let below = r.rect.bottom();
-            egui::Popup::menu(&r).show(|ui| profile_menu(app, ui, &d, below));
+            egui::Popup::menu(&r).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
+                profile_menu(app, ui, &d, below)
+            });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if crate::widgets::icon_button(
                     ui,
@@ -256,6 +259,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                 ui.label(egui::RichText::new(crate::i18n::tr("White Balance")).font(t.font(13.0)).color(t.text_dim));
                 let r = crate::widgets::dropdown(ui, "wbMode", crate::i18n::tr(d.wb.mode.label()), t.font(14.0), t.text_label);
                 egui::Popup::menu(&r).show(|ui| {
+                    crate::widgets::touch_menu_style(ui);
                     for m in WbMode::ALL {
                         if m == WbMode::Custom {
                             continue;
@@ -1305,6 +1309,7 @@ fn curve_footer(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings)
             let label = crate::i18n::builtin_label(current.as_deref().unwrap_or("Custom"), builtin);
             let r = crate::widgets::dropdown(ui, "curvePreset", label, t.font(12.0), t.text);
             egui::Popup::menu(&r).show(|ui| {
+                crate::widgets::touch_menu_style(ui);
                 ui.set_min_width(180.0);
                 let presets = all_presets(&app.session);
                 let mut user_seen = false;
