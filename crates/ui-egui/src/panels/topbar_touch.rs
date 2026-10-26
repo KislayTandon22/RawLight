@@ -56,6 +56,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             window_handle(app, ui, full, left, 12.0);
         }
         let btn_size = if touch { vec2(38.0, 38.0) } else { vec2(30.0, 30.0) };
+        // Split View's smallest widths: only what cannot be reached elsewhere stays (the bottom bar has undo / redo, History has the bell)
+        let compact = touch && full.width() < 620.0;
         let mut left_cluster_end = full.left();
         // desktop: the search field is centred on the window, with room for the in-window menus left of it
         let mut desk_sw = 640.0f32.min(full.width() - 540.0).max(200.0);
@@ -80,7 +82,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
                 icon_button(ui, "forward", Icon::Forward, btn_size, false, false, crate::i18n::tr("Forward"));
             }
-            if touch {
+            if touch && !compact {
                 // undo / redo for edits, ratings and flags (the arrows above move between views)
                 ui.add_space(6.0);
                 let can_undo = !app.session.undo.is_empty();
@@ -112,7 +114,17 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         } else {
             0.0
         };
-        let right_reserved = (if touch { if narrow { 302.0 } else { 210.0 } } else { 320.0 }) + select_extra;
+        let right_reserved = (if touch {
+            if compact {
+                190.0
+            } else if narrow {
+                302.0
+            } else {
+                210.0
+            }
+        } else {
+            320.0
+        }) + select_extra;
         let search_left_bound = left_cluster_end + if touch { 12.0 } else { 16.0 };
         let search_right_bound = (full.right() - right_reserved).max(search_left_bound + 100.0);
         let available_search_w = search_right_bound - search_left_bound;
@@ -224,7 +236,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             )
         });
         let cloud_tip = unsaved.as_deref().unwrap_or("Local library — no cloud account needed");
-        let icons_list: &[(&str, Icon, &str, &str)] = if touch {
+        let icons_list: &[(&str, Icon, &str, &str)] = if compact {
+            &[("share", Icon::Share, "Export", "dialog.export")]
+        } else if touch {
             &[
                 ("cloud", Icon::Cloud, cloud_tip, ""),
                 ("share", Icon::Share, "Export", "dialog.export"),
@@ -311,41 +325,43 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             }
         }
 
-        // Appearance Mode: a click steps Auto → Light → Dark → Auto; the icon shows the mode
-        let (icon, mode) = appearance_icon(app.ui.settings.appearance_mode);
-        let r = Rect::from_center_size(pos2(x, full.center().y), icon_size);
-        let tip = format!("{}: {}", crate::i18n::tr("Appearance Mode"), crate::i18n::tr(mode));
-        let resp = ui.interact(touch_hit(r), egui::Id::unique(("top", "appearance")), Sense::click()).on_hover_text(tip.clone());
-        crate::widgets::announce(&resp, tip);
-        register(ui, "icon:appearance", r);
-        paint(ui.painter(), r.shrink(icon_shrink), icon, if resp.hovered() { t.text } else { t.icon });
-        if resp.clicked() {
-            let _ = app.run("view.appearance", json!({}));
-        }
-        resp.context_menu(|ui| {
-            let settings = ui.button(crate::i18n::tr("Appearance Settings…"));
-            register(ui, "menu:appearanceSettings", settings.rect);
-            if settings.clicked() {
-                let _ = app.run("app.settings", json!({"tab": "interface"}));
-                ui.close();
+        if !compact {
+            // Appearance Mode: a click steps Auto → Light → Dark → Auto; the icon shows the mode
+            let (icon, mode) = appearance_icon(app.ui.settings.appearance_mode);
+            let r = Rect::from_center_size(pos2(x, full.center().y), icon_size);
+            let tip = format!("{}: {}", crate::i18n::tr("Appearance Mode"), crate::i18n::tr(mode));
+            let resp = ui.interact(touch_hit(r), egui::Id::unique(("top", "appearance")), Sense::click()).on_hover_text(tip.clone());
+            crate::widgets::announce(&resp, tip);
+            register(ui, "icon:appearance", r);
+            paint(ui.painter(), r.shrink(icon_shrink), icon, if resp.hovered() { t.text } else { t.icon });
+            if resp.clicked() {
+                let _ = app.run("view.appearance", json!({}));
             }
-            let favorites = app.ui.settings.favorite_themes.clone();
-            for dark in [false, true] {
-                let group: Vec<_> =
-                    crate::theme::ThemeKind::ALL.iter().filter(|k| k.is_dark() == dark && favorites.iter().any(|id| id == k.id())).collect();
-                if !group.is_empty() {
-                    ui.separator();
+            resp.context_menu(|ui| {
+                let settings = ui.button(crate::i18n::tr("Appearance Settings…"));
+                register(ui, "menu:appearanceSettings", settings.rect);
+                if settings.clicked() {
+                    let _ = app.run("app.settings", json!({"tab": "interface"}));
+                    ui.close();
                 }
-                for kind in group {
-                    let r = ui.selectable_label(app.ui.settings.theme(app.system_theme(ui.ctx())) == *kind, crate::i18n::tr(kind.label()));
-                    register(ui, format!("menu:themeFavorite-{}", kind.id()), r.rect);
-                    if r.clicked() {
-                        let _ = app.run("view.theme", json!({"theme": kind.id()}));
-                        ui.close();
+                let favorites = app.ui.settings.favorite_themes.clone();
+                for dark in [false, true] {
+                    let group: Vec<_> =
+                        crate::theme::ThemeKind::ALL.iter().filter(|k| k.is_dark() == dark && favorites.iter().any(|id| id == k.id())).collect();
+                    if !group.is_empty() {
+                        ui.separator();
+                    }
+                    for kind in group {
+                        let r = ui.selectable_label(app.ui.settings.theme(app.system_theme(ui.ctx())) == *kind, crate::i18n::tr(kind.label()));
+                        register(ui, format!("menu:themeFavorite-{}", kind.id()), r.rect);
+                        if r.clicked() {
+                            let _ = app.run("view.theme", json!({"theme": kind.id()}));
+                            ui.close();
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
         // Lightroom Classic Module Switcher: [ LIBRARY | DEVELOP ]
         let left_bound = fr.right() + 16.0;
         let right_bound = x - icon_size.x / 2.0 - 12.0;
