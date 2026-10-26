@@ -476,7 +476,14 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
     let is_glass = kind == ThemeKind::Glass || (touch_ui && dark);
     let mut v = if dark { Visuals::dark() } else { Visuals::light() };
     v.panel_fill = if is_glass { Color32::from_rgba_unmultiplied(24, 24, 30, 220) } else { t.chrome };
-    v.window_fill = if is_glass { Color32::from_rgba_unmultiplied(28, 28, 36, 230) } else { t.chrome };
+    // iPad: popups and dialogs are opaque (the photo behind a translucent menu bled through its labels)
+    v.window_fill = if touch_ui {
+        Color32::from_rgb(28, 28, 36)
+    } else if is_glass {
+        Color32::from_rgba_unmultiplied(28, 28, 36, 230)
+    } else {
+        t.chrome
+    };
     v.extreme_bg_color = t.field;
     v.faint_bg_color = t.inset;
     v.window_stroke = Stroke::new(

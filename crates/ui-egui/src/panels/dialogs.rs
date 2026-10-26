@@ -300,6 +300,16 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
     // rather than growing the window when the options below the grid get taller (e.g. Copy).
     // iPad: the Import review fits the screen like the other dialogs (its options scroll, the title and the button row stay
     // put) instead of a desktop-sized window whose Import button ends up below the screen edge.
+    // iPad: a dialog's sliders and rows stretch to the width the window offers, so the widest ones get a calm reading width
+    let touch_cap = if crate::theme::touch_ui(ctx) {
+        match dlg {
+            Dialog::Export { .. } => Some(660.0_f32),
+            Dialog::Cull { .. } | Dialog::CreatePreset { .. } => Some(520.0),
+            _ => None,
+        }
+    } else {
+        None
+    };
     let import_fits = matches!(dlg, Dialog::Import { .. }) && crate::theme::touch_ui(ctx);
     let import = matches!(dlg, Dialog::Import { .. }) && !import_fits;
     // The Print dialog sizes itself to the window and scrolls its settings column on its own.
@@ -331,7 +341,9 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
         .frame(frame)
         .anchor(if settings { egui::Align2::CENTER_TOP } else { egui::Align2::CENTER_CENTER }, [0.0, if settings { top } else { 0.0 }])
         .min_width(widest)
+        .max_width(touch_cap.map_or(f32::INFINITY, |c| c.min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN)))
         .default_width(match dlg {
+            _ if touch_cap.is_some() => touch_cap.unwrap_or(380.0),
             Dialog::Import { .. } if import_fits => crate::import::DIALOG_SIZE[0].min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN),
             Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
             Dialog::SmartRules { .. } => 680.0,
@@ -352,6 +364,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                 ui.disable();
             }
             ui.spacing_mut().item_spacing.y = 8.0;
+            if crate::theme::touch_ui(ctx) {
+                // egui's own sliders (Assisted Culling…) get a rail a thumb can travel along
+                ui.spacing_mut().slider_width = 240.0;
+            }
             body_h = dialog_body(ui, (!import && !print).then_some(title.as_str()), body_max, |ui| match &mut dlg {
                 Dialog::AutoStack { gap } => {
                     ui.label(egui::RichText::new(crate::i18n::tr("Stack photos taken within this time of each other:")).color(t.text_label));
