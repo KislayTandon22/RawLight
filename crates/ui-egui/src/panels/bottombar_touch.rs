@@ -690,7 +690,7 @@ mod tests {
                         .shapes
                         .iter()
                         .find_map(|shape| match &shape.shape {
-                            egui::Shape::Rect(rect) if rect.rect.contains(star.center()) && rect.rect.height() == 36.0 => Some(rect.rect),
+                            egui::Shape::Rect(rect) if rect.rect.contains(star.center()) && rect.rect.height() == 30.0 => Some(rect.rect),
                             _ => None,
                         })
                         .unwrap();
