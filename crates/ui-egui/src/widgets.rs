@@ -390,7 +390,8 @@ pub fn slider(ui: &mut Ui, spec: &ControlSpec, value: f64, enabled: bool, label_
     let id = ui.scope_id().with(spec.id);
     let is_touch = crate::theme::touch_ui(ui.ctx());
     let hit_rect = if is_touch {
-        Rect::from_min_max(pos2(track_rect.left() - 12.0, label_rect.bottom() - 2.0), pos2(track_rect.right() + 12.0, row.bottom() + 4.0))
+        // a 44pt-tall target centred on the track (the value above it keeps its own tap-to-type area)
+        Rect::from_center_size(track_rect.center(), vec2(track_rect.width() + 24.0, 44.0))
     } else {
         track_rect.expand2(vec2(8.0, 2.0))
     };
