@@ -139,6 +139,22 @@ fn docked_portrait(left: f32, sheet: f32) -> Workspace {
     })
 }
 
+/// iPad: a panel is a rounded glass card floating on the backdrop, like the bars and the tool rail; elsewhere the panel's own
+/// slab is drawn as before.
+fn glass_card(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
+    if !crate::glass::active(ui.ctx()) {
+        add(ui);
+        return;
+    }
+    let card = ui.max_rect().shrink2(egui::vec2(4.0, 6.0));
+    let radius = egui::CornerRadius::same(crate::glass::SHELL_RADIUS);
+    ui.painter().add(crate::glass::shadow().as_shape(card, radius));
+    ui.painter().rect_filled(card, radius, crate::glass::fill());
+    let mut inner = ui.new_child(egui::UiBuilder::new().max_rect(card.shrink2(egui::vec2(2.0, 8.0))));
+    inner.set_clip_rect(card.shrink2(egui::vec2(0.0, 6.0)).intersect(ui.clip_rect()));
+    add(&mut inner);
+}
+
 pub fn default_workspace() -> Workspace {
     if portrait() {
         return docked_portrait(crate::state::LEFT_WIDTH.default, sheet_height());
@@ -447,6 +463,17 @@ pub fn show(app: &mut crate::LightcraftApp, ui: &mut egui::Ui) {
     style.text = t.text;
     style.inactive_text = t.text_dim;
     style.border = egui::Stroke::new(1.0, t.divider);
+    if crate::glass::active(ui.ctx()) {
+        // iPad: the panels are glass cards painted below; the dock itself draws no slab, tab strip or outline
+        style.background = egui::Color32::TRANSPARENT;
+        style.tab_background = egui::Color32::TRANSPARENT;
+        style.border = egui::Stroke::NONE;
+        style.active_background = egui::Color32::TRANSPARENT;
+        // (no desktop-style tab strip above a card: a panel is moved and closed from its own header)
+        style.tab_height = 1.0;
+        style.text = egui::Color32::TRANSPARENT;
+        style.inactive_text = egui::Color32::TRANSPARENT;
+    }
     style.accent = t.accent;
     style.font = t.font(12.0);
     // Tool and preset panels publish hover previews before the photo consumes them.
@@ -464,13 +491,13 @@ pub fn show(app: &mut crate::LightcraftApp, ui: &mut egui::Ui) {
             }
             Panel::Library => {
                 crate::widgets::register(ui, "panel:left_panel", ui.max_rect());
-                crate::panels::left::show(app, ui);
+                glass_card(ui, |ui| crate::panels::left::show(app, ui));
             }
             Panel::Tools => {
                 crate::widgets::register(ui, "panel:right_panel", ui.max_rect());
-                crate::panels::right::show(app, ui);
+                glass_card(ui, |ui| crate::panels::right::show(app, ui));
             }
-            Panel::Presets => crate::panels::presets::show(app, ui),
+            Panel::Presets => glass_card(ui, |ui| crate::panels::presets::show(app, ui)),
         },
     );
     if let Some(mut canvas) = canvas {

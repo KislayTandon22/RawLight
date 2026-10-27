@@ -466,8 +466,12 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
         o.input_options.line_scroll_speed = WHEEL_LINE_POINTS;
         o.input_options.scroll_zoom_speed = WHEEL_ZOOM_PER_POINT;
     });
-    let t = Tokens::for_kind(kind);
+    let mut t = Tokens::for_kind(kind);
     let touch_ui = touch_ui(ctx);
+    if touch_ui {
+        // iPad: no hairlines between the parts of a panel: spacing and the glass card do the grouping
+        t.divider = Color32::TRANSPARENT;
+    }
     ctx.data_mut(|d| {
         d.insert_temp(egui::Id::NULL, t);
         d.insert_temp(theme_id(), kind);
