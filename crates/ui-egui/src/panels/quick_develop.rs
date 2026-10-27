@@ -125,6 +125,7 @@ fn auto_tone_button(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: boo
     let btn_rect = Rect::from_center_size(r.center(), vec2(w, h));
     let btn_resp = ui.interact(btn_rect, egui::Id::unique("quick_dev_auto_tone"), Sense::click());
     register(ui, "button:quickDevelopAutoTone", btn_rect);
+    crate::widgets::announce(&btn_resp, crate::i18n::tr("Auto Tone"));
 
     let fill = if btn_resp.is_pointer_button_down_on() {
         t.accent.gamma_multiply(0.35)
@@ -144,7 +145,7 @@ fn auto_tone_button(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: boo
 }
 
 fn wb_preset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, target_ids: &[u64]) {
-    let h = if touch { 36.0 } else { 26.0 };
+    let h = if touch { 44.0 } else { 26.0 };
     let row_rect = ui.allocate_exact_size(vec2(ui.available_width(), h + 4.0), Sense::hover()).0;
     let content_rect = Rect::from_min_max(pos2(row_rect.left() + 20.0, row_rect.top() + 2.0), pos2(row_rect.right() - 20.0, row_rect.bottom() - 2.0));
 
@@ -156,6 +157,7 @@ fn wb_preset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, 
         let chip_rect = Rect::from_min_size(pos2(content_rect.left() + i as f32 * (col_w + 6.0), content_rect.top()), vec2(col_w, h));
         let chip_resp = ui.interact(chip_rect, egui::Id::unique(("wb_preset", *name)), Sense::click());
         register(ui, format!("chip:wbPreset:{name}"), chip_rect);
+        crate::widgets::announce(&chip_resp, format!("{} {}", crate::i18n::tr("White Balance"), crate::i18n::tr(name)));
 
         let bg = if chip_resp.is_pointer_button_down_on() {
             t.pressed
@@ -187,7 +189,7 @@ fn wb_preset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, 
 }
 
 fn crop_ratio_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, target_ids: &[u64]) {
-    let h = if touch { 34.0 } else { 24.0 };
+    let h = if touch { 44.0 } else { 24.0 };
     let row_rect = ui.allocate_exact_size(vec2(ui.available_width(), h + 4.0), Sense::hover()).0;
     let content_rect = Rect::from_min_max(pos2(row_rect.left() + 20.0, row_rect.top() + 2.0), pos2(row_rect.right() - 20.0, row_rect.bottom() - 2.0));
 
@@ -199,6 +201,7 @@ fn crop_ratio_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: boo
         let chip_rect = Rect::from_min_size(pos2(content_rect.left() + i as f32 * (col_w + 5.0), content_rect.top()), vec2(col_w, h));
         let chip_resp = ui.interact(chip_rect, egui::Id::unique(("crop_ratio", *label)), Sense::click());
         register(ui, format!("chip:cropRatio:{label}"), chip_rect);
+        crate::widgets::announce(&chip_resp, format!("{} {}", crate::i18n::tr("Crop Ratio"), crate::i18n::tr(label)));
 
         let bg = if chip_resp.is_pointer_button_down_on() {
             t.pressed
@@ -227,7 +230,7 @@ fn crop_ratio_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: boo
 }
 
 fn preset_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, target_ids: &[u64]) {
-    let h = if touch { 34.0 } else { 24.0 };
+    let h = if touch { 44.0 } else { 24.0 };
     let row_rect = ui.allocate_exact_size(vec2(ui.available_width(), h + 4.0), Sense::hover()).0;
     let content_rect = Rect::from_min_max(pos2(row_rect.left() + 20.0, row_rect.top() + 2.0), pos2(row_rect.right() - 20.0, row_rect.bottom() - 2.0));
 
@@ -243,6 +246,7 @@ fn preset_chips(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, t
         let chip_rect = Rect::from_min_size(pos2(content_rect.left() + i as f32 * (col_w + 6.0), content_rect.top()), vec2(col_w, h));
         let chip_resp = ui.interact(chip_rect, egui::Id::unique(("preset_quick", *label)), Sense::click());
         register(ui, format!("chip:quickPreset:{label}"), chip_rect);
+        crate::widgets::announce(&chip_resp, crate::i18n::tr(label));
 
         let bg = if chip_resp.is_pointer_button_down_on() {
             t.pressed
@@ -283,7 +287,7 @@ fn nudge_row(
 ) {
     // the label sits above its four buttons so they share the panel's full width (side by side the label
     // column left each only ~33pt, narrower than its own text)
-    let row_h = if touch { 40.0 } else { 28.0 };
+    let row_h = if touch { 44.0 } else { 28.0 };
     let label_h = 20.0;
     let row_rect = ui.allocate_exact_size(vec2(ui.available_width(), label_h + row_h + 6.0), Sense::hover()).0;
     let content = Rect::from_min_max(pos2(row_rect.left() + 20.0, row_rect.top() + 2.0), pos2(row_rect.right() - 20.0, row_rect.bottom() - 4.0));
@@ -300,6 +304,7 @@ fn nudge_row(
         let b_rect = Rect::from_min_size(pos2(bx, content.top() + label_h), vec2(btn_w, row_h));
         let b_resp = ui.interact(b_rect, egui::Id::unique(("nudge", control, i)), Sense::click());
         register(ui, format!("nudge:{control}:{i}"), b_rect);
+        crate::widgets::announce(&b_resp, format!("{} {}", crate::i18n::tr(label), blabel));
 
         let bg = if b_resp.is_pointer_button_down_on() {
             t.pressed
@@ -334,6 +339,7 @@ fn reset_row(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, touch: bool, targ
     let btn_rect = Rect::from_center_size(row_rect.center(), vec2(w, h));
     let resp = ui.interact(btn_rect, egui::Id::unique("quick_develop_reset_all"), Sense::click());
     register(ui, "button:quickDevelopResetAll", btn_rect);
+    crate::widgets::announce(&resp, crate::i18n::tr("Reset All"));
 
     let bg = if resp.is_pointer_button_down_on() {
         t.pressed
