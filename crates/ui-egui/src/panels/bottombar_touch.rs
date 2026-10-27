@@ -269,7 +269,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let label = crate::i18n::tr(if has_clip { "Paste Edit Settings" } else { "Copy Edit Settings" });
     let copy_width = (ui.painter().layout_no_wrap(label.to_string(), t.font(13.0), t.text_label).size().x + 24.0).max(136.0);
     let pill_w = if crate::theme::touch_ui(ui.ctx()) { PILL_W_TOUCH } else { PILL_W };
-    let centre_width = pill_w + 10.0 + copy_width + 4.0 + 30.0;
+    let centre_width = pill_w + 10.0 + copy_width + 4.0 + 36.0;
     let room = to - from;
     // no room for it in the bar: the canvas shows it as a floating capsule instead (touch layout)
     app.ui.rating_floating = room < pill_w && crate::theme::touch_ui(ui.ctx());
@@ -309,23 +309,24 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     if !with_copy {
         return;
     }
-    let copy_r = Rect::from_min_size(pos2(pill.right() + 10.0 + if undo_group { 78.0 } else { 0.0 }, pill.top()), vec2(copy_width, 30.0));
+    // 36pt tall and centred on the rating pill (it was 30pt, hung from the pill's top edge)
+    let copy_r = Rect::from_min_size(pos2(pill.right() + 10.0 + if undo_group { 78.0 } else { 0.0 }, pill.center().y - 18.0), vec2(copy_width, 36.0));
     let cresp = ui.interact(copy_r, egui::Id::unique("copy-settings"), Sense::click());
     register(ui, "button:copySettings", copy_r);
     crate::widgets::announce(&cresp, label.to_string());
-    ui.painter().rect_filled(copy_r, 15.0, if cresp.hovered() { t.hover } else { t.canvas });
+    ui.painter().rect_filled(copy_r, 18.0, if cresp.hovered() { t.hover } else { t.canvas });
     ui.painter().text(copy_r.center(), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
     if cresp.clicked() && active.is_some() {
         let _ = if has_clip { app.run("develop.paste", json!({})) } else { app.run("develop.copy", json!({})) };
         let msg = if has_clip { "Settings pasted" } else { "Edit settings copied" };
         app.toast(ui.ctx(), crate::i18n::tr(msg));
     }
-    let gear_r = Rect::from_min_size(pos2(copy_r.right() + 4.0, pill.top()), vec2(30.0, 30.0));
+    let gear_r = Rect::from_min_size(pos2(copy_r.right() + 4.0, copy_r.top()), vec2(36.0, 36.0));
     let gresp = ui.interact(gear_r, egui::Id::unique("copy-gear"), Sense::click());
     register(ui, "icon:copyGear", gear_r);
     crate::widgets::announce(&gresp, crate::i18n::tr("Copy settings options"));
-    ui.painter().rect_filled(gear_r, 15.0, if gresp.hovered() { t.hover } else { t.canvas });
-    paint(ui.painter(), gear_r.shrink(7.0), Icon::Gear, t.icon);
+    ui.painter().rect_filled(gear_r, 18.0, if gresp.hovered() { t.hover } else { t.canvas });
+    paint(ui.painter(), gear_r.shrink(9.0), Icon::Gear, t.icon);
     if gresp.clicked() {
         let _ = app.run("dialog.copySettings", json!({}));
     }
