@@ -517,7 +517,13 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let full = ui.max_rect();
     let fullscreen = app.ui.fullscreen;
-    let show_film = app.ui.filmstrip && !fullscreen;
+    // iPad portrait with a tool sheet open: the photo needs the room more than the filmstrip does (it comes back when the
+    // sheet closes or the window is tall enough)
+    let cramped = crate::theme::touch_ui(ui.ctx()) && app.ui.right != crate::state::RightPanel::None && {
+        let r = ui.ctx().content_rect();
+        r.height() > r.width() && r.height() < 1000.0
+    };
+    let show_film = app.ui.filmstrip && !fullscreen && !cramped;
     let film_h = if show_film { t.film_h } else { 0.0 };
     let canvas = Rect::from_min_max(full.min, pos2(full.right(), full.bottom() - film_h));
     app.canvas_rect = Some(canvas);

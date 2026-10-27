@@ -60,6 +60,8 @@ pub struct ImportDialog {
     pub checked: Vec<bool>,
     /// Copy into the library (else add in place).
     pub copy: bool,
+    /// With `copy` on a device that reports its free space: (bytes needed, bytes free) when the copy would not fit.
+    pub space_short: Option<(u64, u64)>,
     /// With `copy`: move instead — the originals are removed from the source once each copy is
     /// verified and catalogued (`library.import` mode `move`).
     pub move_files: bool,
@@ -671,6 +673,18 @@ fn show_pending_review(app: &mut LightcraftApp, ctx: &egui::Context) {
 }
 
 /// Tests: a review scan that never ends while the returned value lives, so a drop meets it running.
+/// A copy of `needed` bytes does not fit in `free`: a margin of 5% and 256 MB is kept for the previews and the catalog
+/// written alongside.
+fn would_not_fit(needed: u64, free: u64) -> bool {
+    needed.saturating_add(needed / 20).saturating_add(256 << 20) > free
+}
+
+/// The volume's folder name under iPadOS's mount point for Files drives (`…/userfsd/<name>/…`), for telling the user which drive.
+fn external_volume_name(path: &str) -> Option<&str> {
+    let (_, rest) = path.split_once("/LiveFiles/com.apple.filesystems.userfsd/")?;
+    rest.split('/').next().filter(|name| !name.is_empty())
+}
+
 /// A path on a drive the iPad mounts for Files (USB storage, SD reader, SMB share): iPadOS exposes them under
 /// `.../LiveFiles/com.apple.filesystems.userfsd/`. Anywhere else (macOS, Windows, Linux) this is never true.
 fn on_external_volume(path: &str) -> bool {
@@ -1257,6 +1271,43 @@ pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
         .small(),
     );
     register(ui, "label:importModeHelp", r.rect);
+    // iPad: photos left on a USB drive or share are only there while it is connected
+    if !d.copy && !d.sources.is_empty() && d.sources.iter().all(|s| on_external_volume(s)) {
+        let drive = d.sources.iter().find_map(|s| external_volume_name(s)).unwrap_or("");
+        let note = if drive.is_empty() {
+            crate::i18n::tr(
+                "These photos stay on the external drive. While it is unplugged they show as Original missing; reconnect it and they come back.",
+            )
+            .to_string()
+        } else {
+            crate::i18n::tr_format!(
+                "These photos stay on the drive “{drive}”. While it is unplugged they show as Original missing; reconnect it and they come back.",
+                drive = drive
+            )
+        };
+        ui.label(egui::RichText::new(note).color(t.text_dim).small());
+    }
+    // a device that reports its free space (the iPad): a Copy or Move that would not fit is stopped here, not half-way
+    d.space_short = None;
+    if d.copy
+        && let Some(free) = app.services.free_space.as_ref().and_then(|f| f())
+    {
+        let needed: u64 =
+            d.candidates.iter().zip(&d.checked).enumerate().filter(|(i, (_, on))| **on && d.importable(*i)).map(|(_, (c, _))| c.file_size).sum();
+        // (a margin for the previews and the catalog written alongside)
+        if would_not_fit(needed, free) {
+            d.space_short = Some((needed, free));
+            let gb = |b: u64| b as f64 / 1e9;
+            ui.label(
+                egui::RichText::new(crate::i18n::tr_format!(
+                    "Not enough storage: these photos need {need:.1} GB and {free:.1} GB is free. Choose Add in place to keep them where they are, or check fewer photos.",
+                    need = gb(needed),
+                    free = gb(free)
+                ))
+                .color(ui.visuals().error_fg_color),
+            );
+        }
+    }
     if d.copy {
         field(ui, if d.move_files { "Move to" } else { "Copy to" }, |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -1882,7 +1933,22 @@ mod tests {
 
 #[cfg(test)]
 mod external_volume_tests {
-    use super::on_external_volume;
+    use super::{external_volume_name, on_external_volume, would_not_fit};
+
+    #[test]
+    fn the_drive_name_is_the_folder_after_the_mount_point() {
+        assert_eq!(external_volume_name("/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/SANDISK/DCIM/a.arw"), Some("SANDISK"));
+        assert_eq!(external_volume_name("/private/var/mobile/Containers/Data/Application/U/Documents/a.arw"), None);
+    }
+
+    #[test]
+    fn a_copy_that_leaves_no_room_for_previews_is_refused() {
+        let gb = 1_000_000_000u64;
+        assert!(!would_not_fit(10 * gb, 40 * gb));
+        assert!(would_not_fit(40 * gb, 40 * gb), "exactly the free space leaves nothing for previews");
+        assert!(would_not_fit(1, 100 << 20), "under the 256 MB reserve");
+        assert!(!would_not_fit(0, 1 << 30));
+    }
 
     #[test]
     fn usb_and_share_mounts_are_external_and_the_app_container_is_not() {

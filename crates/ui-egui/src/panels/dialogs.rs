@@ -1481,6 +1481,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     _ => false,
                 };
                 let can_confirm = !rename_blocked
+                    && !matches!(&dlg, Dialog::Import { opts } if opts.space_short.is_some())
                     && (informational
                         || !matches!(
                             &dlg,

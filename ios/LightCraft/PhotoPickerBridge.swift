@@ -649,3 +649,18 @@ final class PencilStrokeRecognizer: UIGestureRecognizer {
         state = .failed
     }
 }
+
+
+// MARK: - Free storage
+
+/// Bytes the app can still write on the device (what iOS will free up for "important" data counts as available).
+/// 0 when it cannot be read; the Rust side then does not check.
+@_cdecl("ios_free_disk_bytes")
+public func ios_free_disk_bytes() -> UInt64 {
+    let home = URL(fileURLWithPath: NSHomeDirectory())
+    if let values = try? home.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+       let bytes = values.volumeAvailableCapacityForImportantUsage, bytes > 0 {
+        return UInt64(bytes)
+    }
+    return 0
+}

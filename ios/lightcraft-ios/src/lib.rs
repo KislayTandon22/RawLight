@@ -11,6 +11,7 @@ use lightcraft_ui_egui::{LightcraftApp, Services};
 
 unsafe extern "C" {
     fn ios_log(format: *const c_char);
+    fn ios_free_disk_bytes() -> u64;
     fn ios_open_url(url: *const c_char) -> bool;
     fn ios_share_file(path: *const c_char) -> bool;
     #[allow(dead_code)]
@@ -422,6 +423,13 @@ fn create_services(egui_ctx: Context) -> Services {
             );
         }
         rx.recv().ok().and_then(|mut paths| paths.pop())
+    }));
+
+    // Free storage on the device, so an import that will not fit is refused before it starts
+    services.free_space = Some(Box::new(|| {
+        // SAFETY: `ios_free_disk_bytes` is defined by the Swift host linked into this app; it takes no arguments and returns a plain integer.
+        let bytes = unsafe { ios_free_disk_bytes() };
+        (bytes > 0).then_some(bytes)
     }));
 
     // System web URL opener for documentation / links

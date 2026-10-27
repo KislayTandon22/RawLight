@@ -243,6 +243,8 @@ const TOAST_SECONDS: f64 = 1.4;
 pub const SCREEN_PROFILE: &str = "screen";
 
 pub type PickFiles = Box<dyn FnMut() -> Vec<String>>;
+/// Free space, in bytes, on the volume the app copies photos to (the iPad host; `None` elsewhere: desktop does not check).
+pub type FreeSpaceFn = Box<dyn Fn() -> Option<u64>>;
 /// A save dialog: suggested file name → chosen path (`None` = cancelled).
 pub type SaveFile = Box<dyn FnMut(&str) -> Option<String>>;
 pub type WriteFn = Box<dyn FnMut(&str, &[u8]) -> Result<(), String>>;
@@ -317,6 +319,8 @@ pub struct Services {
     pub pick_print_templates: Option<PickFiles>,
     /// Save dialog for an exported print template (`.lcprint`).
     pub save_print_template: Option<SaveFile>,
+    /// Free space on the device storage, so a Copy or Move that will not fit is stopped before it starts.
+    pub free_space: Option<FreeSpaceFn>,
     pub write: Option<WriteFn>,
     /// Create-new writer (never replaces an existing path), for screenshots of destinations that
     /// did not exist when the request was admitted. Required for such captures: falling back to
