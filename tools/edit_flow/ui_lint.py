@@ -15,7 +15,8 @@ ap.add_argument("--cli", default="target/debug/lightcraft-cli")
 a = ap.parse_args()
 os.makedirs(a.out, exist_ok=True)
 
-SIZES = {"landscape": (1180, 820), "portrait": (820, 1180)}
+# iPad Pro/Air 11" and iPad (A16): 1180x820; iPad 9th gen (10.2"): 1080x810; iPad mini: 1133x744 (points)
+SIZES = {"landscape": (1180, 820), "portrait": (820, 1180), "ipad9_land": (1080, 810), "ipad9_port": (810, 1080), "mini_land": (1133, 744), "mini_port": (744, 1133)}
 INTERACTIVE = ("button:", "icon:", "menu:", "slider:", "check:", "toggle:", "combo:", "tab:", "chip:", "field:", "star", "module:", "dropdown")
 # (name, ui.set params, extra commands run first)
 STATES = [

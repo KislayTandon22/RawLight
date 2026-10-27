@@ -245,29 +245,49 @@ fn crop(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
             }
         });
         ui.add_space(6.0);
-        ui.horizontal_wrapped(|ui| {
-            if text_button(ui, "cropRotateLeft", crate::i18n::tr("Rotate Left"), false).clicked() {
-                let _ = app.run("photo.rotateLeft", json!({}));
+        if crate::theme::touch_ui(ui.ctx()) {
+            // iPad: the rotate / flip / reset actions are one grid of equal buttons, not rows of ragged widths
+            let mark = |on: bool, label: &str| if on { format!("{} ●", crate::i18n::tr(label)) } else { crate::i18n::tr(label).to_string() };
+            let (flip_h, flip_v) = (mark(d.crop.flip_h, "Flip H"), mark(d.crop.flip_v, "Flip V"));
+            let (left, right, swap, reset) =
+                (crate::i18n::tr("Rotate Left"), crate::i18n::tr("Rotate Right"), crate::i18n::tr("Swap Aspect"), crate::i18n::tr("Reset"));
+            let items: [(&str, &str); 6] =
+                [(left, "rotateLeft"), (right, "rotateRight"), (reset, "reset"), (&flip_h, "flipH"), (&flip_v, "flipV"), (swap, "swapAspect")];
+            match crate::widgets::segmented(ui, "cropActions", &items, None, 3) {
+                Some(0) => drop(app.run("photo.rotateLeft", json!({}))),
+                Some(1) => drop(app.run("photo.rotateRight", json!({}))),
+                Some(2) => drop(app.run("crop.reset", json!({}))),
+                Some(3) => drop(app.run("photo.flipHorizontal", json!({}))),
+                Some(4) => drop(app.run("photo.flipVertical", json!({}))),
+                Some(5) => drop(app.run("crop.rotateAspect", json!({}))),
+                _ => {}
             }
-            if text_button(ui, "cropRotateRight", crate::i18n::tr("Rotate Right"), false).clicked() {
-                let _ = app.run("photo.rotateRight", json!({}));
-            }
-        });
-        ui.add_space(6.0);
-        ui.horizontal_wrapped(|ui| {
-            if text_button(ui, "cropFlipH", crate::i18n::tr("Flip H"), d.crop.flip_h).clicked() {
-                let _ = app.run("photo.flipHorizontal", json!({}));
-            }
-            if text_button(ui, "cropFlipV", crate::i18n::tr("Flip V"), d.crop.flip_v).clicked() {
-                let _ = app.run("photo.flipVertical", json!({}));
-            }
-            if text_button(ui, "cropSwapAspect", crate::i18n::tr(super::right_touch::copy(ui, "Swap Aspect", "Swap Aspect (X)")), false).clicked() {
-                let _ = app.run("crop.rotateAspect", json!({}));
-            }
-            if text_button(ui, "cropReset", crate::i18n::tr("Reset"), false).clicked() {
-                let _ = app.run("crop.reset", json!({}));
-            }
-        });
+        } else {
+            ui.horizontal_wrapped(|ui| {
+                if text_button(ui, "cropRotateLeft", crate::i18n::tr("Rotate Left"), false).clicked() {
+                    let _ = app.run("photo.rotateLeft", json!({}));
+                }
+                if text_button(ui, "cropRotateRight", crate::i18n::tr("Rotate Right"), false).clicked() {
+                    let _ = app.run("photo.rotateRight", json!({}));
+                }
+            });
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                if text_button(ui, "cropFlipH", crate::i18n::tr("Flip H"), d.crop.flip_h).clicked() {
+                    let _ = app.run("photo.flipHorizontal", json!({}));
+                }
+                if text_button(ui, "cropFlipV", crate::i18n::tr("Flip V"), d.crop.flip_v).clicked() {
+                    let _ = app.run("photo.flipVertical", json!({}));
+                }
+                if text_button(ui, "cropSwapAspect", crate::i18n::tr(super::right_touch::copy(ui, "Swap Aspect", "Swap Aspect (X)")), false).clicked()
+                {
+                    let _ = app.run("crop.rotateAspect", json!({}));
+                }
+                if text_button(ui, "cropReset", crate::i18n::tr("Reset"), false).clicked() {
+                    let _ = app.run("crop.reset", json!({}));
+                }
+            });
+        }
     });
     let ang = lightcraft_develop::controls::find("crop.angle").copied();
     if let Some(spec) = ang {

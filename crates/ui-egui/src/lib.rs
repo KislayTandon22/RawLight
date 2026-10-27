@@ -2591,6 +2591,8 @@ impl LightcraftApp {
             self.ui.presets = false;
             self.ui.right = state::RightPanel::None;
             self.ui.docking = None;
+            // (a Detail view of nothing would show a filmstrip of nothing under the empty state)
+            self.ui.view = state::ViewMode::PhotoGrid;
         }
         icons::set_touch_glyphs(theme::touch_ui(&ctx));
         glass::paint_backdrop(&ctx);
