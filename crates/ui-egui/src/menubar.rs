@@ -1082,9 +1082,18 @@ pub fn show_in_window(app: &mut LightcraftApp, ui: &mut egui::Ui, max_width: f32
         let mut menu_btn = egui::Button::new(egui::RichText::new(crate::i18n::tr("Menu")).font(menu_font).color(menu_color)).frame(touch);
         if touch {
             // a capsule like every other iPad button, not bare text
-            menu_btn = menu_btn.min_size(egui::vec2(72.0, 38.0)).corner_radius(19.0);
+            menu_btn = menu_btn.min_size(egui::vec2(64.0, 34.0)).corner_radius(17.0);
         }
-        let r = ui.add(menu_btn);
+        // iPad: 34pt tall in a 50pt bar (the default button padding made it 44pt, touching the bar's top and bottom edge)
+        let r = if touch {
+            ui.scope(|ui| {
+                ui.spacing_mut().button_padding = egui::vec2(14.0, 3.0);
+                ui.add(menu_btn)
+            })
+            .inner
+        } else {
+            ui.add(menu_btn)
+        };
         crate::widgets::register(ui, "menu:all", r.rect);
         egui::Popup::menu(&r).show(|ui| {
             crate::menu_level::level(ui, 1, bar_bottom, |ui| {

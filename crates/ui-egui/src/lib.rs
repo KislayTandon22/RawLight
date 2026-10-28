@@ -2712,7 +2712,9 @@ impl LightcraftApp {
         panels::library_problem::banner(self, ui);
         panels::strip::show(self, ui);
         // filled: the gaps the dock leaves between its panes show chrome, not the dark clear colour
-        let chrome = theme::Tokens::get(&ctx).chrome;
+        // (iPad glass: the canvas colour, so the gaps around the floating panels are the same tone as the photo area)
+        let tokens = theme::Tokens::get(&ctx);
+        let chrome = if glass::active(&ctx) { tokens.canvas } else { tokens.chrome };
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(chrome)).show(ui, |ui| docking::show(self, ui));
         panels::bottombar_touch::floating_rating(self, &ctx);
         gallery::show(self, &ctx);

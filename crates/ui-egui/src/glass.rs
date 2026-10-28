@@ -17,7 +17,8 @@ pub fn active(ctx: &egui::Context) -> bool {
 }
 
 pub fn fill() -> Color32 {
-    Color32::from_rgba_unmultiplied(40, 42, 52, 214)
+    // neutral grey: no blue cast, so a card or bar is the same hue as the canvas around it
+    Color32::from_rgba_unmultiplied(40, 40, 40, 214)
 }
 
 /// The light rim: a hairline brighter than the fill, as light catching a glass edge.

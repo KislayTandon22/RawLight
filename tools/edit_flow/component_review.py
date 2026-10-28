@@ -172,6 +172,8 @@ def crop(name, ws, full):
     x1 = max(w["rect"][0] + w["rect"][2] for w in ws); y1 = max(w["rect"][1] + w["rect"][3] for w in ws)
     m = 14
     box = (max(0, x0 - m), max(0, y0 - m), min(W, x1 + m), min(H, y1 + m))
+    if box[2] <= box[0] or box[3] <= box[1]:
+        return None  # the widgets are off screen (below the fold)
     im = Image.open(full).convert("RGB").crop(tuple(int(v) for v in box))
     if im.width > 900 or im.height > 900:
         im.thumbnail((900, 900))

@@ -146,7 +146,14 @@ fn glass_card(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
         add(ui);
         return;
     }
-    let card = ui.max_rect().shrink2(egui::vec2(4.0, 6.0));
+    // landscape: the card's top and bottom edges line up with the tool rail beside it (both 94pt under the window top, 9pt above the bottom
+    // bar's end), not the dock's own 93pt / 6pt margins; in the portrait sheet it keeps the plain inset
+    let r = ui.max_rect();
+    let card = if portrait() {
+        r.shrink2(egui::vec2(4.0, 6.0))
+    } else {
+        egui::Rect::from_min_max(egui::pos2(r.left() + 4.0, r.top() + 1.0), egui::pos2(r.right() - 4.0, r.bottom() - 9.0))
+    };
     let radius = egui::CornerRadius::same(crate::glass::SHELL_RADIUS);
     ui.painter().add(crate::glass::shadow().as_shape(card, radius));
     ui.painter().rect_filled(card, radius, crate::glass::fill());
@@ -478,11 +485,13 @@ pub fn show(app: &mut crate::LightcraftApp, ui: &mut egui::Ui) {
     style.font = t.font(12.0);
     // Tool and preset panels publish hover previews before the photo consumes them.
     let mut canvas = None;
+    let glass_dock = crate::glass::active(ui.ctx());
     let output = DockArea::new(egui::Id::unique("lightcraft-docking")).locked(workspace.locked).show_with_limits(
         ui,
         &workspace.layout,
         &style,
-        |panel| crate::i18n::tr(panel.label()).into(),
+        // (iPad glass: no tab strip, and its 1pt-high label showed as a row of white dashes above each card)
+        |panel| if glass_dock { " ".into() } else { crate::i18n::tr(panel.label()).into() },
         permissions,
         panel_limits,
         |ui, panel| match panel {

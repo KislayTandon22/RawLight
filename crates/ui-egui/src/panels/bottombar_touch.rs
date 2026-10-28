@@ -90,12 +90,13 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 /// and 10-point padding at both ends.
 const PILL_W: f32 = 208.0;
 /// Wider on the iPad, where the pick / reject buttons are 30pt touch targets.
-const PILL_W_TOUCH: f32 = 324.0;
+const PILL_W_TOUCH: f32 = 360.0;
 
 /// The stars and the unflag / pick (tick) / reject (cross) buttons, laid out left to right in `pill_ui`.
 fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active: Option<&lightcraft_catalog::Photo>) {
     let t = Tokens::get(pill_ui.ctx());
-    pill_ui.spacing_mut().item_spacing.x = 3.0;
+    // iPad: the same 6pt between stars and flags (the stars sat 3pt apart)
+    pill_ui.spacing_mut().item_spacing.x = if crate::theme::touch_ui(pill_ui.ctx()) { 6.0 } else { 3.0 };
     let rating = active.map(|p| p.rating).unwrap_or(0);
     if let Some(r) = crate::rating::Rating::new("bottom", rating).show(pill_ui) {
         let mut params = json!({"rating": r});
@@ -145,7 +146,7 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
             ui.spacing_mut().item_spacing.x = 2.0;
             let min_expand_w = if crate::theme::touch_ui(ui.ctx()) { if full.width() < 800.0 { f32::MAX } else { 420.0 } } else { 270.0 };
             if left_rect.width() >= min_expand_w {
-                let mode_sz = if crate::theme::touch_ui(ui.ctx()) { vec2(36.0, 36.0) } else { vec2(32.0, 32.0) };
+                let mode_sz = if crate::theme::touch_ui(ui.ctx()) { vec2(44.0, 36.0) } else { vec2(32.0, 32.0) };
                 for &(id, icon, mode, tip) in VIEW_MODES {
                     if icon_button(ui, id, icon, mode_sz, app.ui.view == mode, true, tip).clicked() {
                         let _ = app.run(&format!("view.{id}"), json!({}));
@@ -288,7 +289,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let pill_h = if crate::theme::touch_ui(ui.ctx()) { 40.0 } else { 30.0 };
     let pill = Rect::from_min_size(pos2(left, full.center().y - pill_h / 2.0), vec2(pill_w, pill_h));
     // (inside a glass bar the pill is only a faint inset: glass does not sit on opaque dark)
-    ui.painter().rect_filled(pill, 15.0, if crate::glass::active(ui.ctx()) { Color32::from_white_alpha(14) } else { t.canvas });
+    ui.painter().rect_filled(pill, 15.0, if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
     let mut pill_ui = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(pill.shrink2(vec2(10.0, if pill_h > 30.0 { 2.0 } else { 4.0 })))
@@ -315,7 +316,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let cresp = ui.interact(copy_r, egui::Id::unique("copy-settings"), Sense::click());
     register(ui, "button:copySettings", copy_r);
     crate::widgets::announce(&cresp, label.to_string());
-    ui.painter().rect_filled(copy_r, 18.0, if cresp.hovered() { t.hover } else { t.canvas });
+    ui.painter().rect_filled(copy_r, 18.0, if cresp.hovered() { t.hover } else if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
     ui.painter().text(copy_r.center(), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
     if cresp.clicked() && active.is_some() {
         let _ = if has_clip { app.run("develop.paste", json!({})) } else { app.run("develop.copy", json!({})) };
@@ -326,7 +327,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let gresp = ui.interact(gear_r, egui::Id::unique("copy-gear"), Sense::click());
     register(ui, "icon:copyGear", gear_r);
     crate::widgets::announce(&gresp, crate::i18n::tr("Copy settings options"));
-    ui.painter().rect_filled(gear_r, 18.0, if gresp.hovered() { t.hover } else { t.canvas });
+    ui.painter().rect_filled(gear_r, 18.0, if gresp.hovered() { t.hover } else if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
     paint(ui.painter(), gear_r.shrink(9.0), Icon::Gear, t.icon);
     if gresp.clicked() {
         let _ = app.run("dialog.copySettings", json!({}));

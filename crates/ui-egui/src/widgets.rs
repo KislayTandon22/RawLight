@@ -856,13 +856,16 @@ pub fn text_button(ui: &mut Ui, id: &str, label: &str, active: bool) -> Response
         t.pressed
     } else if resp.hovered() {
         t.hover
+    } else if touch {
+        // iPad: a ghost button, drawn only while selected, pressed or hovered (the selection is the oval)
+        Color32::TRANSPARENT
     } else {
         t.button
     };
     let p = ui.painter();
     p.rect(
         r,
-        CornerRadius::same(if touch { 19 } else { 4 }),
+        CornerRadius::same(if touch { 22 } else { 4 }),
         fill,
         if touch { Stroke::NONE } else { Stroke::new(1.0, t.button_border) },
         StrokeKind::Inside,
@@ -901,6 +904,8 @@ pub fn segmented(ui: &mut Ui, id: &str, items: &[(&str, &str)], active: Option<u
                     }
                 } else if (touch && is_down) || resp.hovered() {
                     t.hover
+                } else if touch {
+                    Color32::TRANSPARENT
                 } else {
                     t.button
                 };
@@ -942,9 +947,14 @@ pub fn icon_button(ui: &mut Ui, id: &str, icon: Icon, size: egui::Vec2, active: 
     register(ui, format!("icon:{id}"), if touch { r.union(resp.interact_rect) } else { r });
     let p = ui.painter();
     let sq_size = if touch { 36.0f32 } else { 32.0f32 };
-    let sq = Rect::from_center_size(r.center(), vec2(sq_size.min(size.x), sq_size.min(size.y)));
+    // iPad: the highlight is a capsule (a 44 x 34 oval where the button is wide enough), not a rounded square
+    let sq = if touch {
+        Rect::from_center_size(r.center(), vec2(size.x.clamp(sq_size.min(size.x), 44.0), 34.0f32.min(size.y)))
+    } else {
+        Rect::from_center_size(r.center(), vec2(sq_size.min(size.x), sq_size.min(size.y)))
+    };
     let is_down = resp.is_pointer_button_down_on();
-    let corner = if touch { 10.0 } else { 4.0 };
+    let corner = if touch { sq.height() / 2.0 } else { 4.0 };
     if active {
         p.rect_filled(sq, corner, t.tool_active);
     } else if (resp.hovered() || (touch && is_down)) && enabled {

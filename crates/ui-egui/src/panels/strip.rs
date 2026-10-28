@@ -22,7 +22,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         .resizable(false)
         .frame(if glass {
             // the tool rail as one floating glass capsule
-            crate::glass::shell(egui::Margin { left: 0, right: 0, top: 8, bottom: 8 }, egui::Margin { left: 2, right: 10, top: 8, bottom: 8 })
+            crate::glass::shell(egui::Margin { left: 0, right: 0, top: 8, bottom: 8 }, egui::Margin { left: 2, right: 10, top: 16, bottom: 8 })
         } else {
             egui::Frame::NONE
                 .fill(t.chrome)

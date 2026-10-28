@@ -192,7 +192,7 @@ impl Tokens {
                 ..base
             },
             ThemeKind::Glass => Tokens {
-                chrome: Color32::from_rgba_unmultiplied(24, 24, 30, 222),
+                chrome: Color32::from_rgba_unmultiplied(24, 24, 24, 222),
                 canvas: Color32::from_rgb(0x12, 0x12, 0x16),
                 grid_bg: Color32::from_rgb(0x0a, 0x0a, 0x0c),
                 cell: Color32::from_rgba_unmultiplied(36, 36, 44, 190),
@@ -479,7 +479,7 @@ pub fn apply_kind(ctx: &egui::Context, kind: ThemeKind) {
     let dark = kind.is_dark();
     let is_glass = kind == ThemeKind::Glass || (touch_ui && dark);
     let mut v = if dark { Visuals::dark() } else { Visuals::light() };
-    v.panel_fill = if is_glass { Color32::from_rgba_unmultiplied(24, 24, 30, 220) } else { t.chrome };
+    v.panel_fill = if is_glass { Color32::from_rgba_unmultiplied(24, 24, 24, 220) } else { t.chrome };
     // iPad: popups and dialogs are opaque (the photo behind a translucent menu bled through its labels)
     v.window_fill = if touch_ui {
         Color32::from_rgb(28, 28, 36)
