@@ -677,8 +677,11 @@ pub(crate) fn histogram(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId)
     let (r, resp) = ui.allocate_exact_size(vec2(w, 118.0 + legend), Sense::click_and_drag());
     crate::widgets::announce(&resp, crate::i18n::tr("Histogram"));
     register(ui, "histogram", r);
+    // iPad (glass): a rounded tile inset from the card's edge, not a square block touching it
+    let glass = crate::glass::active(ui.ctx());
+    let r = if glass { r.shrink2(vec2(10.0, 0.0)) } else { r };
     let p = ui.painter();
-    p.rect_filled(r, 0.0, t.button);
+    p.rect_filled(r, if glass { 14.0 } else { 0.0 }, t.button);
     let plot = Rect::from_min_max(r.min + vec2(0.0, 6.0), pos2(r.right(), r.bottom() - 26.0 - legend));
     // Lightroom Classic's tonal zones (Blacks / Shadows / Exposure / Highlights / Whites across the
     // plot): a drag over one moves its control (the band and the readout show which and how far), a

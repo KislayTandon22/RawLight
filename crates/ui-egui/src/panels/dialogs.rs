@@ -335,6 +335,8 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
     let popup_was_open = egui::Popup::is_any_open(ctx);
     let shown = egui::Window::new(crate::i18n::tr(&title)).id(window_id)
         .collapsible(false)
+        // iPad: the title is a centred heading inside the card (egui's grey title band came out narrower than the window)
+        .title_bar(!crate::theme::touch_ui(ctx))
         .resizable(import)
         .vscroll(import)
         .resize(|r| if import { r.default_height(crate::import::DIALOG_SIZE[1]) } else { r })
@@ -365,8 +367,12 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
             }
             ui.spacing_mut().item_spacing.y = 8.0;
             if crate::theme::touch_ui(ctx) {
+                ui.vertical_centered(|ui| ui.label(egui::RichText::new(crate::i18n::tr(&title)).font(t.semibold(17.0)).color(t.text)));
+                ui.add_space(4.0);
                 // egui's own sliders (Assisted Culling…) get a rail a thumb can travel along
                 ui.spacing_mut().slider_width = 240.0;
+                // overlay scroll bars: a fixed gutter made the title band narrower than the window
+                ui.spacing_mut().scroll = egui::style::ScrollStyle::floating();
             }
             body_h = dialog_body(ui, (!import && !print).then_some(title.as_str()), body_max, |ui| match &mut dlg {
                 Dialog::AutoStack { gap } => {

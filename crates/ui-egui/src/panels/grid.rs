@@ -375,7 +375,13 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 app.caches.grid.shapes()
             };
             let spans: Vec<(usize, usize)> = runs.iter().map(|r| (r.start, r.count)).collect();
-            let l = Arc::new(layout(shapes, &spans, avail_w, target, square));
+            // iPad: the photos keep the same side margin as the headers and bars instead of touching the screen edge
+            let inset = if crate::theme::touch_ui(ui.ctx()) { TOUCH_GRID_INSET } else { 0.0 };
+            let mut l = layout(shapes, &spans, avail_w - 2.0 * inset, target, square);
+            if inset > 0.0 {
+                l.cells.iter_mut().chain(l.headers.iter_mut()).for_each(|r| *r = r.translate(vec2(inset, 0.0)));
+            }
+            let l = Arc::new(l);
             app.caches.grid.layout = Some((lay_key, l.clone()));
             l
         }
@@ -520,6 +526,8 @@ pub(crate) fn wheel_step(ui: &egui::Ui, key: egui::Id, area: Rect, span: f32, si
 
 /// Height of a date header row (points).
 pub const HEADER_H: f32 = 40.0;
+/// iPad: the side margin of the photo grid, the same as its header, the filter strip and the bars.
+pub const TOUCH_GRID_INSET: f32 = 16.0;
 
 /// Cell rectangles (one per photo, in order), date-header rectangles (one per group, top to
 /// bottom), the rows of cells (top to bottom, for finding the visible ones by binary search) and
@@ -668,7 +676,8 @@ fn group_header(app: &mut LightcraftApp, ui: &mut egui::Ui, run: &DateRun, ids: 
         p.hline(r.x_range(), r.bottom(), Stroke::new(1.0, t.divider));
     }
     let g = p.layout_no_wrap(crate::i18n::date_group_label(&run.key, false), t.semibold(15.0), if resp.hovered() { t.text } else { t.text_label });
-    let x = r.left() + 8.0;
+    // iPad: the title lines up with the photos below it (a pinned header spans the whole width, the others start at the photos)
+    let x = r.left() + if !crate::theme::touch_ui(ui.ctx()) { 8.0 } else if pinned { TOUCH_GRID_INSET } else { 0.0 };
     let gw = g.size().x;
     p.galley(pos2(x, r.center().y - g.size().y / 2.0), g, t.text);
     let n = run.count;

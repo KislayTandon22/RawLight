@@ -150,8 +150,10 @@ fn show_touch(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let filtering = app.session.filter != Default::default();
     // (what the panel shows ends at its clip edge: the tool rail floats over the rest)
     let width = ui.available_width().min(ui.clip_rect().right() - ui.min_rect().left());
-    let out = egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(14, 8)).show(ui, |ui| {
-        ui.set_width(width - 28.0);
+    // iPad (glass): no slab behind the chips, and the same 16pt side margin as the grid below
+    let (fill, side) = if crate::glass::active(ui.ctx()) { (t.canvas, 16) } else { (t.chrome, 14) };
+    let out = egui::Frame::NONE.fill(fill).inner_margin(egui::Margin::symmetric(side, 8)).show(ui, |ui| {
+        ui.set_width(width - 2.0 * side as f32);
         ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
         ui.horizontal_wrapped(|ui| {
             ui.label(egui::RichText::new(crate::i18n::tr("Show")).font(t.font(13.0)).color(t.text_dim));
