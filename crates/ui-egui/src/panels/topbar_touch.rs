@@ -17,6 +17,11 @@ fn window_handle(_app: &LightcraftApp, ui: &mut egui::Ui, content: Rect, margin_
     crate::widgets::announce(&resp, crate::i18n::tr("Title bar"));
 }
 
+/// iPad: every control in the bar is this tall (icons are circles of this size, text buttons and the search field capsules of it).
+const CONTROL_H: f32 = 36.0;
+/// iPad: how much taller the glass bar is than `top_bar_h`, so the controls sit 8pt from its top and bottom edges as from its sides.
+const TOUCH_BAR_EXTRA: f32 = 10.0;
+
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let touch = crate::theme::touch_ui(ui.ctx());
@@ -39,7 +44,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let frame = if glass {
         // a floating glass shell below the status bar
         crate::glass::shell(
-            egui::Margin { left: 12, right: 12, top: 0, bottom: 0 },
+            egui::Margin { left: 8, right: 8, top: 0, bottom: 0 },
             egui::Margin { left: 10 + safe_left.round() as i8, right: 10 + safe_right.round() as i8, top: safe_top.round() as i8 + 4, bottom: 4 },
         )
     } else {
@@ -50,12 +55,13 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             bottom: 0,
         })
     };
-    egui::Panel::top("top_bar").exact_size(if glass { t.top_bar_h + safe_top + 8.0 } else { total_h }).frame(frame).show(ui, |ui| {
+    egui::Panel::top("top_bar").exact_size(if glass { t.top_bar_h + TOUCH_BAR_EXTRA + safe_top + 8.0 } else { total_h }).frame(frame).show(ui, |ui| {
         let full = ui.max_rect();
         if app.integrated_titlebar && !touch {
             window_handle(app, ui, full, left, 12.0);
         }
-        let btn_size = if touch { vec2(38.0, 38.0) } else { vec2(30.0, 30.0) };
+        // iPad: one control size, 36pt (a circle for icons, a capsule of the same height for text), in a 52pt bar
+        let btn_size = if touch { vec2(CONTROL_H, CONTROL_H) } else { vec2(30.0, 30.0) };
         // Split View's smallest widths: only what cannot be reached elsewhere stays (the bottom bar has undo / redo, History has the bell)
         let compact = touch && full.width() < 620.0;
         let mut left_cluster_end = full.left();
@@ -71,9 +77,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             if icon_button(ui, "sidebar", Icon::Sidebar, btn_size, app.ui.left_panel, true, crate::i18n::tr("Show/hide My Photos panel")).clicked() {
                 let _ = app.run("view.leftPanel", json!({}));
             }
-            ui.add_space(if touch { 4.0 } else { 8.0 });
-            if touch {
-                ui.add_space(4.0);
+            if !touch {
+                ui.add_space(8.0);
             }
             // (view history is the first thing to go when the bar is tight: portrait, Split View)
             if !(touch && full.width() < 900.0) {
@@ -84,7 +89,6 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             }
             if touch && !compact {
                 // undo / redo for edits, ratings and flags (the arrows above move between views)
-                ui.add_space(6.0);
                 let can_undo = !app.session.undo.is_empty();
                 let can_redo = !app.session.redo.is_empty();
                 if icon_button(ui, "undo", Icon::Undo, btn_size, false, can_undo, crate::i18n::tr("Undo")).clicked() {
@@ -95,7 +99,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
             }
             if !app.native_menu {
-                ui.add_space(if touch { 6.0 } else { 10.0 });
+                // (touch: 8pt of item spacing + 8 = the 16pt gap between the leading group and the text button)
+                ui.add_space(if touch { 8.0 } else { 10.0 });
                 let room = if touch { 90.0 } else { desk_search_left - ui.cursor().left() - 16.0 };
                 crate::menubar::show_in_window(app, ui, room);
             }
@@ -125,7 +130,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         } else {
             320.0
         }) + select_extra;
-        let search_left_bound = left_cluster_end + if touch { 12.0 } else { 16.0 };
+        let search_left_bound = left_cluster_end + 16.0;
         let search_right_bound = (full.right() - right_reserved).max(search_left_bound + 100.0);
         let available_search_w = search_right_bound - search_left_bound;
         let sw = if touch { available_search_w.clamp(110.0, 360.0) } else { available_search_w.clamp(160.0, 560.0) };
@@ -172,6 +177,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             paint(child.painter(), Rect::from_min_size(pos2(x0, sr.center().y - 8.0), vec2(16.0, 16.0)), Icon::Search, t.text_dim);
             child.painter().galley(pos2(x0 + 24.0, sr.center().y - g.size().y / 2.0), g, t.text_dim);
         }
+        if touch {
+            // (the field is as tall as a touch row by default and hung from the top of its slot: keep it inside the pill, centred on it)
+            child.spacing_mut().interact_size.y = search_h - 8.0;
+        }
         let resp = crate::text_field::TextField::singleline("field:search", &mut app.ui.search)
             .label(crate::i18n::tr("Search Photos"))
             .frame(false)
@@ -185,8 +194,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let _ = app.run("library.filter", json!({"text": q}));
         }
         // filter icon right of the search field, safely clamped
-        let fr_size = if touch { vec2(34.0, 34.0) } else { vec2(28.0, 28.0) };
-        let fr_x = if touch { (sr.right() + 20.0).min(full.right() - 170.0) } else { sr.right() + 22.0 };
+        let fr_size = if touch { vec2(CONTROL_H, CONTROL_H) } else { vec2(28.0, 28.0) };
+        let fr_x = if touch { (sr.right() + 8.0 + CONTROL_H / 2.0).min(full.right() - 170.0) } else { sr.right() + 22.0 };
         let fr = Rect::from_center_size(pos2(fr_x, sr.center().y), fr_size);
         let fresp = ui.interact(touch_hit(fr), egui::Id::unique("filter-btn"), Sense::click());
         crate::widgets::announce(&fresp, crate::i18n::tr("Filters"));
@@ -220,8 +229,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let _ = app.run("view.filterBar", json!({}));
         }
         // right icons
-        let mut x = full.right() - if touch { 20.0 } else { 18.0 };
-        let icon_size = if touch { vec2(36.0, 36.0) } else { vec2(28.0, 28.0) };
+        let icon_size = if touch { vec2(CONTROL_H, CONTROL_H) } else { vec2(28.0, 28.0) };
+        // (touch: the last control ends at the bar's inner edge, the 8pt inset all round)
+        let mut x = full.right() - if touch { icon_size.x / 2.0 } else { 18.0 };
         let icon_step = if touch { 44.0 } else { 40.0 };
         let icon_shrink = if touch { 7.0 } else { 5.0 };
 
@@ -266,6 +276,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             } else {
                 t.icon
             };
+            if touch && (resp.hovered() || resp.is_pointer_button_down_on()) {
+                ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(r.width(), r.height() - 2.0)), (r.height() - 2.0) / 2.0, t.hover.gamma_multiply(0.7));
+            }
             paint(ui.painter(), r.shrink(icon_shrink), icon, colour);
             if warn {
                 let c = r.right_top() + vec2(-5.0, 6.0);
@@ -291,8 +304,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let sel_label = if app.ui.multi_select { "Done" } else { "Select" };
             let is_active = app.ui.multi_select;
             let btn_w = 58.0;
-            let btn_h = if touch { 32.0 } else { 28.0 };
-            let r = Rect::from_center_size(pos2(x - btn_w / 2.0 + 8.0, full.center().y), vec2(btn_w, btn_h));
+            let btn_h = if touch { CONTROL_H } else { 28.0 };
+            // touch: 16pt between the text button and the icons either side of it (text and symbol buttons never read as one control)
+            let sel_right = if touch { x + icon_step - icon_size.x / 2.0 - 16.0 } else { x - btn_w / 2.0 + 8.0 + btn_w / 2.0 };
+            let r = Rect::from_center_size(pos2(sel_right - btn_w / 2.0, full.center().y), vec2(btn_w, btn_h));
             let resp = ui.interact(touch_hit(r), egui::Id::unique("topbar:select_mode"), Sense::click());
             crate::widgets::announce(&resp, crate::i18n::tr(sel_label));
             register(ui, "button:multiSelect", r);
@@ -300,16 +315,23 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 (t.accent, Stroke::NONE, Color32::WHITE)
             } else if resp.hovered() || resp.is_pointer_button_down_on() {
                 (Color32::from_rgba_unmultiplied(255, 255, 255, 40), Stroke::NONE, t.text)
+            } else if touch {
+                // ghost: only the active (Done) state is filled
+                (Color32::TRANSPARENT, Stroke::NONE, t.text)
             } else {
                 (Color32::from_rgba_unmultiplied(255, 255, 255, 22), Stroke::NONE, t.text)
             };
-            ui.painter().rect(r, 16.0, fill, stroke_rim, StrokeKind::Inside);
+            ui.painter().rect(r, if touch { btn_h / 2.0 } else { 16.0 }, fill, stroke_rim, StrokeKind::Inside);
             let g = ui.painter().layout_no_wrap(crate::i18n::tr(sel_label).into(), t.semibold(12.5), text_col);
             ui.painter().galley(r.center() - g.size() / 2.0, g, text_col);
             if resp.clicked() {
                 let _ = app.run("view.multiSelect", json!({}));
             }
-            x -= btn_w + 10.0;
+            if touch {
+                x = r.left() - 16.0 - icon_size.x / 2.0;
+            } else {
+                x -= btn_w + 10.0;
+            }
 
             // (Select All / Deselect All lives in the bottom bar with Export: one place, not two; the count badge
             // goes when the bar is narrow, the grid header and Export button already say how many)
@@ -318,10 +340,11 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 let cnt_str = format!("\u{2713} {sel_count}");
                 let cg = ui.painter().layout_no_wrap(cnt_str, t.semibold(11.5), t.accent);
                 let cr_w = cg.size().x + 16.0;
-                let cr = Rect::from_center_size(pos2(x - cr_w / 2.0 + 6.0, full.center().y), vec2(cr_w, btn_h));
-                ui.painter().rect_filled(cr, 16.0, Color32::from_rgba_unmultiplied(10, 132, 255, 40));
+                let cr_x = if touch { x + icon_size.x / 2.0 - cr_w / 2.0 } else { x - cr_w / 2.0 + 6.0 };
+                let cr = Rect::from_center_size(pos2(cr_x, full.center().y), vec2(cr_w, btn_h));
+                ui.painter().rect_filled(cr, btn_h / 2.0, Color32::from_rgba_unmultiplied(10, 132, 255, 40));
                 ui.painter().galley(cr.center() - cg.size() / 2.0, cg, t.accent);
-                x -= cr_w + 10.0;
+                x = if touch { cr.left() - 16.0 - icon_size.x / 2.0 } else { x - (cr_w + 10.0) };
             }
         }
 
@@ -333,6 +356,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let resp = ui.interact(touch_hit(r), egui::Id::unique(("top", "appearance")), Sense::click()).on_hover_text(tip.clone());
             crate::widgets::announce(&resp, tip);
             register(ui, "icon:appearance", r);
+            if touch && (resp.hovered() || resp.is_pointer_button_down_on()) {
+                ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(r.width(), r.height() - 2.0)), (r.height() - 2.0) / 2.0, t.hover.gamma_multiply(0.7));
+            }
             paint(ui.painter(), r.shrink(icon_shrink), icon, if resp.hovered() { t.text } else { t.icon });
             if resp.clicked() {
                 let _ = app.run("view.appearance", json!({}));

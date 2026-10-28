@@ -19,6 +19,11 @@ const VIEW_MODES: &[(&str, Icon, ViewMode, &str)] = &[
     ("people", Icon::Subject, ViewMode::People, "People"),
 ];
 
+/// A bar button: a 44 x 36 oval on the iPad (its selection is that oval), 30pt square elsewhere.
+fn tool_sz(ui: &egui::Ui) -> egui::Vec2 {
+    if crate::theme::touch_ui(ui.ctx()) { vec2(44.0, 36.0) } else { vec2(30.0, 30.0) }
+}
+
 /// Narrower than this on the iPad, the bar scrolls sideways instead of squeezing its controls together.
 const BAR_MIN_W: f32 = 640.0;
 
@@ -90,13 +95,13 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 /// and 10-point padding at both ends.
 const PILL_W: f32 = 208.0;
 /// Wider on the iPad, where the pick / reject buttons are 30pt touch targets.
-const PILL_W_TOUCH: f32 = 360.0;
+const PILL_W_TOUCH: f32 = 380.0;
 
 /// The stars and the unflag / pick (tick) / reject (cross) buttons, laid out left to right in `pill_ui`.
 fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active: Option<&lightcraft_catalog::Photo>) {
     let t = Tokens::get(pill_ui.ctx());
-    // iPad: the same 6pt between stars and flags (the stars sat 3pt apart)
-    pill_ui.spacing_mut().item_spacing.x = if crate::theme::touch_ui(pill_ui.ctx()) { 6.0 } else { 3.0 };
+    // iPad: the same 4pt between stars and flags (the stars sat 3pt apart)
+    pill_ui.spacing_mut().item_spacing.x = if crate::theme::touch_ui(pill_ui.ctx()) { 4.0 } else { 3.0 };
     let rating = active.map(|p| p.rating).unwrap_or(0);
     if let Some(r) = crate::rating::Rating::new("bottom", rating).show(pill_ui) {
         let mut params = json!({"rating": r});
@@ -107,7 +112,7 @@ fn rating_pill_contents(app: &mut LightcraftApp, pill_ui: &mut egui::Ui, active:
     let flag = active.map(|p| p.flag).unwrap_or_default();
     for (id, icon, f) in [("unflag", Icon::Circle, Flag::None), ("pick", Icon::FlagPick, Flag::Pick), ("reject", Icon::FlagReject, Flag::Reject)] {
         let (r, resp) = pill_ui.allocate_exact_size(
-            vec2(if crate::theme::touch_ui(pill_ui.ctx()) { 36.0 } else { 22.0 }, if crate::theme::touch_ui(pill_ui.ctx()) { 36.0 } else { 22.0 }),
+            vec2(if crate::theme::touch_ui(pill_ui.ctx()) { 40.0 } else { 22.0 }, if crate::theme::touch_ui(pill_ui.ctx()) { 40.0 } else { 22.0 }),
             Sense::click(),
         );
         register(pill_ui, format!("flag:{id}"), r);
@@ -151,7 +156,7 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 // the sort button on its own after a group gap; no divider line between them
                 let touch = crate::theme::touch_ui(ui.ctx());
                 let track = if touch { Color32::from_white_alpha(10) } else { Color32::TRANSPARENT };
-                egui::Frame::NONE.fill(track).corner_radius(if touch { 22.0 } else { 0.0 }).inner_margin(egui::Margin::symmetric(if touch { 3 } else { 0 }, 0)).show(ui, |ui| {
+                egui::Frame::NONE.fill(track).corner_radius(if touch { 22.0 } else { 0.0 }).inner_margin(egui::Margin::symmetric(if touch { 1 } else { 0 }, 0)).show(ui, |ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
                     for &(id, icon, mode, tip) in VIEW_MODES {
                         if icon_button(ui, id, icon, mode_sz, app.ui.view == mode, true, tip).clicked() {
@@ -165,7 +170,7 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                     ui.painter().rect_filled(sep, 0.0, t.button_border);
                     ui.add_space(10.0);
                 }
-                let sort = icon_button(ui, "sort", Icon::Sort, vec2(30.0, 30.0), false, true, "Sort");
+                let sort = icon_button(ui, "sort", Icon::Sort, tool_sz(ui), false, true, "Sort");
                 egui::Popup::menu(&sort).show(|ui| {
                     crate::widgets::touch_menu_style(ui);
                     sort_menu(app, ui)
@@ -307,7 +312,8 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     ui.painter().rect_filled(pill, 15.0, if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
     let mut pill_ui = ui.new_child(
         egui::UiBuilder::new()
-            .max_rect(pill.shrink2(vec2(10.0, if pill_h > 30.0 { 2.0 } else { 4.0 })))
+            // (iPad: nudged up 2.5pt: the star and flag glyphs sat that far below the centre line of the view buttons)
+            .max_rect(pill.shrink2(vec2(10.0, if pill_h > 30.0 { 2.0 } else { 4.0 })).translate(vec2(0.0, if crate::theme::touch_ui(ui.ctx()) { -2.5 } else { 0.0 })))
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     rating_pill_contents(app, &mut pill_ui, active.as_deref());
@@ -332,7 +338,7 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     register(ui, "button:copySettings", copy_r);
     crate::widgets::announce(&cresp, label.to_string());
     ui.painter().rect_filled(copy_r, 18.0, if cresp.hovered() { t.hover } else if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
-    ui.painter().text(copy_r.center(), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
+    ui.painter().text(copy_r.center() - vec2(0.0, if crate::theme::touch_ui(ui.ctx()) { 1.5 } else { 0.0 }), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
     if cresp.clicked() && active.is_some() {
         let _ = if has_clip { app.run("develop.paste", json!({})) } else { app.run("develop.copy", json!({})) };
         let msg = if has_clip { "Settings pasted" } else { "Edit settings copied" };
@@ -365,7 +371,7 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
             &mut child,
             "autoAdvance",
             Icon::ChevronRight,
-            vec2(30.0, 30.0),
+            tool_sz(ui),
             app.ui.auto_advance,
             true,
             "Auto Advance after rating or flagging",
@@ -378,7 +384,7 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
         // no zoom or thumbnail size in Survey
     } else if matches!(app.ui.view, ViewMode::Detail | ViewMode::Compare) {
         if condensed {
-            let more = icon_button(&mut child, "viewMore", Icon::More, vec2(30.0, 30.0), false, true, "More view options");
+            let more = icon_button(&mut child, "viewMore", Icon::More, tool_sz(ui), false, true, "More view options");
             egui::Popup::menu(&more).show(|ui| {
                 crate::widgets::touch_menu_style(ui);
                 if ui.selectable_label(app.ui.before_after.is_layout(), crate::i18n::tr("Before / After")).clicked() {
@@ -398,17 +404,17 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
                 click_zoom_menu(app, ui);
             });
         } else {
-            if icon_button(&mut child, "beforeAfter", Icon::BeforeAfter, vec2(30.0, 30.0), app.ui.before_after.is_layout(), true, "Before/After (Y)")
+            if icon_button(&mut child, "beforeAfter", Icon::BeforeAfter, tool_sz(ui), app.ui.before_after.is_layout(), true, "Before/After (Y)")
                 .clicked()
             {
                 let _ = app.run("view.beforeAfter", json!({}));
             }
             if app.ui.view == ViewMode::Detail
-                && icon_button(&mut child, "faceBoxes", Icon::FaceBox, vec2(30.0, 30.0), app.ui.face_boxes, true, "Face boxes").clicked()
+                && icon_button(&mut child, "faceBoxes", Icon::FaceBox, tool_sz(ui), app.ui.face_boxes, true, "Face boxes").clicked()
             {
                 let _ = app.run("view.faceBoxes", json!({}));
             }
-            if icon_button(&mut child, "filmstrip", Icon::Filmstrip, vec2(30.0, 30.0), app.ui.filmstrip, true, "Filmstrip (/)").clicked() {
+            if icon_button(&mut child, "filmstrip", Icon::Filmstrip, tool_sz(ui), app.ui.filmstrip, true, "Filmstrip (/)").clicked() {
                 let _ = app.run("view.filmstrip", json!({}));
             }
         }

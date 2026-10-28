@@ -130,7 +130,7 @@ impl Rating {
         let t = Tokens::get(ui.ctx());
         // finger-sized stars on the iPad
         let touch = crate::theme::touch_ui(ui.ctx());
-        let cell = if touch { 36.0 } else { RatingSize::Large.cell() };
+        let cell = if touch { 40.0 } else { RatingSize::Large.cell() };
         let mut out = None;
         let mut hover_n = None;
         let mut focused_at = None;
@@ -185,7 +185,7 @@ impl Rating {
         let side = if touch { 24.0 } else { RatingSize::Large.icon() };
         for (i, r) in (0..STARS).zip(cells) {
             if hover_n == Some(i + 1) {
-                ui.painter().rect_filled(r, 4.0, t.hover.gamma_multiply(0.7));
+                ui.painter().rect_filled(r, if touch { 18.0 } else { 4.0 }, t.hover.gamma_multiply(0.7));
             }
             let filled = star_lit(i, self.rating, hover_n);
             paint_star(ui.painter(), Rect::from_center_size(r.center(), vec2(side, side)), filled, if filled { t.star } else { t.icon });
@@ -206,7 +206,7 @@ pub fn favorite_button(ui: &mut Ui, widget: String, favorite: bool, name: &str) 
         register(ui, widget, r);
     }
     if resp.hovered() {
-        ui.painter().rect_filled(r, 4.0, t.hover.gamma_multiply(0.7));
+        ui.painter().rect_filled(r, if crate::theme::touch_ui(ui.ctx()) { 18.0 } else { 4.0 }, t.hover.gamma_multiply(0.7));
     }
     if resp.has_focus() {
         ui.painter().rect_stroke(r.expand(1.0), 6.0, egui::Stroke::new(2.0, t.accent), egui::StrokeKind::Outside);

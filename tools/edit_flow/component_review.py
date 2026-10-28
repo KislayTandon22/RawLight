@@ -72,7 +72,17 @@ CHECKLIST = """Apple HIG (iPadOS, touch) checklist you must judge against:
 - Group with whitespace and containers, not lines. Same side margin everywhere (16pt). Concentric corner radii (inner = outer - padding).
 - Contrast: text 4.5:1, icons/borders 3:1; state is not shown by colour alone. Selected = highlight, not a heavier border.
 - Labels: verb phrases in Title Case; ellipsis when more input follows. Names spoken by VoiceOver.
-- Glass only for the functional layer (bars, rail, panels), not for content; Reduce Transparency / Dynamic Type must not clip text."""
+- Glass only for the functional layer (bars, rail, panels), not for content; Reduce Transparency / Dynamic Type must not clip text.
+
+Craft rules from ui-skills.com (better-ui, improve-ui; third-party guidance, apply only when the facts or code show it):
+- Concentric radii: outer radius = inner radius + padding (+ border). A control in a capsule bar: bar radius = control radius + inset; the inset on the left equals the inset above and below.
+- Optical alignment: where geometric centring looks off (icon + chevron, play-like glyphs, text in a pill) nudge by eye; a lone chevron or icon in a capsule is not centred on the capsule.
+- Icons: stroke weight matches the adjacent text; outline for the default state, filled for the active state; colour, not separate assets, carries hover / selected / disabled.
+- Borders only for structure (dividers, inputs, selected states); where a border only adds depth use a soft shadow. No hairline outlines on glass cards.
+- Press feedback: a pressed control shows a state change within 150ms (scale about 0.96 or a fill); a disabled one never does. High-frequency actions (taps on stars, row hovers, tab switches) are instant, not animated. Every animated change also has a static cue.
+- Motion respects Reduce Motion (fade instead of move/scale).
+
+Reporting rules (improve-ui): a finding must pass three proofs: (1) contract: a stated rule above or a contradiction between sibling controls; (2) runtime: the cited value or line really reaches the screen (use the measured facts); (3) correction: ONE specific change naming existing constants/tokens. Drop anything with several possible fixes or that needs invented product intent. Report at most 6, strongest first."""
 
 # ---------------------------------------------------------------------------------------------------------- render
 def render(name, comp):
@@ -106,6 +116,8 @@ def ratio(c1, c2):
 def contrast(img, r):
     """Background = the commonest colour in the crop, foreground = the pixel furthest from it in luminance."""
     x, y, w, h = (int(round(v)) for v in r)
+    if x >= img.width or y >= img.height or x + w <= 0 or y + h <= 0:
+        return None  # off screen (below the fold)
     box = img.crop((max(0, x), max(0, y), min(img.width, x + w), min(img.height, y + h))).convert("RGB")
     px = list(box.getdata())
     if not px:
@@ -208,7 +220,7 @@ Per widget: {json.dumps(f.get('widgets', [])[:24])}
 SOURCE (touch paths are behind crate::theme::touch_ui / glass::active; desktop must not change):
 {src}
 
-Reply with ONLY a JSON array (max 8 items), each: {{"severity":"P0|P1|P2|P3","rule":"which checklist rule","evidence":"the exact number or code line","fix":"touch-only change, file + constant","confidence":0-1}}.
+Reply with ONLY a JSON array (max 6 items), each: {{"severity":"P0|P1|P2|P3","rule":"which checklist rule","evidence":"the exact number or code line","fix":"touch-only change, file + constant","confidence":0-1}}.
 Only report what the facts or code prove; do not invent. If the component is fine, return []."""
 
 def ask(reviewer, text):
