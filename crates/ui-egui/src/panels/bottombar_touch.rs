@@ -147,15 +147,24 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
             let min_expand_w = if crate::theme::touch_ui(ui.ctx()) { if full.width() < 800.0 { f32::MAX } else { 420.0 } } else { 270.0 };
             if left_rect.width() >= min_expand_w {
                 let mode_sz = if crate::theme::touch_ui(ui.ctx()) { vec2(44.0, 36.0) } else { vec2(32.0, 32.0) };
-                for &(id, icon, mode, tip) in VIEW_MODES {
-                    if icon_button(ui, id, icon, mode_sz, app.ui.view == mode, true, tip).clicked() {
-                        let _ = app.run(&format!("view.{id}"), json!({}));
+                // iPad: the view modes are one segmented capsule (a faint inset track, the current mode an oval inside it), then
+                // the sort button on its own after a group gap; no divider line between them
+                let touch = crate::theme::touch_ui(ui.ctx());
+                let track = if touch { Color32::from_white_alpha(10) } else { Color32::TRANSPARENT };
+                egui::Frame::NONE.fill(track).corner_radius(if touch { 22.0 } else { 0.0 }).inner_margin(egui::Margin::symmetric(if touch { 3 } else { 0 }, 0)).show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    for &(id, icon, mode, tip) in VIEW_MODES {
+                        if icon_button(ui, id, icon, mode_sz, app.ui.view == mode, true, tip).clicked() {
+                            let _ = app.run(&format!("view.{id}"), json!({}));
+                        }
                     }
+                });
+                ui.add_space(if touch { 14.0 } else { 10.0 });
+                if !touch {
+                    let (sep, _) = ui.allocate_exact_size(vec2(1.0, 22.0), Sense::hover());
+                    ui.painter().rect_filled(sep, 0.0, t.button_border);
+                    ui.add_space(10.0);
                 }
-                ui.add_space(10.0);
-                let (sep, _) = ui.allocate_exact_size(vec2(1.0, 22.0), Sense::hover());
-                ui.painter().rect_filled(sep, 0.0, t.button_border);
-                ui.add_space(10.0);
                 let sort = icon_button(ui, "sort", Icon::Sort, vec2(30.0, 30.0), false, true, "Sort");
                 egui::Popup::menu(&sort).show(|ui| {
                     crate::widgets::touch_menu_style(ui);
@@ -166,8 +175,11 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 }
             } else {
                 let current_icon = VIEW_MODES.iter().find(|(_, _, mode, _)| *mode == app.ui.view).map_or(Icon::More, |(_, icon, _, _)| *icon);
-                let more = icon_button(ui, "viewOptions", current_icon, vec2(40.0, 32.0), true, true, "View");
-                paint(ui.painter(), Rect::from_center_size(more.rect.right_bottom() - vec2(5.0, 5.0), vec2(7.0, 7.0)), Icon::ChevronDown, t.text);
+                let touch = crate::theme::touch_ui(ui.ctx());
+                // iPad: a 52 x 36 capsule holding the current mode's icon and a chevron (the 40pt square read as a blue block)
+                let more = icon_button(ui, "viewOptions", current_icon, if touch { vec2(52.0, 36.0) } else { vec2(40.0, 32.0) }, true, true, "View");
+                let chevron_at = if touch { more.rect.right_center() - vec2(8.0, 0.0) } else { more.rect.right_bottom() - vec2(5.0, 5.0) };
+                paint(ui.painter(), Rect::from_center_size(chevron_at, vec2(if touch { 10.0 } else { 7.0 }, if touch { 10.0 } else { 7.0 })), Icon::ChevronDown, t.text);
                 egui::Popup::menu(&more).show(|ui| {
                     crate::widgets::touch_menu_style(ui);
                     for &(id, _, mode, label) in VIEW_MODES {
