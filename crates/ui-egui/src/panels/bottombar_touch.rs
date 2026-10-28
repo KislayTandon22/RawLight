@@ -34,7 +34,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         // a floating glass shell above the home indicator
         crate::glass::shell(
             egui::Margin { left: 12, right: 12, top: 0, bottom: 0 },
-            egui::Margin { left: 10 + safe_left.round() as i8, right: 10 + safe_right.round() as i8, top: 4, bottom: safe_bottom.round() as i8 },
+            egui::Margin { left: 4 + safe_left.round() as i8, right: 4 + safe_right.round() as i8, top: 4, bottom: safe_bottom.round() as i8 },
         )
     } else {
         egui::Frame::NONE
@@ -175,24 +175,13 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 }
             } else {
                 let current_icon = VIEW_MODES.iter().find(|(_, _, mode, _)| *mode == app.ui.view).map_or(Icon::More, |(_, icon, _, _)| *icon);
+                // iPad: the current mode's icon in the same 44 x 36 oval as the buttons beside it; tapping it opens the list of modes
+                // (no arrow: the selection oval is the cue)
                 let touch = crate::theme::touch_ui(ui.ctx());
-                // iPad: a 68 x 36 capsule holding the current mode's icon and a chevron, with 14pt between the chevron and the capsule's edge
-                // (the highlight is painted here, under the icon: `icon_button` caps its own at 44pt)
-                let fill = ui.painter().add(egui::Shape::Noop);
-                let more = icon_button(
-                    ui,
-                    "viewOptions",
-                    current_icon,
-                    if touch { vec2(68.0, 36.0) } else { vec2(40.0, 32.0) },
-                    !touch,
-                    true,
-                    "View",
-                );
-                if touch {
-                    ui.painter().set(fill, egui::epaint::RectShape::filled(more.rect.shrink2(vec2(0.0, 1.0)), 17.0, t.tool_active));
+                let more = icon_button(ui, "viewOptions", current_icon, if touch { vec2(44.0, 36.0) } else { vec2(40.0, 32.0) }, true, true, "View");
+                if !touch {
+                    paint(ui.painter(), Rect::from_center_size(more.rect.right_bottom() - vec2(5.0, 5.0), vec2(7.0, 7.0)), Icon::ChevronDown, t.text);
                 }
-                let chevron_at = if touch { more.rect.right_center() - vec2(15.0, 0.0) } else { more.rect.right_bottom() - vec2(5.0, 5.0) };
-                paint(ui.painter(), Rect::from_center_size(chevron_at, vec2(if touch { 10.0 } else { 7.0 }, if touch { 10.0 } else { 7.0 })), Icon::ChevronDown, t.text);
                 egui::Popup::menu(&more).show(|ui| {
                     crate::widgets::touch_menu_style(ui);
                     for &(id, _, mode, label) in VIEW_MODES {
@@ -309,7 +298,8 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     // (the group's whole width is kept inside the bar: without the undo pair it ran 78pt into the zoom and view controls)
     let w = if with_copy { centre_width + if undo_group { 78.0 } else { 0.0 } } else { pill_w };
     // where it sits with room to spare (slightly left of centre), kept between the side groups
-    let left = (full.center().x - 60.0 - pill_w / 2.0).clamp(from, to - w);
+    // (iPad: right after the left group, not floating in the middle of the leftover space)
+    let left = if crate::theme::touch_ui(ui.ctx()) { from } else { (full.center().x - 60.0 - pill_w / 2.0).clamp(from, to - w) };
     let active = app.session.active().and_then(|id| app.session.catalog.photo(id).cloned());
     let pill_h = if crate::theme::touch_ui(ui.ctx()) { 40.0 } else { 30.0 };
     let pill = Rect::from_min_size(pos2(left, full.center().y - pill_h / 2.0), vec2(pill_w, pill_h));

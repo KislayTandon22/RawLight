@@ -956,7 +956,9 @@ pub fn icon_button(ui: &mut Ui, id: &str, icon: Icon, size: egui::Vec2, active: 
     let is_down = resp.is_pointer_button_down_on();
     let corner = if touch { sq.height() / 2.0 } else { 4.0 };
     if active {
-        p.rect_filled(sq, corner, t.tool_active);
+        // iPad: the system's selection look, a soft translucent oval (not the accent blue)
+        let sel = if touch { if ui.visuals().dark_mode { Color32::from_white_alpha(40) } else { Color32::from_black_alpha(24) } } else { t.tool_active };
+        p.rect_filled(sq, corner, sel);
     } else if (resp.hovered() || (touch && is_down)) && enabled {
         p.rect_filled(sq, corner, t.hover.gamma_multiply(0.7));
     }
