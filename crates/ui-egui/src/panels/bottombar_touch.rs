@@ -176,9 +176,22 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
             } else {
                 let current_icon = VIEW_MODES.iter().find(|(_, _, mode, _)| *mode == app.ui.view).map_or(Icon::More, |(_, icon, _, _)| *icon);
                 let touch = crate::theme::touch_ui(ui.ctx());
-                // iPad: a 52 x 36 capsule holding the current mode's icon and a chevron (the 40pt square read as a blue block)
-                let more = icon_button(ui, "viewOptions", current_icon, if touch { vec2(52.0, 36.0) } else { vec2(40.0, 32.0) }, true, true, "View");
-                let chevron_at = if touch { more.rect.right_center() - vec2(8.0, 0.0) } else { more.rect.right_bottom() - vec2(5.0, 5.0) };
+                // iPad: a 68 x 36 capsule holding the current mode's icon and a chevron, with 14pt between the chevron and the capsule's edge
+                // (the highlight is painted here, under the icon: `icon_button` caps its own at 44pt)
+                let fill = ui.painter().add(egui::Shape::Noop);
+                let more = icon_button(
+                    ui,
+                    "viewOptions",
+                    current_icon,
+                    if touch { vec2(68.0, 36.0) } else { vec2(40.0, 32.0) },
+                    !touch,
+                    true,
+                    "View",
+                );
+                if touch {
+                    ui.painter().set(fill, egui::epaint::RectShape::filled(more.rect.shrink2(vec2(0.0, 1.0)), 17.0, t.tool_active));
+                }
+                let chevron_at = if touch { more.rect.right_center() - vec2(15.0, 0.0) } else { more.rect.right_bottom() - vec2(5.0, 5.0) };
                 paint(ui.painter(), Rect::from_center_size(chevron_at, vec2(if touch { 10.0 } else { 7.0 }, if touch { 10.0 } else { 7.0 })), Icon::ChevronDown, t.text);
                 egui::Popup::menu(&more).show(|ui| {
                     crate::widgets::touch_menu_style(ui);
