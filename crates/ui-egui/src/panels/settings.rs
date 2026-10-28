@@ -81,14 +81,24 @@ const PREVIEW_CHROME: f32 = 82.0;
 pub fn window(app: &mut LightcraftApp, ui: &mut egui::Ui, tab: &mut String, max_height: f32) {
     ui.set_width((ui.ctx().content_rect().width() - 64.0).clamp(240.0, PAGE_SIZE.x));
     let top = ui.cursor().top();
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
-        for (id, label) in TABS {
-            if crate::widgets::text_button(ui, &format!("settingsTab-{id}"), label, tab == id).clicked() {
-                *tab = id.to_string();
-            }
+    if crate::theme::touch_ui(ui.ctx()) {
+        // iPad: the tabs are equal segments, four to a row, not chips of every width with one left over on a second row
+        let labels: Vec<String> = TABS.iter().map(|(_, l)| crate::i18n::tr(l).to_string()).collect();
+        let items: Vec<(&str, &str)> = labels.iter().zip(TABS).map(|(l, (id, _))| (l.as_str(), *id)).collect();
+        let active = TABS.iter().position(|(id, _)| tab == id);
+        if let Some(i) = crate::widgets::segmented(ui, "settingsTab", &items, active, 4) {
+            *tab = TABS[i].0.to_string();
         }
-    });
+    } else {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
+            for (id, label) in TABS {
+                if crate::widgets::text_button(ui, &format!("settingsTab-{id}"), label, tab == id).clicked() {
+                    *tab = id.to_string();
+                }
+            }
+        });
+    }
     ui.separator();
     // (a point less than the room left, so rounding never makes the dialog's own scroll area scroll)
     let room = max_height - (ui.cursor().top() - top) - 1.0;
@@ -223,6 +233,28 @@ pub(super) fn check(ui: &mut egui::Ui, id: &str, value: &mut bool, label: &str) 
 /// Mutually exclusive buttons (`button:{id}-{index}`).
 pub(super) fn choices<V: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, options: &[(V, &str)], value: &mut V) -> bool {
     let mut changed = false;
+    if crate::theme::touch_ui(ui.ctx()) && options.len() > 1 {
+        // iPad: equal-width segments (three to a row when there are many or the room is narrow), not chips of every width
+        let keys: Vec<String> = (0..options.len()).map(|i| i.to_string()).collect();
+        let items: Vec<(&str, &str)> = options.iter().zip(&keys).map(|((_, l), k)| (*l, k.as_str())).collect();
+        let active = options.iter().position(|(v, _)| *v == *value);
+        // (a row that wraps offers unbounded width: the segments get a reading width of their own)
+        let width = ui.available_width().min(480.0);
+        let per_row = if options.len() > 4 || width < 360.0 { options.len().min(3) } else { options.len() };
+        let clicked = ui
+            .vertical(|ui| {
+                ui.set_width(width);
+                crate::widgets::segmented(ui, id, &items, active, per_row)
+            })
+            .inner;
+        if let Some(i) = clicked
+            && options[i].0 != *value
+        {
+            *value = options[i].0;
+            changed = true;
+        }
+        return changed;
+    }
     ui.spacing_mut().item_spacing.x = 4.0;
     for (i, (v, l)) in options.iter().enumerate() {
         if crate::widgets::text_button(ui, &format!("{id}-{i}"), l, *value == *v).clicked() && *value != *v {

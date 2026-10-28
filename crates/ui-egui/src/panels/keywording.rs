@@ -13,6 +13,18 @@ use crate::widgets::register;
 /// what exported files will carry.
 pub fn view_switch(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     use crate::state::KeywordingView as V;
+    if crate::theme::touch_ui(ui.ctx()) {
+        // iPad: three equal segments in one row, not three differently sized labels that wrap
+        let views =
+            [(V::Keywords, "keywords", "Keywords"), (V::Containing, "containing", "& Containing"), (V::WillExport, "willExport", "Will Export")];
+        let labels: Vec<String> = views.iter().map(|(_, _, l)| crate::i18n::tr(l).to_string()).collect();
+        let items: Vec<(&str, &str)> = labels.iter().zip(&views).map(|(l, (_, id, _))| (l.as_str(), *id)).collect();
+        let active = views.iter().position(|(v, _, _)| *v == app.ui.keywording_view);
+        if let Some(i) = crate::widgets::segmented(ui, "keywordView", &items, active, 3) {
+            app.ui.keywording_view = views[i].0;
+        }
+        return;
+    }
     ui.horizontal_wrapped(|ui| {
         for (view, id, label) in
             [(V::Keywords, "keywords", "Keywords"), (V::Containing, "containing", "& Containing"), (V::WillExport, "willExport", "Will Export")]
