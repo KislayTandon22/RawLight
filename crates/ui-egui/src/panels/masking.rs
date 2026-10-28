@@ -93,12 +93,15 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 0, bottom: 10 }).show(ui, |ui| {
         ui.label(egui::RichText::new(crate::i18n::tr("Create New Mask")).color(t.text_dim));
         ui.add_space(6.0);
+        // iPad: four tiles that shared one icon get one each, so they can be told apart at a glance
+        let touch = crate::theme::touch_ui(ui.ctx());
+        let pick = |touch_icon: Icon| if touch { touch_icon } else { Icon::Subject };
         let tiles: [(&str, &str, Icon); 10] = [
-            ("object", "Object", Icon::Subject),
-            ("prompt", "Describe", Icon::Subject),
+            ("object", "Object", pick(Icon::Picker)),
+            ("prompt", "Describe", pick(Icon::Search)),
             ("subject", "Subject", Icon::Subject),
             ("sky", "Sky", Icon::Sky),
-            ("background", "Background", Icon::Subject),
+            ("background", "Background", pick(Icon::Photos)),
             ("brush", "Brush", Icon::Brush),
             ("linear", "Linear", Icon::Linear),
             ("radial", "Radial", Icon::Radial),
