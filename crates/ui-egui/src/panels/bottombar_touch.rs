@@ -277,7 +277,11 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
         return;
     }
     let with_copy = room >= centre_width;
-    let w = if with_copy { centre_width } else { pill_w };
+    // Undo / Redo right after the rater (the top bar has them too), when there is room for them
+    // (Copy Edit Settings matters more than a second pair of undo / redo buttons: they appear only when both fit)
+    let undo_group = crate::theme::touch_ui(ui.ctx()) && room >= centre_width + 78.0;
+    // (the group's whole width is kept inside the bar: without the undo pair it ran 78pt into the zoom and view controls)
+    let w = if with_copy { centre_width + if undo_group { 78.0 } else { 0.0 } } else { pill_w };
     // where it sits with room to spare (slightly left of centre), kept between the side groups
     let left = (full.center().x - 60.0 - pill_w / 2.0).clamp(from, to - w);
     let active = app.session.active().and_then(|id| app.session.catalog.photo(id).cloned());
@@ -291,9 +295,6 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     rating_pill_contents(app, &mut pill_ui, active.as_deref());
-    // Undo / Redo right after the rater (the top bar has them too), when there is room for them
-    // (Copy Edit Settings matters more than a second pair of undo / redo buttons: they appear only when both fit)
-    let undo_group = crate::theme::touch_ui(ui.ctx()) && room >= centre_width + 78.0;
     if undo_group {
         let r = Rect::from_min_size(pos2(pill.right() + 8.0, pill.top()), vec2(72.0, pill_h));
         let mut cu = ui.new_child(egui::UiBuilder::new().max_rect(r).layout(egui::Layout::left_to_right(egui::Align::Center)));

@@ -840,10 +840,11 @@ pub fn flyout_row(ui: &mut Ui, id: &str, title: &str, icon: Icon, open: bool) ->
 pub fn text_button(ui: &mut Ui, id: &str, label: &str, active: bool) -> Response {
     let label = if id.starts_with("labelSet-") { label } else { crate::i18n::tr(label) };
     let t = Tokens::get(ui.ctx());
-    let font = t.semibold(11.5);
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font, t.text);
     let touch = crate::theme::touch_ui(ui.ctx());
-    let h = if touch { 38.0 } else { 24.0 };
+    // iPad: 13pt text and a 44pt target (11.5pt / 38pt were the desktop's size with a little more padding)
+    let font = t.semibold(if touch { 13.0 } else { 11.5 });
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, t.text);
+    let h = if touch { 44.0 } else { 24.0 };
     let pad_x = if touch { 24.0 } else { 18.0 };
     let min_w = if touch { 48.0 } else { 37.0 };
     let size = vec2((galley.size().x + pad_x).max(min_w), h);
