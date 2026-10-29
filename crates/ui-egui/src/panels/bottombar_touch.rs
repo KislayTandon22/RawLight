@@ -58,37 +58,40 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 bottom: safe_bottom.round() as i8,
             })
     };
-    egui::Panel::bottom("bottom_bar").exact_size(if glass { super::topbar_touch::TOUCH_BAR_H + safe_bottom + 8.0 } else { total_h }).frame(frame).show(ui, |ui| {
-        let avail = ui.max_rect();
-        if crate::theme::touch_ui(ui.ctx()) && avail.width() < BAR_MIN_W {
-            // too narrow for the controls (Split View, Slide Over): keep their layout and scroll the bar sideways
-            let out = egui::ScrollArea::horizontal()
-                .id_salt("bottom-bar-scroll")
-                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    let (strip, _) = ui.allocate_exact_size(vec2(BAR_MIN_W, avail.height()), Sense::hover());
-                    let mut inner = ui.new_child(egui::UiBuilder::new().max_rect(strip));
-                    bar_contents(app, &mut inner, strip);
-                });
-            // a fade and a chevron at each end that has more beyond it: the bar visibly slides
-            let (offset, view_w) = (out.state.clamped_offset().x, out.inner_rect.width());
-            let painter = ui.painter();
-            let fade_w = 34.0;
-            if offset > 1.0 {
-                let r = Rect::from_min_size(out.inner_rect.min, vec2(fade_w, out.inner_rect.height()));
-                crate::glass::fade_edge(painter, r, true);
-                paint(painter, Rect::from_center_size(pos2(r.left() + 10.0, r.center().y), vec2(16.0, 16.0)), Icon::ChevronLeft, t.text);
+    egui::Panel::bottom("bottom_bar")
+        .exact_size(if glass { super::topbar_touch::TOUCH_BAR_H + safe_bottom + 8.0 } else { total_h })
+        .frame(frame)
+        .show(ui, |ui| {
+            let avail = ui.max_rect();
+            if crate::theme::touch_ui(ui.ctx()) && avail.width() < BAR_MIN_W {
+                // too narrow for the controls (Split View, Slide Over): keep their layout and scroll the bar sideways
+                let out = egui::ScrollArea::horizontal()
+                    .id_salt("bottom-bar-scroll")
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        let (strip, _) = ui.allocate_exact_size(vec2(BAR_MIN_W, avail.height()), Sense::hover());
+                        let mut inner = ui.new_child(egui::UiBuilder::new().max_rect(strip));
+                        bar_contents(app, &mut inner, strip);
+                    });
+                // a fade and a chevron at each end that has more beyond it: the bar visibly slides
+                let (offset, view_w) = (out.state.clamped_offset().x, out.inner_rect.width());
+                let painter = ui.painter();
+                let fade_w = 34.0;
+                if offset > 1.0 {
+                    let r = Rect::from_min_size(out.inner_rect.min, vec2(fade_w, out.inner_rect.height()));
+                    crate::glass::fade_edge(painter, r, true);
+                    paint(painter, Rect::from_center_size(pos2(r.left() + 10.0, r.center().y), vec2(16.0, 16.0)), Icon::ChevronLeft, t.text);
+                }
+                if offset + view_w < out.content_size.x - 1.0 {
+                    let r = Rect::from_min_size(pos2(out.inner_rect.right() - fade_w, out.inner_rect.top()), vec2(fade_w, out.inner_rect.height()));
+                    crate::glass::fade_edge(painter, r, false);
+                    paint(painter, Rect::from_center_size(pos2(r.right() - 10.0, r.center().y), vec2(16.0, 16.0)), Icon::ChevronRight, t.text);
+                }
+            } else {
+                bar_contents(app, ui, avail);
             }
-            if offset + view_w < out.content_size.x - 1.0 {
-                let r = Rect::from_min_size(pos2(out.inner_rect.right() - fade_w, out.inner_rect.top()), vec2(fade_w, out.inner_rect.height()));
-                crate::glass::fade_edge(painter, r, false);
-                paint(painter, Rect::from_center_size(pos2(r.right() - 10.0, r.center().y), vec2(16.0, 16.0)), Icon::ChevronRight, t.text);
-            }
-        } else {
-            bar_contents(app, ui, avail);
-        }
-    });
+        });
 }
 
 /// Five 19-point stars, three 22-point flags, seven 3-point gaps, a 6-point group gap
@@ -156,14 +159,18 @@ fn bar_contents(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect) {
                 // the sort button on its own after a group gap; no divider line between them
                 let touch = crate::theme::touch_ui(ui.ctx());
                 let track = if touch { Color32::from_white_alpha(10) } else { Color32::TRANSPARENT };
-                egui::Frame::NONE.fill(track).corner_radius(if touch { 22.0 } else { 0.0 }).inner_margin(egui::Margin::symmetric(if touch { 1 } else { 0 }, 0)).show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.x = 2.0;
-                    for &(id, icon, mode, tip) in VIEW_MODES {
-                        if icon_button(ui, id, icon, mode_sz, app.ui.view == mode, true, tip).clicked() {
-                            let _ = app.run(&format!("view.{id}"), json!({}));
+                egui::Frame::NONE
+                    .fill(track)
+                    .corner_radius(if touch { 22.0 } else { 0.0 })
+                    .inner_margin(egui::Margin::symmetric(if touch { 1 } else { 0 }, 0))
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.x = 2.0;
+                        for &(id, icon, mode, tip) in VIEW_MODES {
+                            if icon_button(ui, id, icon, mode_sz, app.ui.view == mode, true, tip).clicked() {
+                                let _ = app.run(&format!("view.{id}"), json!({}));
+                            }
                         }
-                    }
-                });
+                    });
                 ui.add_space(if touch { 14.0 } else { 10.0 });
                 if !touch {
                     let (sep, _) = ui.allocate_exact_size(vec2(1.0, 22.0), Sense::hover());
@@ -313,7 +320,10 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let mut pill_ui = ui.new_child(
         egui::UiBuilder::new()
             // (iPad: nudged up 2.5pt: the star and flag glyphs sat that far below the centre line of the view buttons)
-            .max_rect(pill.shrink2(vec2(10.0, if pill_h > 30.0 { 2.0 } else { 4.0 })).translate(vec2(0.0, if crate::theme::touch_ui(ui.ctx()) { -2.5 } else { 0.0 })))
+            .max_rect(
+                pill.shrink2(vec2(10.0, if pill_h > 30.0 { 2.0 } else { 4.0 }))
+                    .translate(vec2(0.0, if crate::theme::touch_ui(ui.ctx()) { -2.5 } else { 0.0 })),
+            )
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     rating_pill_contents(app, &mut pill_ui, active.as_deref());
@@ -337,8 +347,24 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let cresp = ui.interact(copy_r, egui::Id::unique("copy-settings"), Sense::click());
     register(ui, "button:copySettings", copy_r);
     crate::widgets::announce(&cresp, label.to_string());
-    ui.painter().rect_filled(copy_r, 18.0, if cresp.hovered() { t.hover } else if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
-    ui.painter().text(copy_r.center() - vec2(0.0, if crate::theme::touch_ui(ui.ctx()) { 1.5 } else { 0.0 }), Align2::CENTER_CENTER, label, t.font(13.0), if active.is_some() { t.text_label } else { t.text_disabled });
+    ui.painter().rect_filled(
+        copy_r,
+        18.0,
+        if cresp.hovered() {
+            t.hover
+        } else if crate::glass::active(ui.ctx()) {
+            Color32::TRANSPARENT
+        } else {
+            t.canvas
+        },
+    );
+    ui.painter().text(
+        copy_r.center() - vec2(0.0, if crate::theme::touch_ui(ui.ctx()) { 1.5 } else { 0.0 }),
+        Align2::CENTER_CENTER,
+        label,
+        t.font(13.0),
+        if active.is_some() { t.text_label } else { t.text_disabled },
+    );
     if cresp.clicked() && active.is_some() {
         let _ = if has_clip { app.run("develop.paste", json!({})) } else { app.run("develop.copy", json!({})) };
         let msg = if has_clip { "Settings pasted" } else { "Edit settings copied" };
@@ -348,7 +374,17 @@ fn centre(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, from: f32, to:
     let gresp = ui.interact(gear_r, egui::Id::unique("copy-gear"), Sense::click());
     register(ui, "icon:copyGear", gear_r);
     crate::widgets::announce(&gresp, crate::i18n::tr("Copy settings options"));
-    ui.painter().rect_filled(gear_r, 18.0, if gresp.hovered() { t.hover } else if crate::glass::active(ui.ctx()) { Color32::TRANSPARENT } else { t.canvas });
+    ui.painter().rect_filled(
+        gear_r,
+        18.0,
+        if gresp.hovered() {
+            t.hover
+        } else if crate::glass::active(ui.ctx()) {
+            Color32::TRANSPARENT
+        } else {
+            t.canvas
+        },
+    );
     paint(ui.painter(), gear_r.shrink(9.0), Icon::Gear, t.icon);
     if gresp.clicked() {
         let _ = app.run("dialog.copySettings", json!({}));
@@ -367,16 +403,8 @@ fn right_side(app: &mut LightcraftApp, ui: &mut egui::Ui, full: Rect, compact_zo
     // with a tool panel open the bar is too narrow for the rater and every view toggle: the toggles move into a menu
     let condensed = crate::theme::touch_ui(child.ctx()) && full.width() < 900.0;
     if matches!(app.ui.view, ViewMode::Compare | ViewMode::Survey)
-        && icon_button(
-            &mut child,
-            "autoAdvance",
-            Icon::ChevronRight,
-            tool_sz(ui),
-            app.ui.auto_advance,
-            true,
-            "Auto Advance after rating or flagging",
-        )
-        .clicked()
+        && icon_button(&mut child, "autoAdvance", Icon::ChevronRight, tool_sz(ui), app.ui.auto_advance, true, "Auto Advance after rating or flagging")
+            .clicked()
     {
         let _ = app.run("view.autoAdvance", json!({}));
     }

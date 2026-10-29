@@ -677,7 +677,14 @@ fn group_header(app: &mut LightcraftApp, ui: &mut egui::Ui, run: &DateRun, ids: 
     }
     let g = p.layout_no_wrap(crate::i18n::date_group_label(&run.key, false), t.semibold(15.0), if resp.hovered() { t.text } else { t.text_label });
     // iPad: the title lines up with the photos below it (a pinned header spans the whole width, the others start at the photos)
-    let x = r.left() + if !crate::theme::touch_ui(ui.ctx()) { 8.0 } else if pinned { TOUCH_GRID_INSET } else { 0.0 };
+    let x = r.left()
+        + if !crate::theme::touch_ui(ui.ctx()) {
+            8.0
+        } else if pinned {
+            TOUCH_GRID_INSET
+        } else {
+            0.0
+        };
     let gw = g.size().x;
     p.galley(pos2(x, r.center().y - g.size().y / 2.0), g, t.text);
     let n = run.count;

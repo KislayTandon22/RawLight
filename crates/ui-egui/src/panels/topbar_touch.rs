@@ -149,7 +149,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         } else if phone && !phone_search_open {
             Rect::from_min_size(pos2(search_left_bound, full.center().y - search_h / 2.0), vec2(search_h, search_h))
         } else if narrow {
-            Rect::from_min_size(pos2(search_left_bound, full.center().y - search_h / 2.0), vec2(available_search_w.clamp(if phone { 100.0 } else { 120.0 }, 360.0), search_h))
+            Rect::from_min_size(
+                pos2(search_left_bound, full.center().y - search_h / 2.0),
+                vec2(available_search_w.clamp(if phone { 100.0 } else { 120.0 }, 360.0), search_h),
+            )
         } else {
             Rect::from_center_size(pos2(search_center_x, full.center().y), vec2(sw, search_h))
         };
@@ -298,7 +301,11 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 t.icon
             };
             if touch && (resp.hovered() || resp.is_pointer_button_down_on()) {
-                ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(r.width(), r.height() - 2.0)), (r.height() - 2.0) / 2.0, t.hover.gamma_multiply(0.7));
+                ui.painter().rect_filled(
+                    Rect::from_center_size(r.center(), vec2(r.width(), r.height() - 2.0)),
+                    (r.height() - 2.0) / 2.0,
+                    t.hover.gamma_multiply(0.7),
+                );
             }
             paint(ui.painter(), r.shrink(icon_shrink), icon, colour);
             if warn {
@@ -378,7 +385,11 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             crate::widgets::announce(&resp, tip);
             register(ui, "icon:appearance", r);
             if touch && (resp.hovered() || resp.is_pointer_button_down_on()) {
-                ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(r.width(), r.height() - 2.0)), (r.height() - 2.0) / 2.0, t.hover.gamma_multiply(0.7));
+                ui.painter().rect_filled(
+                    Rect::from_center_size(r.center(), vec2(r.width(), r.height() - 2.0)),
+                    (r.height() - 2.0) / 2.0,
+                    t.hover.gamma_multiply(0.7),
+                );
             }
             paint(ui.painter(), r.shrink(icon_shrink), icon, if resp.hovered() { t.text } else { t.icon });
             if resp.clicked() {
