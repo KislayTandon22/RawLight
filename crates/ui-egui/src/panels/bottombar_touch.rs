@@ -38,8 +38,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let frame = if glass {
         // a floating glass shell above the home indicator
         crate::glass::shell(
-            egui::Margin { left: 12, right: 12, top: 0, bottom: 0 },
-            egui::Margin { left: 4 + safe_left.round() as i8, right: 4 + safe_right.round() as i8, top: 4, bottom: safe_bottom.round() as i8 },
+            egui::Margin { left: 8, right: 8, top: 0, bottom: 0 },
+            egui::Margin { left: 8 + safe_left.round() as i8, right: 8 + safe_right.round() as i8, top: 8, bottom: safe_bottom.round() as i8 },
         )
     } else {
         egui::Frame::NONE
@@ -58,7 +58,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 bottom: safe_bottom.round() as i8,
             })
     };
-    egui::Panel::bottom("bottom_bar").exact_size(if glass { t.bottom_bar_h + safe_bottom + 4.0 } else { total_h }).frame(frame).show(ui, |ui| {
+    egui::Panel::bottom("bottom_bar").exact_size(if glass { super::topbar_touch::TOUCH_BAR_H + safe_bottom + 8.0 } else { total_h }).frame(frame).show(ui, |ui| {
         let avail = ui.max_rect();
         if crate::theme::touch_ui(ui.ctx()) && avail.width() < BAR_MIN_W {
             // too narrow for the controls (Split View, Slide Over): keep their layout and scroll the bar sideways

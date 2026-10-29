@@ -383,7 +383,8 @@ impl<'a> Button<'a> {
         if let Some(fill) = lk.fill {
             p.rect_filled(rect, radius, fill);
         }
-        if let Some(border) = lk.border {
+        // (touch: a selection or a press is a soft fill, never an outline)
+        if let Some(border) = lk.border.filter(|_| !crate::theme::touch_ui(ui.ctx())) {
             p.rect_stroke(rect, radius, Stroke::new(1.0, border), StrokeKind::Inside);
         }
         // where the keyboard is: an accent ring around it

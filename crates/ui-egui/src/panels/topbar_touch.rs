@@ -19,8 +19,8 @@ fn window_handle(_app: &LightcraftApp, ui: &mut egui::Ui, content: Rect, margin_
 
 /// iPad: every control in the bar is this tall (icons are circles of this size, text buttons and the search field capsules of it).
 const CONTROL_H: f32 = 36.0;
-/// iPad: how much taller the glass bar is than `top_bar_h`, so the controls sit 8pt from its top and bottom edges as from its sides.
-const TOUCH_BAR_EXTRA: f32 = 10.0;
+/// Touch: the floating glass bars are 60pt tall and sit 8pt in from the screen edges (the glass bottom bar uses the same height).
+pub(crate) const TOUCH_BAR_H: f32 = 60.0;
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
@@ -45,7 +45,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         // a floating glass shell below the status bar
         crate::glass::shell(
             egui::Margin { left: 8, right: 8, top: 0, bottom: 0 },
-            egui::Margin { left: 10 + safe_left.round() as i8, right: 10 + safe_right.round() as i8, top: safe_top.round() as i8 + 4, bottom: 4 },
+            egui::Margin { left: 8 + safe_left.round() as i8, right: 8 + safe_right.round() as i8, top: safe_top.round() as i8 + 8, bottom: 8 },
         )
     } else {
         egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin {
@@ -55,7 +55,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             bottom: 0,
         })
     };
-    egui::Panel::top("top_bar").exact_size(if glass { t.top_bar_h + TOUCH_BAR_EXTRA + safe_top + 8.0 } else { total_h }).frame(frame).show(ui, |ui| {
+    egui::Panel::top("top_bar").exact_size(if glass { TOUCH_BAR_H + safe_top + 16.0 } else { total_h }).frame(frame).show(ui, |ui| {
         let full = ui.max_rect();
         if app.integrated_titlebar && !touch {
             window_handle(app, ui, full, left, 12.0);
@@ -64,6 +64,11 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let btn_size = if touch { vec2(CONTROL_H, CONTROL_H) } else { vec2(30.0, 30.0) };
         // Split View's smallest widths: only what cannot be reached elsewhere stays (the bottom bar has undo / redo, History has the bell)
         let compact = touch && full.width() < 620.0;
+        // iPhone: the search field is a 36pt circle until it is used, and while it is open the "Menu" label makes room for it
+        // (the bar's controls never overlap at 390pt)
+        let phone = crate::theme::phone(ui.ctx());
+        let search_id = crate::text_field::id("field:search");
+        let phone_search_open = phone && (ui.memory(|m| m.has_focus(search_id)) || !app.ui.search.is_empty() || app.ui.focus_search);
         let mut left_cluster_end = full.left();
         // desktop: the search field is centred on the window, with room for the in-window menus left of it
         let mut desk_sw = 640.0f32.min(full.width() - 540.0).max(200.0);
@@ -98,7 +103,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                     let _ = app.run("edit.redo", json!({}));
                 }
             }
-            if !app.native_menu {
+            if !app.native_menu && !phone_search_open {
                 // (touch: 8pt of item spacing + 8 = the 16pt gap between the leading group and the text button)
                 ui.add_space(if touch { 8.0 } else { 10.0 });
                 let room = if touch { 90.0 } else { desk_search_left - ui.cursor().left() - 16.0 };
@@ -120,7 +125,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             0.0
         };
         let right_reserved = (if touch {
-            if compact {
+            if phone {
+                170.0
+            } else if compact {
                 190.0
             } else if narrow {
                 302.0
@@ -139,12 +146,14 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         // narrow: the field starts right after the buttons (never over them) and takes what is left; wide: centred in its space
         let sr = if !touch {
             Rect::from_center_size(pos2(full.center().x, full.center().y), vec2(desk_sw, search_h))
+        } else if phone && !phone_search_open {
+            Rect::from_min_size(pos2(search_left_bound, full.center().y - search_h / 2.0), vec2(search_h, search_h))
         } else if narrow {
-            Rect::from_min_size(pos2(search_left_bound, full.center().y - search_h / 2.0), vec2(available_search_w.clamp(120.0, 360.0), search_h))
+            Rect::from_min_size(pos2(search_left_bound, full.center().y - search_h / 2.0), vec2(available_search_w.clamp(if phone { 100.0 } else { 120.0 }, 360.0), search_h))
         } else {
             Rect::from_center_size(pos2(search_center_x, full.center().y), vec2(sw, search_h))
         };
-        let id = crate::text_field::id("field:search");
+        let id = search_id;
         if std::mem::take(&mut app.ui.focus_search) {
             ui.memory_mut(|m| m.request_focus(id));
         }
@@ -161,7 +170,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let search_stroke = if focused {
             t.accent
         } else if touch {
-            if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 26) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 20) }
+            // (touch: a soft fill, no outline)
+            Color32::TRANSPARENT
         } else {
             t.field_border
         };
@@ -170,32 +180,43 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             ui.new_child(egui::UiBuilder::new().max_rect(sr.shrink2(vec2(10.0, 4.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         let empty = app.ui.search.is_empty();
         let search_font = t.font(if touch { 14.0 } else { 13.5 });
-        if empty && !focused {
+        let collapsed = phone && !phone_search_open;
+        if collapsed {
+            paint(child.painter(), Rect::from_center_size(sr.center(), vec2(16.0, 16.0)), Icon::Search, t.text_dim);
+            let r = ui.interact(touch_hit(sr), egui::Id::unique("phone-search-open"), Sense::click());
+            crate::widgets::announce(&r, crate::i18n::tr("Search Photos"));
+            register(ui, "field:search", sr);
+            if r.clicked() {
+                app.ui.focus_search = true;
+            }
+        } else if empty && !focused {
             let g = child.painter().layout_no_wrap(crate::i18n::tr("Search Photos").into(), search_font.clone(), t.text_dim);
             let w = g.size().x + 24.0;
             let x0 = sr.center().x - w / 2.0;
             paint(child.painter(), Rect::from_min_size(pos2(x0, sr.center().y - 8.0), vec2(16.0, 16.0)), Icon::Search, t.text_dim);
-            child.painter().galley(pos2(x0 + 24.0, sr.center().y - g.size().y / 2.0), g, t.text_dim);
+            child.painter().with_clip_rect(sr.shrink2(vec2(8.0, 0.0))).galley(pos2(x0 + 24.0, sr.center().y - g.size().y / 2.0), g, t.text_dim);
         }
         if touch {
             // (the field is as tall as a touch row by default and hung from the top of its slot: keep it inside the pill, centred on it)
             child.spacing_mut().interact_size.y = search_h - 8.0;
         }
-        let resp = crate::text_field::TextField::singleline("field:search", &mut app.ui.search)
-            .label(crate::i18n::tr("Search Photos"))
-            .frame(false)
-            .width(sr.width() - 20.0)
-            .font(search_font)
-            .text_color(t.text)
-            .show(&mut child)
-            .response;
-        if resp.changed() {
-            let q = app.ui.search.clone();
-            let _ = app.run("library.filter", json!({"text": q}));
+        if !collapsed {
+            let resp = crate::text_field::TextField::singleline("field:search", &mut app.ui.search)
+                .label(crate::i18n::tr("Search Photos"))
+                .frame(false)
+                .width(sr.width() - 20.0)
+                .font(search_font)
+                .text_color(t.text)
+                .show(&mut child)
+                .response;
+            if resp.changed() {
+                let q = app.ui.search.clone();
+                let _ = app.run("library.filter", json!({"text": q}));
+            }
         }
         // filter icon right of the search field, safely clamped
         let fr_size = if touch { vec2(CONTROL_H, CONTROL_H) } else { vec2(28.0, 28.0) };
-        let fr_x = if touch { (sr.right() + 8.0 + CONTROL_H / 2.0).min(full.right() - 170.0) } else { sr.right() + 22.0 };
+        let fr_x = if touch { (sr.right() + 8.0 + CONTROL_H / 2.0).min(full.right() - if phone { 144.0 } else { 170.0 }) } else { sr.right() + 22.0 };
         let fr = Rect::from_center_size(pos2(fr_x, sr.center().y), fr_size);
         let fresp = ui.interact(touch_hit(fr), egui::Id::unique("filter-btn"), Sense::click());
         crate::widgets::announce(&fresp, crate::i18n::tr("Filters"));
@@ -407,7 +428,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 t.canvas.gamma_multiply(0.5)
             };
             let container_stroke = if touch {
-                if dark { Color32::from_rgba_unmultiplied(255, 255, 255, 20) } else { Color32::from_rgba_unmultiplied(0, 0, 0, 24) }
+                // (touch: the segmented track is a soft fill, no outline)
+                Color32::TRANSPARENT
             } else {
                 t.field_border
             };

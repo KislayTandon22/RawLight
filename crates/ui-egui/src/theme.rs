@@ -443,6 +443,12 @@ pub fn touch_ui(ctx: &egui::Context) -> bool {
     ctx.data_mut(|data| data.get_persisted::<bool>(egui::Id::unique("lightcraft-touch-ui"))).unwrap_or(false)
 }
 
+/// Touch UI on a phone-sized window (the short side under 500pt): the iPhone, never an iPad, even in Split View.
+pub fn phone(ctx: &egui::Context) -> bool {
+    let r = ctx.content_rect();
+    touch_ui(ctx) && r.width().min(r.height()) < 500.0
+}
+
 /// Record host safe-area insets: [top, bottom, left, right] in points.
 pub fn set_safe_area_insets(ctx: &egui::Context, top: f32, bottom: f32, left: f32, right: f32) {
     ctx.data_mut(|data| data.insert_persisted(egui::Id::unique("lightcraft-safe-area-insets"), [top, bottom, left, right]));

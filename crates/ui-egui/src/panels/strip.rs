@@ -1,6 +1,6 @@
 //! The vertical tool strip at the far right (Presets, Edit, Crop, Remove, Masking, Red Eye …).
 
-use egui::vec2;
+use egui::{Rect, vec2};
 use serde_json::json;
 
 use crate::LightcraftApp;
@@ -14,7 +14,80 @@ const BUTTON_H: f32 = 40.0;
 /// Space between tool buttons.
 const GAP: f32 = 6.0;
 
+/// iPhone: the tool rail would eat a fifth of the width, so the same tools are one floating capsule along the bottom
+/// (60pt tall, 8pt in from the edges, scrolling sideways when they do not fit).
+fn show_phone(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    use crate::panels::topbar_touch::TOUCH_BAR_H;
+    let insets = crate::theme::safe_area_insets(ui.ctx());
+    let safe_bottom = insets[1].max(20.0);
+    let has_photo = app.session.active().is_some();
+    let in_library = !matches!(app.ui.view, crate::state::ViewMode::Detail) && !app.ui.right.is_edit_tool();
+    egui::Panel::bottom("tool_strip")
+        .exact_size(TOUCH_BAR_H + safe_bottom + 8.0)
+        .resizable(false)
+        .frame(crate::glass::shell(
+            egui::Margin { left: 8, right: 8, top: 0, bottom: 0 },
+            egui::Margin { left: 8 + insets[2].round() as i8, right: 8 + insets[3].round() as i8, top: 8, bottom: safe_bottom.round() as i8 },
+        ))
+        .show(ui, |ui| {
+            let view = ui.max_rect();
+            let out = egui::ScrollArea::horizontal()
+                .id_salt("tool-strip-scroll")
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.horizontal_centered(|ui| {
+                        ui.spacing_mut().item_spacing.x = 2.0;
+                        let sz = vec2(44.0, 44.0);
+                        if icon_button(ui, "presets", Icon::Presets, sz, app.ui.presets, has_photo, "Presets").clicked() {
+                            let _ = app.run("panel.presets", json!({}));
+                        }
+                        for (id, icon, panel, tip) in [
+                            (
+                                if in_library { "quickDevelop" } else { "edit" },
+                                Icon::Sliders,
+                                if in_library { RightPanel::QuickDevelop } else { RightPanel::Edit },
+                                if in_library { "Quick Develop" } else { "Edit" },
+                            ),
+                            ("crop", Icon::Crop, RightPanel::Crop, "Crop & Rotate"),
+                            ("remove", Icon::Eraser, RightPanel::Remove, "Remove"),
+                            ("masking", Icon::Mask, RightPanel::Masking, "Masking"),
+                            ("redeye", Icon::Eye, RightPanel::RedEye, "Red Eye"),
+                            ("versions", Icon::Versions, RightPanel::Versions, "Versions"),
+                            ("activity", Icon::Activity, RightPanel::Activity, "History & Activity"),
+                            ("keywords", Icon::Tag, RightPanel::Keywords, "Keywords"),
+                            ("info", Icon::Info, RightPanel::Info, "Info"),
+                        ] {
+                            let on = app.ui.right == panel || (panel == RightPanel::Edit && app.ui.right == RightPanel::Profiles);
+                            let enabled = has_photo || id == "activity";
+                            if icon_button(ui, id, icon, sz, on, enabled, tip).clicked() {
+                                if id == "quickDevelop" {
+                                    app.ui.right = if on { RightPanel::None } else { RightPanel::QuickDevelop };
+                                } else {
+                                    let _ = app.run(&format!("panel.{id}"), json!({}));
+                                }
+                            }
+                        }
+                        if icon_button(ui, "more", Icon::More, sz, false, true, "More").clicked() {
+                            app.ui.dialog = Some(crate::state::Dialog::About);
+                        }
+                    });
+                });
+            // a fade at each end that has more beyond it
+            let (offset, view_w) = (out.state.clamped_offset().x, out.inner_rect.width());
+            if offset > 1.0 {
+                crate::glass::fade_edge(ui.painter(), Rect::from_min_size(view.min, vec2(28.0, view.height())), true);
+            }
+            if offset + view_w < out.content_size.x - 1.0 {
+                crate::glass::fade_edge(ui.painter(), Rect::from_min_size(egui::pos2(view.right() - 28.0, view.top()), vec2(28.0, view.height())), false);
+            }
+        });
+}
+
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    if crate::glass::active(ui.ctx()) && crate::theme::phone(ui.ctx()) {
+        return show_phone(app, ui);
+    }
     let t = Tokens::get(ui.ctx());
     let glass = crate::glass::active(ui.ctx());
     egui::Panel::right("tool_strip")
