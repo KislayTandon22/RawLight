@@ -53,6 +53,7 @@ pub mod tasks;
 pub mod text_field;
 pub mod theme;
 pub mod touch;
+pub mod ui_kit_touch;
 pub mod updates_ui;
 pub mod widgets;
 pub mod window_place;
@@ -2715,6 +2716,9 @@ impl LightcraftApp {
         // (iPad glass: the canvas colour, so the gaps around the floating panels are the same tone as the photo area)
         let tokens = theme::Tokens::get(&ctx);
         let chrome = if glass::active(&ctx) { tokens.canvas } else { tokens.chrome };
+        if theme::touch_ui(&ctx) && glass::active(&ctx) {
+            panels::modebar_touch::show(self, ui);
+        }
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(chrome)).show(ui, |ui| docking::show(self, ui));
         panels::bottombar_touch::floating_rating(self, &ctx);
         gallery::show(self, &ctx);

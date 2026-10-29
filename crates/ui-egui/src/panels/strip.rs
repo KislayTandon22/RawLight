@@ -79,12 +79,19 @@ fn show_phone(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 crate::glass::fade_edge(ui.painter(), Rect::from_min_size(view.min, vec2(28.0, view.height())), true);
             }
             if offset + view_w < out.content_size.x - 1.0 {
-                crate::glass::fade_edge(ui.painter(), Rect::from_min_size(egui::pos2(view.right() - 28.0, view.top()), vec2(28.0, view.height())), false);
+                crate::glass::fade_edge(
+                    ui.painter(),
+                    Rect::from_min_size(egui::pos2(view.right() - 28.0, view.top()), vec2(28.0, view.height())),
+                    false,
+                );
             }
         });
 }
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+        return;
+    }
     if crate::glass::active(ui.ctx()) && crate::theme::phone(ui.ctx()) {
         return show_phone(app, ui);
     }
