@@ -28,6 +28,11 @@ fn tool_sz(ui: &egui::Ui) -> egui::Vec2 {
 const BAR_MIN_W: f32 = 640.0;
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    // V4's photo screen replaces this whole legacy bar with the filmstrip and the
+    // mode capsule. Library keeps the existing bar, and desktop is untouched.
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) && app.ui.view == ViewMode::Detail {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let insets = crate::theme::safe_area_insets(ui.ctx());
     let safe_bottom = insets[1].max(if crate::theme::touch_ui(ui.ctx()) { 20.0 } else { 0.0 });

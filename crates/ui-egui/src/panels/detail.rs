@@ -523,8 +523,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         let r = ui.ctx().content_rect();
         r.height() > r.width() && r.height() < 1000.0
     };
-    let show_film = app.ui.filmstrip && !fullscreen && !cramped;
-    let film_h = if show_film { t.film_h } else { 0.0 };
+    let touch_glass = crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx());
+    let show_film = (app.ui.filmstrip || touch_glass) && !fullscreen && !cramped && !(touch_glass && crate::theme::phone(ui.ctx()));
+    let film_h = if show_film { if touch_glass { 76.0 } else { t.film_h } } else { 0.0 };
     let canvas = Rect::from_min_max(full.min, pos2(full.right(), full.bottom() - film_h));
     app.canvas_rect = Some(canvas);
     if show_film {
@@ -994,6 +995,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     }
     // drawn and hit-tested above the loupe and its tools: clicks on it pan
     let nav = navigator(app, ui, canvas, img_rect, id);
+    if touch_glass {
+        touch_compare_button(app, ui, canvas);
+    }
     // what is on screen isn't the render on its way (a stand-in, the last render after an edit,
     // a magnified frame under its window): say so once that has lasted a moment
     let whole: &[Slot] = if show_before && !split {
@@ -2969,6 +2973,10 @@ fn film_label(name: &str) -> String {
 /// the range; in Compare they adjust the pair's selection, and a plain click replaces the active
 /// side.
 pub(crate) fn filmstrip(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect) {
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+        touch_filmstrip(app, ui, r);
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     ui.painter().rect_filled(r, 0.0, t.canvas);
     ui.painter().rect_filled(Rect::from_min_size(r.min, vec2(r.width(), 4.0)), 0.0, Color32::from_gray(0x20));
@@ -3104,6 +3112,82 @@ pub(crate) fn filmstrip(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect) {
             crate::widgets::context_menu(&resp, |ui| super::grid::context_menu(app, ui, *id));
         }
     });
+}
+
+/// V4's compact, label-free touch filmstrip. It deliberately remains a normal
+/// horizontal ScrollArea so a sideways finger drag can reach every photo.
+fn touch_filmstrip(app: &mut LightcraftApp, ui: &mut egui::Ui, r: Rect) {
+    let t = Tokens::get(ui.ctx());
+    let ids = app.session.visible_cloned();
+    let active = app.session.selection.active;
+    let cell_w = 76.0;
+    let thumb_h = 48.0;
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(r));
+    child.style_mut().always_scroll_the_only_direction = true;
+    let follow = super::grid::follow_active(child.ctx(), egui::Id::unique("touch-film-follow"), active, app.session.source);
+    register(ui, "filmstrip", r);
+    egui::ScrollArea::horizontal()
+        .id_salt("touch-filmstrip")
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+        .auto_shrink([false, false])
+        .show_viewport(&mut child, |ui, vp| {
+            let content = (ids.len() as f32 * (cell_w + 8.0) - 8.0).max(0.0);
+            let width = content.max(r.width());
+            let inset = ((width - content) / 2.0).max(0.0);
+            let (area, _) = ui.allocate_exact_size(vec2(width, thumb_h), Sense::hover());
+            for (i, id) in ids.iter().enumerate() {
+                let cr = Rect::from_min_size(pos2(area.left() + inset + i as f32 * (cell_w + 8.0), area.top()), vec2(cell_w, thumb_h));
+                let local = cr.translate(-area.min.to_vec2());
+                if follow && Some(*id) == active && !local.intersects(vp) {
+                    ui.scroll_to_rect(cr, Some(egui::Align::Center));
+                }
+                if !cr.intersects(vp.expand(16.0)) {
+                    continue;
+                }
+                let resp = ui.interact(cr, egui::Id::unique(("touch-film", id.0)), Sense::click());
+                let failed = app.renderer.thumb(*id).is_none() && app.renderer.failure(Slot::Thumb(*id)).is_some();
+                let name = app.session.catalog.photo(*id).map_or("Photo", |p| p.file_name.as_str());
+                crate::widgets::announce(&resp, name.to_owned());
+                let selected = Some(*id) == active;
+                let image = cr.shrink(2.0);
+                let p = ui.painter();
+                p.rect_filled(cr, 12.0, t.skeleton);
+                super::grid::request_thumb(app, *id, 160, 8);
+                if let Some(tex) = app.renderer.thumb(*id) {
+                    let [tw, th] = tex.size;
+                    let scale = (image.width() / tw as f32).min(image.height() / th as f32);
+                    let fr = Rect::from_center_size(image.center(), vec2(tw as f32 * scale, th as f32 * scale));
+                    p.with_clip_rect(image).image(tex.tex.id(), fr, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                    if selected {
+                        p.rect_stroke(cr.expand(1.5), 12.0, Stroke::new(2.0, Color32::from_white_alpha(210)), StrokeKind::Outside);
+                    }
+                } else if failed {
+                    p.text(cr.center(), Align2::CENTER_CENTER, "!", t.semibold(14.0), t.text);
+                }
+                if resp.clicked() {
+                    let _ = app.run("library.select", json!({"ids": [id.0], "mode": "replace"}));
+                }
+            }
+        });
+}
+
+/// The only legacy photo-view action retained on the V4 canvas.
+fn touch_compare_button(app: &mut LightcraftApp, ui: &mut egui::Ui, canvas: Rect) {
+    let rect = Rect::from_min_size(pos2(canvas.right() - 60.0, canvas.bottom() - 60.0), vec2(44.0, 44.0));
+    let resp = ui.interact(rect, egui::Id::unique("touch-photo-compare"), Sense::click());
+    register(ui, "button:photoCompare", rect);
+    crate::widgets::announce(&resp, "Before and After");
+    let t = Tokens::get(ui.ctx());
+    if resp.hovered() {
+        ui.painter().rect_filled(rect, 22.0, Color32::from_white_alpha(55));
+    }
+    crate::glass::shell(egui::Margin::ZERO, egui::Margin::ZERO).show(ui, |ui| {
+        ui.painter().rect_filled(rect, 22.0, Color32::from_white_alpha(34));
+        crate::icons::paint(ui.painter(), rect.shrink(12.0), crate::icons::Icon::BeforeAfter, t.text);
+    });
+    if resp.clicked() {
+        let _ = app.run("view.beforeAfter", json!({}));
+    }
 }
 
 /// What a screen reader says for a filmstrip thumbnail: the file, and why there is no picture
