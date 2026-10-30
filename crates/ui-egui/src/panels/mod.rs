@@ -30,6 +30,7 @@ pub mod modebar_touch;
 pub mod notices;
 pub mod people;
 pub mod person;
+pub mod photo_bar_touch;
 pub mod presets;
 pub mod profiles;
 pub mod quick_develop;
