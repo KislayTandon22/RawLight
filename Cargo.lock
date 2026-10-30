@@ -3096,6 +3096,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightcraft-bridge"
+version = "0.8.0"
+dependencies = [
+ "lightcraft-engine",
+ "serde_json",
+]
+
+[[package]]
 name = "lightcraft-catalog"
 version = "0.8.0"
 dependencies = [
