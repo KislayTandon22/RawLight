@@ -151,7 +151,8 @@ pub struct RlJob {
     result: Option<lightcraft_engine::media::RenderResult>,
 }
 
-/// `kind`: 0 full-quality fit, 1 grid/filmstrip thumbnail (disk cached), 2 draft (interactive drags).
+/// `kind`: 0 full-quality fit, 1 grid/filmstrip thumbnail (disk cached), 2 draft (interactive drags),
+/// 3 full uncropped frame (shown while the crop tool is active).
 /// Null when the photo does not exist.
 ///
 /// # Safety
@@ -163,6 +164,7 @@ pub unsafe extern "C" fn rl_job_new(session: *mut RlSession, id: u64, max_w: u32
     let job = catch_unwind(AssertUnwindSafe(|| match kind {
         1 => session.0.thumb_job(pid, max_w.max(max_h) as usize),
         2 => session.0.render_job(pid, max_w as usize, max_h as usize, false, true).map(|j| j.draft()),
+        3 => session.0.render_job(pid, max_w as usize, max_h as usize, false, false),
         _ => session.0.render_job(pid, max_w as usize, max_h as usize, false, true),
     }));
     match job {

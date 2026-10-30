@@ -21,7 +21,7 @@ unsigned char *rl_render(RlSession *session, unsigned long long id, unsigned max
 unsigned char *rl_render_hist(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h,
                               unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
 /* Detached render: build (fast), run on any thread (slow), finish on the session.
-   kind: 0 full, 1 thumbnail (disk cached), 2 draft. */
+   kind: 0 full, 1 thumbnail (disk cached), 2 draft, 3 uncropped. */
 typedef struct RlJob RlJob;
 RlJob *rl_job_new(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind);
 unsigned char *rl_job_run(RlJob *job, unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
