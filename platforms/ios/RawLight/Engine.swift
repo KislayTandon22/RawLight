@@ -174,3 +174,36 @@ enum EngineError: Error, LocalizedError {
     case message(String)
     var errorDescription: String? { if case .message(let m) = self { return m }; return nil }
 }
+
+extension Engine {
+    /// `develop.get` for the active photo (full develop settings as JSON).
+    func developState() async -> [String: Any] {
+        (try? await execute("develop.get") as? [String: Any]) ?? [:]
+    }
+
+    /// The crop rectangle (normalised, x0 y0 x1 y1) from develop state.
+    static func cropRect(_ d: [String: Any]) -> CGRect {
+        let r = ((d["crop"] as? [String: Any])?["geometry"] as? [String: Any])?["rect"] as? [String: Any]
+        func n(_ k: String, _ def: Double) -> Double { (r?[k] as? NSNumber)?.doubleValue ?? def }
+        return CGRect(x: n("x0", 0), y: n("y0", 0), width: n("x1", 1) - n("x0", 0), height: n("y1", 1) - n("y0", 0))
+    }
+
+    static func cropAngle(_ d: [String: Any]) -> Double {
+        (((d["crop"] as? [String: Any])?["geometry"] as? [String: Any])?["angle"] as? NSNumber)?.doubleValue ?? 0
+    }
+}
+
+/// Runs the latest value only: while one engine call is in flight newer ones replace each other.
+@MainActor final class Throttle {
+    private var busy = false
+    private var pending: (() async -> Void)?
+    func run(_ work: @escaping () async -> Void) {
+        pending = work
+        guard !busy else { return }
+        busy = true
+        Task {
+            while let w = pending { pending = nil; await w() }
+            busy = false
+        }
+    }
+}

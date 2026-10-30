@@ -14,10 +14,12 @@
 		6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152DED07BD4B22C089F27083 /* AppModel.swift */; };
 		719E99E7BC32BEFA09BD09FA /* ColorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AD332855C4111D6E843DC0 /* ColorSlider.swift */; };
 		7C236BFC68456C18831CD622 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773D225FB743BF09F0786159 /* Engine.swift */; };
+		8B8622516CB2417190BC36AD /* CropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C0A5D018031985E8DCD890 /* CropView.swift */; };
 		90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62BE11F6376A150B4F7F7A /* RootView.swift */; };
 		9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 793784F1303D4D3381740077 /* Assets.xcassets */; };
 		D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */; };
 		DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8560E8AC4BC45B87ADF19267 /* Theme.swift */; };
+		DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 746AE174CA016CAF647AD43E /* MaskView.swift */; };
 		E19781E0B876437FEE642F69 /* HistogramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6546856C997D6BFE63CC7F /* HistogramView.swift */; };
 /* End PBXBuildFile section */
 
@@ -25,7 +27,9 @@
 		152DED07BD4B22C089F27083 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		188A661C8121EDA12A429069 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		1C6546856C997D6BFE63CC7F /* HistogramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistogramView.swift; sourceTree = "<group>"; };
+		48C0A5D018031985E8DCD890 /* CropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropView.swift; sourceTree = "<group>"; };
 		59AD332855C4111D6E843DC0 /* ColorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorSlider.swift; sourceTree = "<group>"; };
+		746AE174CA016CAF647AD43E /* MaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskView.swift; sourceTree = "<group>"; };
 		773D225FB743BF09F0786159 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
 		793784F1303D4D3381740077 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8560E8AC4BC45B87ADF19267 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -54,6 +58,7 @@
 				152DED07BD4B22C089F27083 /* AppModel.swift */,
 				793784F1303D4D3381740077 /* Assets.xcassets */,
 				59AD332855C4111D6E843DC0 /* ColorSlider.swift */,
+				48C0A5D018031985E8DCD890 /* CropView.swift */,
 				A475B1E68A117F49D9DE92CD /* CurveEditor.swift */,
 				188A661C8121EDA12A429069 /* EditorView.swift */,
 				773D225FB743BF09F0786159 /* Engine.swift */,
@@ -61,6 +66,7 @@
 				1C6546856C997D6BFE63CC7F /* HistogramView.swift */,
 				D934F9B15D5972DDA61E86D6 /* Info.plist */,
 				D206DF744DE049ABECA7CEDA /* LibraryView.swift */,
+				746AE174CA016CAF647AD43E /* MaskView.swift */,
 				A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */,
 				9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */,
 				AE62BE11F6376A150B4F7F7A /* RootView.swift */,
@@ -174,12 +180,14 @@
 			files = (
 				6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */,
 				719E99E7BC32BEFA09BD09FA /* ColorSlider.swift in Sources */,
+				8B8622516CB2417190BC36AD /* CropView.swift in Sources */,
 				326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */,
 				17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */,
 				7C236BFC68456C18831CD622 /* Engine.swift in Sources */,
 				02C29839F2ECC7641EBFC5F6 /* ExportSheet.swift in Sources */,
 				E19781E0B876437FEE642F69 /* HistogramView.swift in Sources */,
 				2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */,
+				DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */,
 				D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */,
 				90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */,
 				DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */,

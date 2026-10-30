@@ -5,6 +5,11 @@ private let groups: [(name: String, sections: [String])] = [
     ("Effects", ["effects", "vignette", "grain"]), ("Detail", ["detail"]), ("Optics", ["optics"]),
 ]
 
+enum EditMode: String, CaseIterable {
+    case edit = "Edit", crop = "Crop", mask = "Mask"
+    var symbol: String { switch self { case .edit: "slider.horizontal.3"; case .crop: "crop.rotate"; case .mask: "circle.lefthalf.filled.inverse" } }
+}
+
 struct EditorView: View {
     @Environment(AppModel.self) private var model
     @State private var photoID: UInt64
@@ -19,6 +24,10 @@ struct EditorView: View {
     @State private var showExport = false
     @State private var curveChannel = "master"
     @State private var curvePoints: [CGPoint] = []
+    @State private var mode: EditMode = .edit
+    @State private var brushSize = 0.03
+    @State private var erase = false
+    @State private var live = Throttle()
 
     init(photoID: UInt64) { _photoID = State(initialValue: photoID) }
 
@@ -30,6 +39,7 @@ struct EditorView: View {
                 VStack(spacing: 0) {
                     topBar
                     canvas
+                    modeBar
                     filmstrip
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -84,14 +94,18 @@ struct EditorView: View {
 
     private var canvas: some View {
         GeometryReader { geo in
+            let rect = fitRect(image?.size ?? .zero, in: geo.size)
             ZStack {
                 if let image {
                     Image(uiImage: image).resizable().scaledToFit()
                         .scaleEffect(scale).offset(offset)
-                        .gesture(MagnifyGesture().onChanged { scale = min(max($0.magnification * baseScale, 1), 8) }.onEnded { _ in baseScale = scale; if scale == 1 { offset = .zero } })
-                        .simultaneousGesture(DragGesture().onChanged { if scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
+                        .gesture(MagnifyGesture().onChanged { if mode == .edit { scale = min(max($0.magnification * baseScale, 1), 8) } }
+                            .onEnded { _ in baseScale = scale; if scale == 1 { offset = .zero } })
+                        .simultaneousGesture(DragGesture().onChanged { if mode == .edit, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
                             .onEnded { _ in baseOffset = offset })
-                        .onTapGesture(count: 2) { withAnimation(.snappy) { scale = scale > 1 ? 1 : 3; baseScale = scale; offset = .zero; baseOffset = .zero } }
+                        .onTapGesture(count: 2) { if mode == .edit { withAnimation(.snappy) { scale = scale > 1 ? 1 : 3; baseScale = scale; offset = .zero; baseOffset = .zero } } }
+                    if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } } }
+                    if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase) { live.run { await render(draft: true) } } }
                 } else {
                     ProgressView()
                 }
@@ -99,6 +113,32 @@ struct EditorView: View {
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
         }
+    }
+
+    private func fitRect(_ s: CGSize, in box: CGSize) -> CGRect {
+        guard s.width > 0, s.height > 0 else { return .zero }
+        let k = min(box.width / s.width, box.height / s.height)
+        let w = s.width * k, h = s.height * k
+        return CGRect(x: (box.width - w) / 2, y: (box.height - h) / 2, width: w, height: h)
+    }
+
+    private var modeBar: some View {
+        HStack(spacing: 4) {
+            ForEach(EditMode.allCases, id: \.self) { m in
+                Button { setMode(m) } label: {
+                    Label(m.rawValue, systemImage: m.symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 16).frame(height: 44)
+                        .background(mode == m ? Color.white.opacity(0.16) : .clear, in: Capsule())
+                        .foregroundStyle(mode == m ? Theme.accentSoft : .primary)
+                }
+            }
+        }
+        .padding(4).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 6)
+    }
+
+    private func setMode(_ m: EditMode) {
+        mode = m
+        scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero
+        Task { await render() }
     }
     @State private var baseScale: CGFloat = 1
     @State private var baseOffset: CGSize = .zero
@@ -134,13 +174,18 @@ struct EditorView: View {
     private var inspector: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("Edit").font(.title3.weight(.semibold))
+                Text(mode.rawValue).font(.title3.weight(.semibold))
                 Spacer()
-                Button("Reset") { Task { await command("develop.reset"); await reloadControls(); await render() } }
-                    .buttonStyle(.bordered).tint(Theme.accent)
+                if mode == .edit { Button("Reset") { Task { await command("develop.reset"); await reloadControls(); await render() } }
+                    .buttonStyle(.bordered).tint(Theme.accent) }
             }
             .padding(.horizontal, 20).padding(.top, 12)
             ScrollView {
+                if mode == .crop {
+                    CropPanel(engine: model.engine, photoID: photoID) { live.run { await render(draft: true) } }.padding(.horizontal, 16)
+                } else if mode == .mask {
+                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase) { live.run { await render(draft: true) } }.padding(.horizontal, 16)
+                } else {
                 VStack(spacing: 8) {
                     if !histogram.isEmpty { HistogramView(bins: histogram) }
                     if group == "Light" {
@@ -154,9 +199,10 @@ struct EditorView: View {
                                     reset: { set(c.id, c.def, commit: true) })
                     }
                 }.padding(.horizontal, 16)
+                }
             }
-            Picker("Group", selection: $group) { ForEach(groups, id: \.name) { Text($0.name).tag($0.name) } }
-                .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 12)
+            if mode == .edit { Picker("Group", selection: $group) { ForEach(groups, id: \.name) { Text($0.name).tag($0.name) } }
+                  .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 12) }
         }
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(8)
@@ -173,6 +219,10 @@ struct EditorView: View {
         controls = await c
         info = await i ?? info
         curvePoints = await p
+        // Debug aids for screenshots: RAWLIGHT_MODE=crop|mask, RAWLIGHT_MASK=1 adds a radial mask.
+        let env = ProcessInfo.processInfo.environment
+        if let m = env["RAWLIGHT_MODE"], let em = EditMode(rawValue: m.capitalized) { mode = em }
+        if env["RAWLIGHT_MASK"] != nil { _ = try? await model.engine.execute("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 0.5]) }
         await render()
     }
 
@@ -204,7 +254,7 @@ struct EditorView: View {
     /// Fast draft while dragging; full quality when the finger lifts.
     private func render(draft: Bool = false) async {
         let id = photoID
-        if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: draft ? .draft : .full), id == photoID {
+        if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: mode == .crop ? .uncropped : (draft ? .draft : .full)), id == photoID {
             image = r.image; histogram = r.histogram
             if !draft { info.edited = true }
         }
