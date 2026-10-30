@@ -11,7 +11,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     override init() {
         super.init()
-        NSLog("[LightCraft-Swift] SceneDelegate init")
+        NSLog("[RawLight] SceneDelegate init")
         Self.enableWindowSceneAttachmentHook()
     }
 
@@ -25,7 +25,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let m1 = class_getInstanceMethod(UIWindow.self, origInit),
            let m2 = class_getInstanceMethod(UIWindow.self, swizInit) {
             method_exchangeImplementations(m1, m2)
-            NSLog("[LightCraft-Swift] Swizzled UIWindow initWithFrame")
+            NSLog("[RawLight] Swizzled UIWindow initWithFrame")
         }
     }
 
@@ -35,12 +35,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         options connectionOptions: UIScene.ConnectionOptions
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
-        NSLog("[LightCraft-Swift] Scene willConnectTo session")
+        NSLog("[RawLight] Scene willConnectTo session")
 
         self.bindWindows(to: windowScene)
 
         DispatchQueue.main.async {
-            NSLog("[LightCraft-Swift] Posting didBecomeActiveNotification after scene connection")
+            NSLog("[RawLight] Posting didBecomeActiveNotification after scene connection")
             NotificationCenter.default.post(
                 name: UIApplication.didBecomeActiveNotification,
                 object: UIApplication.shared
@@ -54,7 +54,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         ) { [weak self, weak windowScene] notif in
             guard let ws = windowScene else { return }
             if let win = notif.object as? UIWindow {
-                NSLog("[LightCraft-Swift] Window didBecomeVisible: %@", win)
+                NSLog("[RawLight] Window didBecomeVisible: %@", win)
                 self?.bind(window: win, to: ws)
             }
         }
@@ -62,7 +62,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         guard let windowScene = scene as? UIWindowScene else { return }
-        NSLog("[LightCraft-Swift] sceneDidBecomeActive")
+        NSLog("[RawLight] sceneDidBecomeActive")
         bindWindows(to: windowScene)
 
         NotificationCenter.default.post(
@@ -72,17 +72,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
-        NSLog("[LightCraft-Swift] sceneWillResignActive")
+        NSLog("[RawLight] sceneWillResignActive")
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
         guard let windowScene = scene as? UIWindowScene else { return }
-        NSLog("[LightCraft-Swift] sceneWillEnterForeground")
+        NSLog("[RawLight] sceneWillEnterForeground")
         bindWindows(to: windowScene)
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        NSLog("[LightCraft-Swift] sceneDidEnterBackground")
+        NSLog("[RawLight] sceneDidEnterBackground")
     }
 
     func windowScene(
@@ -91,7 +91,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         interfaceOrientation previousInterfaceOrientation: UIInterfaceOrientation,
         traitCollection previousTraitCollection: UITraitCollection
     ) {
-        NSLog("[LightCraft-Swift] windowScene didUpdate coordinateSpace: %@", NSCoder.string(for: windowScene.coordinateSpace.bounds))
+        NSLog("[RawLight] windowScene didUpdate coordinateSpace: %@", NSCoder.string(for: windowScene.coordinateSpace.bounds))
         bindWindows(to: windowScene)
     }
 
@@ -102,7 +102,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         if window.windowScene !== windowScene {
             window.windowScene = windowScene
-            NSLog("[LightCraft-Swift] Attached window %@ to windowScene %@", window, windowScene)
+            NSLog("[RawLight] Attached window %@ to windowScene %@", window, windowScene)
         }
         window.overrideUserInterfaceStyle = .dark
         window.rootViewController?.overrideUserInterfaceStyle = .dark
@@ -126,11 +126,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 let pencil = UIPencilInteraction()
                 pencil.delegate = self
                 window.addInteraction(pencil)
-                NSLog("[LightCraft-Swift] Attached UIPencilInteraction to window")
+                NSLog("[RawLight] Attached UIPencilInteraction to window")
             }
             if !(window.gestureRecognizers ?? []).contains(where: { $0 is PencilStrokeRecognizer }) {
                 window.addGestureRecognizer(PencilStrokeRecognizer(target: nil, action: nil))
-                NSLog("[LightCraft-Swift] Attached Pencil stroke recognizer to window")
+                NSLog("[RawLight] Attached Pencil stroke recognizer to window")
             }
         }
 
@@ -157,7 +157,7 @@ extension UIWindow {
 extension SceneDelegate: UIPencilInteractionDelegate {
     @available(iOS 12.1, *)
     func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
-        NSLog("[LightCraft-Swift] UIPencilInteraction double-tap -> posting ZoomToggle action (3)")
+        NSLog("[RawLight] UIPencilInteraction double-tap -> posting ZoomToggle action (3)")
         lightcraft_post_action(3)
     }
 }

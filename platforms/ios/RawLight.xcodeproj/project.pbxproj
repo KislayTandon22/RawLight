@@ -7,119 +7,119 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		51C2D593D3D20BDD9276CB50 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D06A0C46339D0E8848D960 /* main.swift */; };
-		6164197B175636C1A71799AF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0F19600327560EABFC7D6A5E /* Assets.xcassets */; };
-		69EAE00B6D5782368C78A7CA /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */; };
-		FA36834ED3DDCD8A14DB05B8 /* PhotoPickerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4868D13EB3396B18851FCCDD /* PhotoPickerBridge.swift */; };
+		9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 793784F1303D4D3381740077 /* Assets.xcassets */; };
+		CBC46CA57561F64908AC608E /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CED3E14FB29C78F69F8691 /* main.swift */; };
+		D4D22B6733587176A1F4E1D7 /* PhotoPickerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 324A4F47B9EA6A132DF42A5D /* PhotoPickerBridge.swift */; };
+		DC4F2294474AB5EE12A87B62 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10D5ADD48B346B847862C362 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0F19600327560EABFC7D6A5E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		4868D13EB3396B18851FCCDD /* PhotoPickerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerBridge.swift; sourceTree = "<group>"; };
-		4CF7E954CDDA2B9226DAC442 /* LightCraftiPad.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LightCraftiPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9F4ABFADA8E18DDA5F214D69 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		B0D06A0C46339D0E8848D960 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		10D5ADD48B346B847862C362 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		324A4F47B9EA6A132DF42A5D /* PhotoPickerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerBridge.swift; sourceTree = "<group>"; };
+		793784F1303D4D3381740077 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C9CED3E14FB29C78F69F8691 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		CB1E46860D465391ACFBEF6F /* RawLight.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RawLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D934F9B15D5972DDA61E86D6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		5ACC84F632FACD4BC4791CCF = {
+		70B8AA074D518F7D4FF2B953 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				9DEEC911AB97490B26ABCB10 /* LightCraft */,
-				5D7DE3E04DDB3B77BFD8DC2C /* Products */,
-			);
-			sourceTree = "<group>";
-		};
-		5D7DE3E04DDB3B77BFD8DC2C /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				4CF7E954CDDA2B9226DAC442 /* LightCraftiPad.app */,
+				CB1E46860D465391ACFBEF6F /* RawLight.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		9DEEC911AB97490B26ABCB10 /* LightCraft */ = {
+		81B94FAE8AB787C7D0D3440A /* RawLight */ = {
 			isa = PBXGroup;
 			children = (
-				0F19600327560EABFC7D6A5E /* Assets.xcassets */,
-				9F4ABFADA8E18DDA5F214D69 /* Info.plist */,
-				B0D06A0C46339D0E8848D960 /* main.swift */,
-				4868D13EB3396B18851FCCDD /* PhotoPickerBridge.swift */,
-				EECA81CA6D5DE3719DC09B3B /* SceneDelegate.swift */,
+				793784F1303D4D3381740077 /* Assets.xcassets */,
+				D934F9B15D5972DDA61E86D6 /* Info.plist */,
+				C9CED3E14FB29C78F69F8691 /* main.swift */,
+				324A4F47B9EA6A132DF42A5D /* PhotoPickerBridge.swift */,
+				10D5ADD48B346B847862C362 /* SceneDelegate.swift */,
 			);
-			path = LightCraft;
+			path = RawLight;
+			sourceTree = "<group>";
+		};
+		CDFAB3EA57F414C0DF2CCFDF = {
+			isa = PBXGroup;
+			children = (
+				81B94FAE8AB787C7D0D3440A /* RawLight */,
+				70B8AA074D518F7D4FF2B953 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		FD7EDB7A2E13E6F68C6A8C56 /* LightCraftiPad */ = {
+		5269EFC45AA7061E25975341 /* RawLight */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4F6A3789D84D78DA3C7C10F4 /* Build configuration list for PBXNativeTarget "LightCraftiPad" */;
+			buildConfigurationList = 9E751D3A36F3F3A694D95B3F /* Build configuration list for PBXNativeTarget "RawLight" */;
 			buildPhases = (
-				5D9F5BCB7BC48AD4D2E98492 /* Build Rust static library */,
-				6880A2BAA51C9AEE8E1A1EBE /* Sources */,
-				74510296AD68B6430C066887 /* Resources */,
+				C00D3A2F4FCCB8B2C736A75E /* Build Rust static library */,
+				96D3FAC69EA1865E403FCF92 /* Sources */,
+				A165AEFA3D9CD5543AEA65C4 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = LightCraftiPad;
+			name = RawLight;
 			packageProductDependencies = (
 			);
-			productName = LightCraftiPad;
-			productReference = 4CF7E954CDDA2B9226DAC442 /* LightCraftiPad.app */;
+			productName = RawLight;
+			productReference = CB1E46860D465391ACFBEF6F /* RawLight.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		F51BF04274CCB703F0FFD2FC /* Project object */ = {
+		A4CF4E53CF131E029F01B120 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					FD7EDB7A2E13E6F68C6A8C56 = {
+					5269EFC45AA7061E25975341 = {
 						DevelopmentTeam = ZW9T4T3ZDY;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 5BFED10D41131292343CA8AF /* Build configuration list for PBXProject "LightCraftiPad" */;
+			buildConfigurationList = 8D527A821FE150C10D05F301 /* Build configuration list for PBXProject "RawLight" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 5ACC84F632FACD4BC4791CCF;
+			mainGroup = CDFAB3EA57F414C0DF2CCFDF;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 5D7DE3E04DDB3B77BFD8DC2C /* Products */;
+			productRefGroup = 70B8AA074D518F7D4FF2B953 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				FD7EDB7A2E13E6F68C6A8C56 /* LightCraftiPad */,
+				5269EFC45AA7061E25975341 /* RawLight */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		74510296AD68B6430C066887 /* Resources */ = {
+		A165AEFA3D9CD5543AEA65C4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6164197B175636C1A71799AF /* Assets.xcassets in Resources */,
+				9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		5D9F5BCB7BC48AD4D2E98492 /* Build Rust static library */ = {
+		C00D3A2F4FCCB8B2C736A75E /* Build Rust static library */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -140,76 +140,24 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		6880A2BAA51C9AEE8E1A1EBE /* Sources */ = {
+		96D3FAC69EA1865E403FCF92 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FA36834ED3DDCD8A14DB05B8 /* PhotoPickerBridge.swift in Sources */,
-				69EAE00B6D5782368C78A7CA /* SceneDelegate.swift in Sources */,
-				51C2D593D3D20BDD9276CB50 /* main.swift in Sources */,
+				D4D22B6733587176A1F4E1D7 /* PhotoPickerBridge.swift in Sources */,
+				DC4F2294474AB5EE12A87B62 /* SceneDelegate.swift in Sources */,
+				CBC46CA57561F64908AC608E /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		4E565A7E1A89694DD3653162 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
-				ENABLE_DEBUG_DYLIB = NO;
-				ENABLE_PREVIEWS = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = LightCraft/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/build",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-force_load",
-					"$(PROJECT_DIR)/build/liblightcraft_ios.a",
-					"-framework",
-					Metal,
-					"-framework",
-					UIKit,
-					"-framework",
-					Foundation,
-					"-framework",
-					QuartzCore,
-					"-framework",
-					CoreGraphics,
-					"-framework",
-					CoreFoundation,
-					"-framework",
-					ImageIO,
-					"-framework",
-					Photos,
-					"-framework",
-					PhotosUI,
-					"-framework",
-					UniformTypeIdentifiers,
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
-				PRODUCT_NAME = "LightCraft iPad (fork)";
-				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				TARGETED_DEVICE_FAMILY = 2;
-			};
-			name = Release;
-		};
-		7AB19CCDFE97199C532A5B8F /* Release */ = {
+		0B16B5513FF7A87BF8A7EE36 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -262,63 +210,11 @@
 			};
 			name = Release;
 		};
-		93A92FE893474A30C69E9821 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
-				ENABLE_DEBUG_DYLIB = NO;
-				ENABLE_PREVIEWS = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = LightCraft/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/build",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-force_load",
-					"$(PROJECT_DIR)/build/liblightcraft_ios.a",
-					"-framework",
-					Metal,
-					"-framework",
-					UIKit,
-					"-framework",
-					Foundation,
-					"-framework",
-					QuartzCore,
-					"-framework",
-					CoreGraphics,
-					"-framework",
-					CoreFoundation,
-					"-framework",
-					ImageIO,
-					"-framework",
-					Photos,
-					"-framework",
-					PhotosUI,
-					"-framework",
-					UniformTypeIdentifiers,
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
-				PRODUCT_NAME = "LightCraft iPad (fork)";
-				SDKROOT = iphoneos;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				TARGETED_DEVICE_FAMILY = 2;
-			};
-			name = Debug;
-		};
-		BDAE755816D9FE84A4786DD6 /* Debug */ = {
+		2BD544C6645413E98A94AE88 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -378,28 +274,134 @@
 			};
 			name = Debug;
 		};
+		750566BFF7026EA1A3C8988B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RawLight/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/build",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(PROJECT_DIR)/build/liblightcraft_ios.a",
+					"-framework",
+					Metal,
+					"-framework",
+					UIKit,
+					"-framework",
+					Foundation,
+					"-framework",
+					QuartzCore,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					ImageIO,
+					"-framework",
+					Photos,
+					"-framework",
+					PhotosUI,
+					"-framework",
+					UniformTypeIdentifiers,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.rawlight;
+				PRODUCT_NAME = RawLight;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CB5A53853D2BA0DF3DFD768E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RawLight/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/build",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(PROJECT_DIR)/build/liblightcraft_ios.a",
+					"-framework",
+					Metal,
+					"-framework",
+					UIKit,
+					"-framework",
+					Foundation,
+					"-framework",
+					QuartzCore,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					ImageIO,
+					"-framework",
+					Photos,
+					"-framework",
+					PhotosUI,
+					"-framework",
+					UniformTypeIdentifiers,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.rawlight;
+				PRODUCT_NAME = RawLight;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		4F6A3789D84D78DA3C7C10F4 /* Build configuration list for PBXNativeTarget "LightCraftiPad" */ = {
+		8D527A821FE150C10D05F301 /* Build configuration list for PBXProject "RawLight" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				93A92FE893474A30C69E9821 /* Debug */,
-				4E565A7E1A89694DD3653162 /* Release */,
+				2BD544C6645413E98A94AE88 /* Debug */,
+				0B16B5513FF7A87BF8A7EE36 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		5BFED10D41131292343CA8AF /* Build configuration list for PBXProject "LightCraftiPad" */ = {
+		9E751D3A36F3F3A694D95B3F /* Build configuration list for PBXNativeTarget "RawLight" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BDAE755816D9FE84A4786DD6 /* Debug */,
-				7AB19CCDFE97199C532A5B8F /* Release */,
+				750566BFF7026EA1A3C8988B /* Debug */,
+				CB5A53853D2BA0DF3DFD768E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = F51BF04274CCB703F0FFD2FC /* Project object */;
+	rootObject = A4CF4E53CF131E029F01B120 /* Project object */;
 }

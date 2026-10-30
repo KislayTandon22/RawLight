@@ -2395,6 +2395,7 @@ dependencies = [
  "lightcraft-engine",
  "lightcraft-pipeline",
  "lightcraft-raster",
+ "lightcraft-segment",
  "lightcraft-ui-egui",
  "log",
  "serde_json",
