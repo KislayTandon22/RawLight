@@ -33,6 +33,16 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) && app.ui.view == ViewMode::Detail {
         return;
     }
+    // V4's library has no toolbar: its count and grid-size pills live on the mode capsule's row
+    // (`modebar_touch`). Select mode keeps this bar for the bulk actions until they are redesigned.
+    if crate::theme::touch_ui(ui.ctx())
+        && crate::glass::active(ui.ctx())
+        && !crate::theme::phone(ui.ctx())
+        && app.ui.view == ViewMode::PhotoGrid
+        && !app.ui.multi_select
+    {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let insets = crate::theme::safe_area_insets(ui.ctx());
     let safe_bottom = insets[1].max(if crate::theme::touch_ui(ui.ctx()) { 20.0 } else { 0.0 });
@@ -525,7 +535,7 @@ fn click_zoom_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     }
 }
 
-fn sort_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+pub(super) fn sort_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     use lightcraft_catalog::GroupBy;
     use lightcraft_catalog::SortKey::*;
     let cur = app.session.sort;

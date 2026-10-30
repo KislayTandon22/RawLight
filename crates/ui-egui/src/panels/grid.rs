@@ -298,6 +298,9 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let local = app.caches.grid.local(&app.session.catalog, &ids, generation);
             folder_header(app, ui, &b, &ids, local, &cnt);
         }
+        None if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) && !crate::theme::phone(ui.ctx()) => {
+            // V4: the collection name lives in the top bar and the count in the bottom pill
+        }
         None => {
             let (hr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::hover());
             ui.painter().rect_filled(hr, 0.0, t.canvas);
@@ -794,6 +797,7 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
     }
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &spoken));
     let active = state == lightcraft_engine::SelectionState::Active;
+    let round = if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) { 18.0 } else { 0.0 };
     let p = ui.painter();
     let img_rect = if square {
         let base = if selected { t.cell_selected } else { t.cell };
@@ -809,15 +813,21 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         let [tw, th] = tex.size;
         // Preserve the decoded preview's ratio when it differs from the catalog dimensions.
         let fit = super::detail::fit_texture_rect(img_rect, [tw, th]);
-        p.image(tex.tex.id(), fit, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+        let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+        if round > 0.0 {
+            // V4: rounded tiles; the photo is painted as a textured rounded rect
+            p.add(egui::epaint::RectShape::filled(fit, round, Color32::WHITE).with_texture(tex.tex.id(), uv));
+        } else {
+            p.image(tex.tex.id(), fit, uv, Color32::WHITE);
+        }
         if active {
-            p.rect_stroke(fit.expand(if square { 2.0 } else { 0.0 }), 0.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Outside);
+            p.rect_stroke(fit.expand(if square { 2.0 } else { 0.0 }), round, Stroke::new(2.0, Color32::WHITE), StrokeKind::Outside);
         } else if selected {
-            p.rect_stroke(fit, 0.0, Stroke::new(2.0, Color32::from_gray(170)), StrokeKind::Outside);
+            p.rect_stroke(fit, round, Stroke::new(2.0, Color32::from_gray(170)), StrokeKind::Outside);
         }
     } else {
         let ph = img_rect.shrink(if square { 20.0 } else { 0.0 });
-        p.rect_filled(ph, 0.0, t.skeleton);
+        p.rect_filled(ph, round, t.skeleton);
         // not drawn yet (or unreadable): the selection is still visible
         if active {
             p.rect_stroke(ph, 0.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Outside);

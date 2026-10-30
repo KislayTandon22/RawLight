@@ -282,7 +282,7 @@ fn phone_rating(app: &mut LightcraftApp, ui: &mut egui::Ui, rect: Rect, photo: &
 
 /// One 44-point bar button: its icon, a soft oval while hovered or pressed, and its screen-reader
 /// name. Painted at `rect`, so the bar's layout stays exact whatever the screen width.
-fn bar_button(ui: &mut egui::Ui, id: &str, icon: Icon, rect: Rect, side: f32, enabled: bool, name: &str) -> Response {
+pub(super) fn bar_button(ui: &mut egui::Ui, id: &str, icon: Icon, rect: Rect, side: f32, enabled: bool, name: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let resp = ui.interact(rect, Id::unique(("photo-bar", id)), if enabled { Sense::click() } else { Sense::hover() });
     if enabled {

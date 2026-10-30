@@ -203,8 +203,84 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 }
             });
         });
+        if app.ui.view == ViewMode::PhotoGrid && !app.ui.multi_select && !crate::theme::phone(ui.ctx()) {
+            library_pills(app, ui, panel_rect, capsule_rect);
+        }
         capsule_ui.response
     });
+}
+
+/// The library's two pills either side of the mode capsule: how many photos are showing and in
+/// what order (left), and the grid size (right).
+fn library_pills(app: &mut LightcraftApp, ui: &mut egui::Ui, panel: Rect, capsule: Rect) {
+    use lightcraft_catalog::SortKey;
+    let t = Tokens::get(ui.ctx());
+    let h = capsule.height();
+    let shown = app.session.visible().len();
+    let total = app.session.catalog.len();
+    let order = match (app.session.sort.key, app.session.sort.ascending) {
+        (SortKey::CaptureDate | SortKey::ImportDate | SortKey::EditDate, false) => "Newest first",
+        (SortKey::CaptureDate | SortKey::ImportDate | SortKey::EditDate, true) => "Oldest first",
+        (SortKey::FileName, true) => "Name A–Z",
+        (SortKey::FileName, false) => "Name Z–A",
+        (SortKey::Rating, _) => "By rating",
+        (SortKey::FileSize, _) => "By size",
+        _ => "Custom order",
+    };
+    let count = if shown == total { format!("{total}") } else { format!("{shown} of {total}") };
+    let glass = |rect: Rect| {
+        ui.painter().rect_filled(rect, rect.height() / 2.0, crate::glass::fill());
+        ui.painter().rect_stroke(rect, rect.height() / 2.0, crate::glass::rim(), egui::StrokeKind::Inside);
+    };
+    // left pill
+    let font = t.semibold(15.0);
+    let dim = t.font(15.0);
+    let cw = ui.painter().layout_no_wrap(count.clone(), font.clone(), Color32::WHITE).size().x;
+    let ow = ui.painter().layout_no_wrap(crate::i18n::tr(order).to_owned(), dim.clone(), Color32::WHITE).size().x;
+    let left_w = cw + ow + 14.0 + 40.0;
+    let left_gap = capsule.left() - panel.left() - 16.0;
+    if left_gap >= left_w {
+        let r = Rect::from_min_size(pos2(panel.left() + 8.0, capsule.top()), vec2(left_w, h));
+        glass(r);
+        ui.painter().text(pos2(r.left() + 20.0, r.center().y), egui::Align2::LEFT_CENTER, &count, font, Color32::WHITE);
+        ui.painter().text(
+            pos2(r.left() + 20.0 + cw + 14.0, r.center().y),
+            egui::Align2::LEFT_CENTER,
+            crate::i18n::tr(order),
+            dim,
+            Color32::from_white_alpha(158),
+        );
+    }
+    // right pill: small grid, slider, large grid
+    let right_w = 220.0;
+    let right_gap = panel.right() - capsule.right() - 16.0;
+    if right_gap >= right_w {
+        let r = Rect::from_min_size(pos2(panel.right() - 8.0 - right_w, capsule.top()), vec2(right_w, h));
+        glass(r);
+        let y = r.center().y;
+        let track = Rect::from_min_max(pos2(r.left() + 46.0, y - 2.0), pos2(r.right() - 46.0, y + 2.0));
+        let hit = Rect::from_min_max(pos2(track.left() - 8.0, r.top()), pos2(track.right() + 8.0, r.bottom()));
+        let resp = ui.interact(hit, ui.scope_id().with("library-grid-size"), egui::Sense::click_and_drag());
+        crate::widgets::register(ui, "slider:thumbSize", hit);
+        crate::widgets::announce(&resp, crate::i18n::tr("Grid size").to_owned());
+        let f = ((app.ui.thumb_size - 90.0) / (480.0 - 90.0)).clamp(0.0, 1.0);
+        let x = track.left() + f * track.width();
+        ui.painter().rect_filled(track, 2.0, Color32::from_white_alpha(46));
+        ui.painter().rect_filled(Rect::from_min_max(track.min, pos2(x, track.bottom())), 2.0, Color32::from_rgb(10, 132, 255));
+        ui.painter().circle_filled(pos2(x, y), 14.0, Color32::WHITE);
+        if let Some(pp) = resp.interact_pointer_pos()
+            && (resp.dragged() || resp.clicked())
+        {
+            app.ui.thumb_size = 90.0 + ((pp.x - track.left()) / track.width()).clamp(0.0, 1.0) * (480.0 - 90.0);
+        }
+        crate::icons::paint(
+            ui.painter(),
+            Rect::from_center_size(pos2(r.left() + 24.0, y), vec2(14.0, 14.0)),
+            Icon::GridSquare,
+            Color32::from_white_alpha(158),
+        );
+        crate::icons::paint(ui.painter(), Rect::from_center_size(pos2(r.right() - 24.0, y), vec2(20.0, 20.0)), Icon::GridPhoto, Color32::WHITE);
+    }
 }
 
 #[cfg(test)]

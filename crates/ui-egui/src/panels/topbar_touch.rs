@@ -26,6 +26,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     if super::photo_bar_touch::show(app, ui) {
         return;
     }
+    if super::grid_bar_touch::show(app, ui) {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let touch = crate::theme::touch_ui(ui.ctx());
     let insets = crate::theme::safe_area_insets(ui.ctx());

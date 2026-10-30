@@ -17,6 +17,7 @@ pub mod export_touch;
 pub mod faces;
 pub mod filterbar;
 pub mod grid;
+mod grid_bar_touch;
 mod grid_touch;
 pub mod histogram;
 pub mod keymap;
