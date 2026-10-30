@@ -11,6 +11,34 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use lightcraft_engine::Session;
 use serde_json::{Value, json};
 
+/// `app.export` is a UI-level command in the desktop app (it needs the app's writer); the bridge runs the
+/// same engine export directly. Params as the engine documents: `path` (one exact file) or `dir`, `ids`
+/// (default: the active photo), format, quality, size, colour space...
+fn export(s: &mut Session, p: &Value) -> Result<Value, String> {
+    use lightcraft_engine::export::{Destination, ExportFormat, ExportOptions, export_batch, write_file};
+    let p = &s.export_params(p)?;
+    let mut opts = ExportOptions::from_params(p).map_err(|e| e.to_string())?;
+    if let (Some(path), None) = (p.get("path").and_then(Value::as_str), p.get("format")) {
+        let ext = path.rsplit_once('.').map_or("", |(_, e)| e);
+        opts.format = ExportFormat::parse(ext).unwrap_or(opts.format);
+    }
+    let ids: Vec<_> = match p.get("ids").and_then(Value::as_array) {
+        Some(a) => a.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect(),
+        None => s.active().into_iter().collect(),
+    };
+    if ids.is_empty() {
+        return Err("no photo selected".into());
+    }
+    let exact = p.get("path").and_then(Value::as_str).filter(|x| !x.trim().is_empty()).map(str::to_string);
+    let dir = p.get("dir").and_then(Value::as_str).unwrap_or_default().trim().to_string();
+    if dir.is_empty() && exact.is_none() {
+        return Err("choose an output folder".into());
+    }
+    let to = Destination { dir, exact };
+    let files = export_batch(s, &ids, &opts, &to, &mut |path, bytes| write_file(path, bytes), &|path| std::path::Path::new(path).exists())?;
+    Ok(json!({"files": files}))
+}
+
 /// Opaque session handle.
 pub struct RlSession(Session);
 
@@ -75,7 +103,8 @@ pub unsafe extern "C" fn rl_execute(session: *mut RlSession, id: *const c_char, 
             Err(_) => return reply(json!({"error": "params are not UTF-8"})),
         }
     };
-    match catch_unwind(AssertUnwindSafe(|| session.0.execute(id, &params))) {
+    let run = || if id == "app.export" { export(&mut session.0, &params).map_err(|e| e.to_string()) } else { session.0.execute(id, &params).map_err(|e| e.to_string()) };
+    match catch_unwind(AssertUnwindSafe(run)) {
         Ok(Ok(v)) => reply(json!({"ok": v})),
         Ok(Err(e)) => reply(json!({"error": e.to_string()})),
         Err(_) => reply(json!({"error": "internal panic"})),
@@ -133,15 +162,13 @@ pub unsafe extern "C" fn rl_render_hist(
         }
     }
     let img = rendered.image;
-    let mut bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
-    bytes.shrink_to_fit();
+    let bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
     unsafe {
         *out_w = img.width as u32;
         *out_h = img.height as u32;
         *out_len = bytes.len();
     }
-    let mut bytes = std::mem::ManuallyDrop::new(bytes);
-    bytes.as_mut_ptr()
+    Box::into_raw(bytes.into_boxed_slice()).cast::<u8>()
 }
 
 /// A render detached from the session: build it with [`rl_job_new`] (fast, needs the session),
@@ -189,11 +216,31 @@ pub unsafe extern "C" fn rl_job_new_mask_overlay(session: *mut RlSession, id: u6
         lightcraft_engine::pipeline::Overlay::Mask { id: mask_id as u16, view: lightcraft_engine::pipeline::MaskView::Color, color, opacity: 55 }
     };
     let job = catch_unwind(AssertUnwindSafe(|| {
-        session.0.render_job(pid, max_w as usize, max_h as usize, false, true).map(|j| {
+        session.0.render_job(pid, max_w as usize, max_h as usize, false, kind != 3).map(|j| {
             let j = if kind == 2 { j.draft() } else { j };
             j.with_overlay(overlay)
         })
     }));
+    match job {
+        Ok(Some(job)) => Box::into_raw(Box::new(RlJob { job: Some(job), result: None })),
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// A render of photo `id` as if the look `preset_id` were applied (`amount` percent), without changing
+/// the photo's edits: a live preview for a picker. Null when the photo or the look does not exist.
+///
+/// # Safety
+/// `session` from [`rl_session_new`]; `preset_id` NUL-terminated.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_job_new_preset(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, preset_id: *const c_char, amount: u32) -> *mut RlJob {
+    let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
+    if preset_id.is_null() {
+        return std::ptr::null_mut();
+    }
+    let Ok(preset) = unsafe { CStr::from_ptr(preset_id) }.to_str() else { return std::ptr::null_mut() };
+    let pid = lightcraft_catalog::PhotoId(id);
+    let job = catch_unwind(AssertUnwindSafe(|| session.0.preview_job_with_preset(pid, max_w as usize, max_h as usize, preset, f64::from(amount) / 100.0)));
     match job {
         Ok(Some(job)) => Box::into_raw(Box::new(RlJob { job: Some(job), result: None })),
         _ => std::ptr::null_mut(),
@@ -220,15 +267,13 @@ pub unsafe extern "C" fn rl_job_run(job: *mut RlJob, out_w: *mut u32, out_h: *mu
                 }
             }
             let img = &rendered.image;
-            let mut bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
-            bytes.shrink_to_fit();
+            let bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
             unsafe {
                 *out_w = img.width as u32;
                 *out_h = img.height as u32;
                 *out_len = bytes.len();
             }
-            let mut bytes = std::mem::ManuallyDrop::new(bytes);
-            bytes.as_mut_ptr()
+            Box::into_raw(bytes.into_boxed_slice()).cast::<u8>()
         }
         Err(_) => std::ptr::null_mut(),
     };
@@ -289,7 +334,8 @@ pub extern "C" fn rl_set_segmenter(cb: Option<SegmentCb>) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rl_buffer_free(ptr: *mut u8, len: usize) {
     if !ptr.is_null() {
-        drop(unsafe { Vec::from_raw_parts(ptr, len, len) });
+        // SAFETY: the buffer came from `Box<[u8]>::into_raw` with exactly `len` bytes.
+        drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len)) });
     }
 }
 
@@ -342,6 +388,18 @@ mod tests {
         let p = unsafe { rl_render(s, id, 256, 256, &mut w, &mut h, &mut len) };
         assert!(!p.is_null() && w > 0 && h > 0 && len == (w * h * 4) as usize);
         unsafe { rl_buffer_free(p, len) };
+        unsafe { rl_session_free(s) };
+    }
+
+    #[test]
+    fn export_writes_a_jpeg() {
+        let s = rl_session_new(1);
+        let out = std::env::temp_dir().join(format!("rl-export-{}.jpg", std::process::id()));
+        let params = format!(r#"{{"path":"{}","longEdge":300,"format":"jpeg","quality":80}}"#, out.display());
+        let r = call(s, "app.export", &params);
+        assert!(r.get("error").is_none(), "{r}");
+        assert!(std::fs::metadata(&out).is_ok_and(|m| m.len() > 1000));
+        let _ = std::fs::remove_file(&out);
         unsafe { rl_session_free(s) };
     }
 

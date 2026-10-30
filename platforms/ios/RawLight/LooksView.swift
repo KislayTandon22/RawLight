@@ -21,6 +21,8 @@ struct LooksPanel: View {
     @State private var askName = false
     @State private var name = ""
     @State private var message: String?
+    @State private var previews: [String: UIImage] = [:]
+    @State private var lastApplied: String?   // the look currently applied from this panel (so a new look replaces it)
 
     var body: some View {
         VStack(spacing: 12) {
@@ -50,7 +52,8 @@ struct LooksPanel: View {
                 }
             }
         }
-        .task(id: photoID) { await load() }
+        .task(id: photoID) { previews = [:]; lastApplied = nil; applied = nil; await load() }
+        .onDisappear { lastApplied = nil }
         .alert("Save look", isPresented: $askName) {
             TextField("Name", text: $name)
             Button("Save") { let n = name; name = ""; Task { await create(n) } }
@@ -61,18 +64,24 @@ struct LooksPanel: View {
     private func group(_ title: String, _ items: [PresetItem]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.subheadline.weight(.semibold))
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 10)], spacing: 10) {
                 ForEach(items) { p in
                     Button { Task { await apply(p.id) } } label: {
-                        VStack(spacing: 2) {
-                            Text(p.name).font(.footnote.weight(.medium)).lineLimit(2).multilineTextAlignment(.center)
+                        VStack(spacing: 5) {
+                            Color(white: 0.14).aspectRatio(4 / 3, contentMode: .fit)
+                                .overlay {
+                                    if let img = previews[p.id] { Image(uiImage: img).resizable().scaledToFill().transition(.opacity) }
+                                    else { ProgressView().controlSize(.small) }
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(applied == p.id ? Theme.accent : .clear, lineWidth: 3))
+                                .overlay(alignment: .topTrailing) { if p.favorite { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Theme.accentSoft).padding(6) } }
+                            Text(p.name).font(.caption.weight(applied == p.id ? .semibold : .regular)).lineLimit(1)
+                                .foregroundStyle(applied == p.id ? Color.white : Color.white.opacity(0.75))
                         }
-                        .frame(maxWidth: .infinity).frame(height: 54).padding(.horizontal, 6)
-                        .fieldBackground(applied == p.id, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .foregroundStyle(applied == p.id ? .white : .primary)
-                        .overlay(alignment: .topTrailing) { if p.favorite { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(Theme.accentSoft).padding(6) } }
                     }
                     .buttonStyle(.plain)
+                    .task(id: "\(photoID)-\(p.id)") { await preview(p.id) }
                     .contextMenu {
                         Button(p.favorite ? "Remove favourite" : "Favourite", systemImage: "star") { Task { await fav(p) } }
                         if !p.builtin { Button("Delete", systemImage: "trash", role: .destructive) { Task { await delete(p) } } }
@@ -80,6 +89,14 @@ struct LooksPanel: View {
                 }
             }
         }
+    }
+
+    /// A small render of the current photo with this look applied (the photo itself is untouched).
+    private func preview(_ id: String) async {
+        let pid = photoID
+        guard previews[id] == nil, let img = await engine.renderPreset(pid, preset: id) else { return }
+        guard !Task.isCancelled, pid == photoID else { return }   // a late result of another photo must not show here
+        withAnimation(.easeIn(duration: 0.2)) { previews[id] = img }
     }
 
     private func load() async {
@@ -94,8 +111,12 @@ struct LooksPanel: View {
             currentCurve = r["current"] as? String
         }
     }
+    /// Applies a look. A look chosen from this panel replaces the previous one (and a new amount re-applies
+    /// it): the previous application is undone first, since a preset blends the *current* settings toward itself.
     private func apply(_ id: String) async {
-        do { _ = try await engine.execute("preset.apply", ["id": id, "amount": Int(amount)]); applied = id; message = nil } catch { message = error.localizedDescription }
+        if lastApplied != nil { _ = try? await engine.execute("edit.undo") }
+        do { _ = try await engine.execute("preset.apply", ["id": id, "amount": Int(amount)]); applied = id; lastApplied = id; message = nil } catch { message = error.localizedDescription }
+        previews = [:]   // the other previews were made on the old edit
         onChange()
     }
     private func create(_ n: String) async {

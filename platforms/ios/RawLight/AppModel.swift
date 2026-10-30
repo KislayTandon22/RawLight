@@ -122,6 +122,8 @@ final class AppModel {
         started = true
         loadSources()
         scanLibraries()
+        // UI tests start from a fresh demo library every run
+        if ProcessInfo.processInfo.environment["RAWLIGHT_FRESH"] != nil { await createLibrary(name: "UITest", demo: true); return }
         if libraries.isEmpty { await createLibrary(name: "My Library", demo: true); return }
         let saved = UserDefaults.standard.string(forKey: "currentLibraryName")
         await open(libraries.first { $0.name == saved } ?? libraries[0], seedDemo: false)

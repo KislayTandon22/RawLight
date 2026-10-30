@@ -24,7 +24,7 @@ struct ColourPanel: View {
         Group {
             if var c = ctl(id) {
                 let _ = { if let label { c = Control(id: c.id, label: label, section: c.section, min: c.min, max: c.max, def: c.def, value: c.value, step: c.step, decimals: c.decimals, track: c.track) } }()
-                ColorSlider(control: c, onChange: { set(id, $0, false) }, onEnd: { set(id, c.value, true) }, reset: { set(id, c.def, true) })
+                ColorSlider(control: c, onChange: { set(id, $0, false) }, onEnd: { v in set(id, v, true) }, reset: { set(id, c.def, true) }, compact: tab != "Basic")
             }
         }
     }

@@ -14,6 +14,7 @@ struct PencilCanvas: UIViewRepresentable {
     var onBegan: (StrokeSample) -> Void
     var onMoved: ([StrokeSample]) -> Void
     var onEnded: () -> Void
+    var onCancelled: () -> Void = {}
     var onUndo: () -> Void
     var onRedo: () -> Void
     var onPencilTap: () -> Void
@@ -37,7 +38,7 @@ struct PencilCanvas: UIViewRepresentable {
 
     func updateUIView(_ v: CanvasView, context: Context) {
         v.pencilOnly = pencilOnly
-        v.onBegan = onBegan; v.onMoved = onMoved; v.onEnded = onEnded
+        v.onBegan = onBegan; v.onMoved = onMoved; v.onEnded = onEnded; v.onCancelled = onCancelled
         context.coordinator.parent = self
     }
 
@@ -59,6 +60,7 @@ struct PencilCanvas: UIViewRepresentable {
         var onBegan: (StrokeSample) -> Void = { _ in }
         var onMoved: ([StrokeSample]) -> Void = { _ in }
         var onEnded: () -> Void = {}
+        var onCancelled: () -> Void = {}
         private var active: UITouch?
 
         private func sample(_ t: UITouch) -> StrokeSample {
@@ -88,6 +90,7 @@ struct PencilCanvas: UIViewRepresentable {
 
         override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { cancel() }
 
-        private func cancel() { if active != nil { active = nil; onEnded() } }
+        /// A second finger or the system took the touch: the partial stroke is thrown away, not committed.
+        private func cancel() { if active != nil { active = nil; onCancelled() } }
     }
 }

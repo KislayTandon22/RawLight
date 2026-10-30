@@ -23,7 +23,7 @@ struct EditorView: View {
     @State private var controls: [Control] = []
     @State private var info = PhotoInfo(name: "", rating: 0, flag: "none", edited: false)
     @State private var group = "Light"
-    @State private var renderTask: Task<Void, Never>?
+    @State private var edits = OrderedQueue()
     @State private var scale: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var showExport = false
@@ -40,6 +40,7 @@ struct EditorView: View {
     @State private var showMask = true
     @State private var activeMask: Int?
     @State private var copied = false
+    @State private var wbMode = "asShot"
     @State private var showCurve = false
     @State private var colourTab = "Basic"
     @State private var colourBand = "red"
@@ -68,6 +69,10 @@ struct EditorView: View {
         }
         .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
         .onReceive(NotificationCenter.default.publisher(for: .masksChanged)) { n in activeMask = n.object as? Int }
+        .onReceive(NotificationCenter.default.publisher(for: .curvePreset)) { n in
+            guard let name = n.object as? String else { return }
+            Task { _ = try? await model.engine.execute("curve.applyPreset", ["name": name]); curvePoints = await model.engine.curve(curveChannel); await render() }
+        }
         .onChange(of: objectPick) { _, on in if on { objectMask = nil } }
         .task(id: photoID) { await open() }
     }
@@ -291,21 +296,44 @@ struct EditorView: View {
                     if group == "Light" {
                         Button { withAnimation(.snappy) { showCurve.toggle() } } label: {
                             HStack { Text("Tone curve").font(.subheadline.weight(.medium)); Spacer()
-                                Text(curvePoints.isEmpty ? "Linear" : "Custom").font(.subheadline).foregroundStyle(.secondary)
+                                Text(curvePoints.count <= 2 && curvePoints.allSatisfy { abs($0.x - $0.y) < 0.001 } ? "Linear" : "Custom").accessibilityIdentifier("curve.state").font(.subheadline).foregroundStyle(.secondary)
                                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary).rotationEffect(.degrees(showCurve ? 90 : 0)) }
                                 .padding(.horizontal, 14).frame(height: 48).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }.buttonStyle(.plain)
                     }
+                    if group == "Light" {
+                        HStack {
+                            Text("White balance").font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Menu {
+                                ForEach([("asShot", "As shot"), ("auto", "Auto"), ("daylight", "Daylight"), ("cloudy", "Cloudy"), ("shade", "Shade"),
+                                         ("tungsten", "Tungsten"), ("fluorescent", "Fluorescent"), ("flash", "Flash")], id: \.0) { m in
+                                    Button { Task { await command("develop.wb", ["mode": m.0]); await reloadControls(); await render() } } label: {
+                                        if wbMode == m.0 { Label(m.1, systemImage: "checkmark") } else { Text(m.1) }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) { Text(wbMode == "asShot" ? "As shot" : wbMode.capitalized); Image(systemName: "chevron.up.chevron.down").font(.caption) }
+                                    .font(.subheadline.weight(.medium)).padding(.horizontal, 12).frame(height: 36).fieldBackground(in: Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                    }
                     if group == "Light" && showCurve {
-                        CurveEditor(channel: $curveChannel, points: $curvePoints, histogram: histogram,
-                                    onChange: { pts in setCurve(pts, commit: false) }, onEnd: { setCurve(curvePoints, commit: true) })
+                        CurveEditor(channel: $curveChannel, points: $curvePoints, histogram: histogram, controls: controls,
+                                    setControl: { id, v, commit in set(id, v, commit: commit) },
+                                    onChange: { pts in curvePoints = pts; setCurve(pts, commit: false) },
+                                    onEnd: { setCurve(curvePoints, commit: true); edits.add(.step) { _ = try? await model.engine.execute("develop.endInteraction") } },
+                                    onBegin: { edits.add(.step) { _ = try? await model.engine.execute("develop.beginInteraction", ["label": "Tone Curve"]) } })
                             .padding(.vertical, 4)
                             .onChange(of: curveChannel) { _, c in Task { curvePoints = await model.engine.curve(c) } }
                     }
-                    if group == "Colour" {
+                    if group == "Detail" {
+                        DetailPanel(engine: model.engine, photoID: photoID, controls: controls, set: { id, v, c in set(id, v, commit: c) }) { Task { await reloadControls(); await render() } }
+                    } else if group == "Colour" {
                         ColourPanel(controls: controls, set: { id, v, commit in set(id, v, commit: commit) }, tab: $colourTab, band: $colourBand, picking: $picking)
                     } else { ForEach(visible) { c in
-                        ColorSlider(control: c, onChange: { v in set(c.id, v, commit: false) }, onEnd: { set(c.id, c.value, commit: true) },
+                        ColorSlider(control: c, onChange: { v in set(c.id, v, commit: false) }, onEnd: { v in set(c.id, v, commit: true) },
                                     reset: { set(c.id, c.def, commit: true) })
                     } }
                 }.padding(.horizontal, 16)
@@ -331,12 +359,21 @@ struct EditorView: View {
         async let i = model.engine.info()
         async let p = model.engine.curve(curveChannel)
         controls = await c
+        wbMode = (((await model.engine.developState())["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"
         info = await i ?? info
         curvePoints = await p
         // Debug aids for screenshots: RAWLIGHT_MODE=crop|mask, RAWLIGHT_MASK=1 adds a radial mask.
         let env = ProcessInfo.processInfo.environment
         if let m = env["RAWLIGHT_MODE"], let em = EditMode(rawValue: m.capitalized) { mode = em }
-        if env["RAWLIGHT_MASK"] != nil { _ = try? await model.engine.execute("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 0.5]) }
+        if env["RAWLIGHT_MASK"] != nil { _ = try? await model.engine.execute("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }
+        if env["RAWLIGHT_EXPORT"] != nil {
+            let url = FileManager.default.temporaryDirectory.appending(path: "dbg-export.jpg")
+            let t0 = Date()
+            do { let r = try await model.engine.execute("app.export", ["path": url.path, "ids": [photoID], "format": "jpeg", "quality": 90, "longEdge": 3000, "colorSpace": "srgb"]); NSLog("[RawLight] EXPORT ok %.1fs %@", Date().timeIntervalSince(t0), "\(r)") }
+            catch { NSLog("[RawLight] EXPORT error %@", error.localizedDescription) }
+        }
+        if let g = env["RAWLIGHT_GROUP"] { group = g }
+        if env["RAWLIGHT_CURVE"] != nil { showCurve = true; _ = try? await model.engine.execute("develop.curve", ["channel": "master", "points": [[0, 0], [0.3, 0.2], [1, 1]]]); curvePoints = await model.engine.curve("master") }
         if let k = env["RAWLIGHT_AIMASK"] {
             do { let r = try await model.engine.execute("mask.add", ["kind": k]); NSLog("[RawLight] AIMASK %@ ok %@", k, "\(r)"); _ = try? await model.engine.execute("mask.adjust", ["values": ["exposure": -3.0]]); try? await Task.sleep(for: .seconds(4)) }
             catch { NSLog("[RawLight] AIMASK %@ error %@", k, error.localizedDescription) }
@@ -345,7 +382,7 @@ struct EditorView: View {
         await render()
     }
 
-    private func reloadControls() async { controls = await model.engine.controls(); curvePoints = await model.engine.curve(curveChannel); await refreshInfo() }
+    private func reloadControls() async { controls = await model.engine.controls(); wbMode = (((await model.engine.developState())["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"; curvePoints = await model.engine.curve(curveChannel); await refreshInfo() }
     private func refreshInfo() async { if let i = await model.engine.info() { info = i } }
     private func command(_ id: String, _ p: [String: Any] = [:]) async {
         _ = try? await model.engine.execute(id, p)
@@ -354,26 +391,25 @@ struct EditorView: View {
 
     private func set(_ id: String, _ value: Double, commit: Bool) {
         if let i = controls.firstIndex(where: { $0.id == id }) { controls[i].value = value }
-        renderTask?.cancel()
-        renderTask = Task {
+        edits.add(commit ? .step : .live) {
             _ = try? await model.engine.execute("develop.set", ["control": id, "value": value])
-            if !Task.isCancelled { await render(draft: !commit) }
+            await render(draft: !commit)
         }
     }
 
     private func setCurve(_ pts: [CGPoint], commit: Bool) {
         let ch = curveChannel
-        renderTask?.cancel()
-        renderTask = Task {
-            _ = try? await model.engine.execute("develop.curve", ["channel": ch, "points": pts.map { [$0.x, $0.y] }])
-            if !Task.isCancelled { await render(draft: !commit) }
+        edits.add(commit ? .step : .live) {
+            if pts.isEmpty { _ = try? await model.engine.execute("curve.reset", ["channel": ch]) }
+            else { _ = try? await model.engine.execute("develop.curve", ["channel": ch, "points": pts.map { [$0.x, $0.y] }]) }
+            await render(draft: !commit)
         }
     }
 
     /// Fast draft while dragging; full quality when the finger lifts.
     private func render(draft: Bool = false) async {
         let id = photoID
-        if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: mode == .crop ? .uncropped : (draft ? .draft : .full),
+        if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: (mode == .crop || mode == .mask || mode == .heal) ? .uncropped : (draft ? .draft : .full),
                                             maskOverlay: mode == .mask && showMask ? (activeMask ?? 0) : nil), id == photoID {
             image = r.image; histogram = r.histogram
             if !draft { info.edited = true }

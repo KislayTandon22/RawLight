@@ -26,19 +26,23 @@ private func trackGradient(_ t: Track) -> LinearGradient? {
 struct ColorSlider: View {
     let control: Control
     let onChange: (Double) -> Void
-    let onEnd: () -> Void
+    /// Called when the finger lifts, with the final value (read from here, not from a possibly stale `Control`).
+    let onEnd: (Double) -> Void
+    @State private var live: Double?
     let reset: () -> Void
+    /// A slimmer row without its own card, for long lists such as the colour mixer.
+    var compact = false
 
     private var fraction: Double { (control.value - control.min) / max(control.max - control.min, .ulpOfOne) }
     private var neutral: Double { (control.def - control.min) / max(control.max - control.min, .ulpOfOne) }
 
     var body: some View {
-        VStack(spacing: 4) {
+        let row = VStack(spacing: compact ? 1 : 4) {
             HStack {
-                Text(control.label).font(.subheadline)
+                Text(control.label).font(compact ? .footnote : .subheadline)
                 Spacer()
                 Text(String(format: "%.\(control.decimals)f", control.value))
-                    .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                    .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).accessibilityIdentifier("value.\(control.id)")
                 Button(action: reset) {
                     Image(systemName: "arrow.counterclockwise").font(.caption.weight(.semibold))
                         .frame(width: 28, height: 28).fieldBackground(in: Circle())
@@ -46,7 +50,7 @@ struct ColorSlider: View {
                 .buttonStyle(.plain).foregroundStyle(.secondary).opacity(control.value == control.def ? 0.3 : 1)
             }
             GeometryReader { geo in
-                let w = geo.size.width, h: CGFloat = 30
+                let w = geo.size.width, h: CGFloat = compact ? 20 : 30
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.10)).frame(height: h)
                     if let g = trackGradient(control.track) {
@@ -59,22 +63,26 @@ struct ColorSlider: View {
                         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                         .offset(x: min(max(fraction * w - (h + 4) / 2, -2), w - (h + 4) / 2 + 2))
                 }
-                .frame(height: 44)
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { v in
-                        let f = min(max(v.location.x / w, 0), 1)
+                .frame(height: compact ? 32 : 44)
+                .overlay {
+                    SliderTouch(onChanged: { x in
+                        let f = min(max(x / w, 0), 1)
                         var val = control.min + f * (control.max - control.min)
                         if control.step > 0 { val = (val / control.step).rounded() * control.step }
                         // snap to the neutral point so zero is easy to hit
                         if abs(f - neutral) < 0.015 { val = control.def }
-                        onChange(min(max(val, control.min), control.max))
-                    }
-                    .onEnded { _ in onEnd() })
+                        let v = min(max(val, control.min), control.max)
+                        live = v
+                        onChange(v)
+                    }, onEnded: { onEnd(live ?? control.value); live = nil })
+                }
+                .accessibilityElement().accessibilityIdentifier("slider.\(control.id)")
             }
-            .frame(height: 44)
+            .frame(height: compact ? 32 : 44)
         }
-        .padding(.horizontal, 12).padding(.vertical, 6)
-        .fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        return Group {
+            if compact { row.padding(.horizontal, 6).padding(.vertical, 1) }
+            else { row.padding(.horizontal, 12).padding(.vertical, 6).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
+        }
     }
 }

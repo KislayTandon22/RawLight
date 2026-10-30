@@ -52,6 +52,7 @@ struct HealOverlay: View {
     @State private var active: Int?
     @State private var dragging: Int?
     @State private var throttle = Throttle()
+    @State private var sent: CGPoint?
 
     private func toScreen(_ p: CGPoint) -> CGPoint { CGPoint(x: imageRect.minX + p.x * imageRect.width, y: imageRect.minY + p.y * imageRect.height) }
     private func toNorm(_ p: CGPoint) -> CGPoint {
@@ -63,7 +64,7 @@ struct HealOverlay: View {
         ZStack {
             Canvas { ctx, _ in
                 for s in spots {
-                    let c = toScreen(s.point), r = max(s.size * long / 2, 8)
+                    let c = toScreen(s.point), r = max(s.size * long, 8)
                     let sel = s.id == active
                     ctx.stroke(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)), with: .color(sel ? Theme.accent : .white), lineWidth: sel ? 2.5 : 1.5)
                     if sel {
@@ -84,14 +85,20 @@ struct HealOverlay: View {
                     .onChanged { v in
                         guard tool == .spot else { return }
                         if dragging == nil {
-                            let hit = spots.first { hypot(toScreen($0.point).x - v.startLocation.x, toScreen($0.point).y - v.startLocation.y) < max($0.size * long / 2, 22) }
+                            let hit = spots.first { hypot(toScreen($0.point).x - v.startLocation.x, toScreen($0.point).y - v.startLocation.y) < max($0.size * long, 22) }
                             dragging = hit?.id ?? -1
-                            if let hit { active = hit.id; Task { _ = try? await engine.execute("spot.select", ["index": hit.id]) } }
+                            if let hit { active = hit.id; sent = hit.point; Task { _ = try? await engine.execute("spot.select", ["index": hit.id]); NotificationCenter.default.post(name: .healEdited, object: nil) } }
                         }
                         if let d = dragging, d >= 0 {
                             let p = toNorm(v.location)
                             if let i = spots.firstIndex(where: { $0.id == d }) { spots[i].point = p }
-                            throttle.run { _ = try? await engine.execute("spot.update", ["index": d, "move": [p.x, p.y]]); onChange() }
+                            // `move` is a delta from where the spot is now: send the step since the last one sent
+                            throttle.run {
+                                guard let from = sent else { return }
+                                sent = p
+                                _ = try? await engine.execute("spot.update", ["index": d, "move": [p.x - from.x, p.y - from.y]])
+                                onChange()
+                            }
                         }
                     }
                     .onEnded { v in
@@ -102,12 +109,12 @@ struct HealOverlay: View {
                         if tool == .redEye {
                             Task {
                                 _ = try? await engine.execute("redeye.add", ["center": [p.x, p.y], "rx": 0.03, "ry": 0.03, "pet": pet])
-                                await refresh(); onChange()
+                                await refresh(); NotificationCenter.default.post(name: .healEdited, object: nil); onChange()
                             }
                         } else if dragging == -1, !moved {
                             Task {
                                 _ = try? await engine.execute("spot.add", ["mode": spotMode, "points": [[p.x, p.y]], "size": spotSize])
-                                await refresh(); onChange()
+                                await refresh(); NotificationCenter.default.post(name: .healEdited, object: nil); onChange()
                             }
                         } else { Task { await refresh(); onChange() } }
                     })
@@ -119,7 +126,10 @@ struct HealOverlay: View {
     private func refresh() async { let s = await engine.healState(); spots = s.spots; eyes = s.eyes; active = s.active }
 }
 
-extension Notification.Name { static let healChanged = Notification.Name("rawlight.healChanged") }
+extension Notification.Name {
+    static let healChanged = Notification.Name("rawlight.healChanged")   // the panel changed something: the overlay refreshes
+    static let healEdited = Notification.Name("rawlight.healEdited")     // the overlay changed something: the panel refreshes
+}
 
 struct HealPanel: View {
     let engine: Engine
@@ -177,14 +187,15 @@ struct HealPanel: View {
                     VStack(spacing: 8) {
                         HStack { Text("Eye \(e.id + 1)").font(.subheadline.weight(.semibold)); Spacer()
                             Button { Task { await run("redeye.delete", ["index": e.id]) } } label: { Image(systemName: "trash").foregroundStyle(.secondary).frame(width: 44, height: 44) } }
-                        slider("Pupil size", e.pupil, 0...100, "%.0f", 1) { v in eyeUpdate(e.id, v, nil) }
-                        slider("Darken", e.darken, 0...100, "%.0f", 1) { v in eyeUpdate(e.id, nil, v) }
+                        eyeSlider("Pupil size", e.pupil, e.id) { v in setEye(e.id, pupil: v) }
+                        eyeSlider("Darken", e.darken, e.id) { v in setEye(e.id, darken: v) }
                     }.padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
         }
         .task(id: photoID) { await refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .healEdited)) { _ in Task { let s = await engine.healState(); spots = s.spots; eyes = s.eyes; active = s.active } }
     }
 
     private func slider(_ label: String, _ value: Double, _ range: ClosedRange<Double>, _ fmt: String, _ scale: Double, _ set: @escaping (Double) -> Void) -> some View {
@@ -221,17 +232,25 @@ struct HealPanel: View {
             if let v = p["feather"] as? Double { spots[i].feather = v }
             if let v = p["opacity"] as? Double { spots[i].opacity = v }
         }
-        throttle.run { var q = p; q["index"] = active; _ = try? await engine.execute("spot.update", q); onChange() }
+        // no index: the engine edits the selected spot
+        throttle.run { _ = try? await engine.execute("spot.update", p); onChange() }
     }
-    private func eyeUpdate(_ index: Int, _ pupil: Double?, _ darken: Double?) {
-        // redeye has no update command: re-create at the same place with the new values
-        guard let e = eyes.first(where: { $0.id == index }) else { return }
-        let pu = pupil ?? e.pupil, da = darken ?? e.darken
-        if let i = eyes.firstIndex(where: { $0.id == index }) { eyes[i].pupil = pu; eyes[i].darken = da }
-        throttle.run {
-            _ = try? await engine.execute("redeye.delete", ["index": index])
-            _ = try? await engine.execute("redeye.add", ["center": [e.center.x, e.center.y], "rx": e.rx, "ry": e.rx, "pet": e.pet, "pupilSize": pu, "darken": da])
-            await refresh(); onChange()
+    /// Red-eye has no update command, so an eye is rebuilt once when the slider is released (not on every tick).
+    private func eyeSlider(_ label: String, _ value: Double, _ index: Int, _ set: @escaping (Double) -> Void) -> some View {
+        VStack(spacing: 2) {
+            HStack { Text(label).font(.subheadline); Spacer(); Text(String(format: "%.0f", value)).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary) }
+            Slider(value: Binding(get: { value }, set: { set($0) }), in: 0...100, onEditingChanged: { editing in if !editing { Task { await commitEye(index) } } }).tint(Theme.accent)
         }
+    }
+    private func setEye(_ index: Int, pupil: Double? = nil, darken: Double? = nil) {
+        guard let i = eyes.firstIndex(where: { $0.id == index }) else { return }
+        if let pupil { eyes[i].pupil = pupil }
+        if let darken { eyes[i].darken = darken }
+    }
+    private func commitEye(_ index: Int) async {
+        guard let e = eyes.first(where: { $0.id == index }) else { return }
+        _ = try? await engine.execute("redeye.delete", ["index": index])
+        _ = try? await engine.execute("redeye.add", ["center": [e.center.x, e.center.y], "rx": e.rx, "ry": e.rx, "pet": e.pet, "pupilSize": e.pupil, "darken": e.darken])
+        await refresh(); onChange()
     }
 }

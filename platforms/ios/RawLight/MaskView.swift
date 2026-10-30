@@ -58,6 +58,7 @@ struct MaskOverlay: View {
         self.onUndo = onUndo; self.onRedo = onRedo; self.onPencilTap = onPencilTap; self.onChange = onChange
     }
 
+    private var long: Double { max(imageRect.width, imageRect.height) }
     private func toScreen(_ p: CGPoint) -> CGPoint { CGPoint(x: imageRect.minX + p.x * imageRect.width, y: imageRect.minY + p.y * imageRect.height) }
     private func toNorm(_ p: CGPoint) -> CGPoint {
         CGPoint(x: min(max((p.x - imageRect.minX) / imageRect.width, 0), 1), y: min(max((p.y - imageRect.minY) / imageRect.height, 0), 1))
@@ -76,7 +77,7 @@ struct MaskOverlay: View {
                     for p in [a, b] { ctx.fill(Path(ellipseIn: CGRect(x: p.x - 11, y: p.y - 11, width: 22, height: 22)), with: .color(.white)) }
                 case "radial":
                     let c = toScreen(pt(m.shape["center"]))
-                    let rx = num(m.shape["rx"], 0.3) * imageRect.width, ry = num(m.shape["ry"], 0.25) * imageRect.height
+                    let rx = num(m.shape["rx"], 0.3) * long, ry = num(m.shape["ry"], 0.25) * long
                     let ang = num(m.shape["angle"], 0) * .pi / 180
                     var e = Path(ellipseIn: CGRect(x: -rx, y: -ry, width: rx * 2, height: ry * 2))
                     e = e.applying(CGAffineTransform(rotationAngle: ang).concatenating(CGAffineTransform(translationX: c.x, y: c.y)))
@@ -88,7 +89,7 @@ struct MaskOverlay: View {
                     break
                 }
                 if m.kind == "brush", samples.count > 1 {
-                    let base = brushSize * max(imageRect.width, imageRect.height)
+                    let base = 2 * brushSize * max(imageRect.width, imageRect.height)   // size is a radius
                     for i in 1..<samples.count {
                         var seg = Path(); seg.move(to: samples[i - 1].point); seg.addLine(to: samples[i].point)
                         ctx.stroke(seg, with: .color(erase ? .black.opacity(0.5) : Theme.accent.opacity(0.55)),
@@ -102,6 +103,7 @@ struct MaskOverlay: View {
                              onBegan: { samples = [$0] },
                              onMoved: { samples.append(contentsOf: $0) },
                              onEnded: { finishBrush(m) },
+                             onCancelled: { samples = [] },
                              onUndo: onUndo, onRedo: onRedo, onPencilTap: onPencilTap)
             } else if let m = mask {
                 Color.clear.contentShape(Rectangle())
@@ -142,7 +144,7 @@ struct MaskOverlay: View {
         case "radial":
             if drag == nil {
                 let c = toScreen(pt(m.shape["center"]))
-                let rx = num(m.shape["rx"], 0.3) * imageRect.width, ry = num(m.shape["ry"], 0.25) * imageRect.height, ang = num(m.shape["angle"], 0) * .pi / 180
+                let rx = num(m.shape["rx"], 0.3) * long, ry = num(m.shape["ry"], 0.25) * long, ang = num(m.shape["angle"], 0) * .pi / 180
                 let h0 = radialHandle(c, rx, ry, ang, side: 0), h1 = radialHandle(c, rx, ry, ang, side: 1)
                 let d0 = hypot(h0.x - v.startLocation.x, h0.y - v.startLocation.y), d1 = hypot(h1.x - v.startLocation.x, h1.y - v.startLocation.y)
                 drag = min(d0, d1) < 50 ? (d0 < d1 ? "rx" : "ry") : "move"
@@ -155,7 +157,7 @@ struct MaskOverlay: View {
                 // distance from the centre along the ellipse axis the handle controls
                 let dx = (p.x - c.x) * imageRect.width, dy = (p.y - c.y) * imageRect.height
                 let along = d == "rx" ? abs(dx * cos(ang) + dy * sin(ang)) : abs(-dx * sin(ang) + dy * cos(ang))
-                shape[d] = max(along / (d == "rx" ? imageRect.width : imageRect.height), 0.02)
+                shape[d] = max(along / long, 0.02)
             }
             shape["center"] = shape["center"] ?? ["x": c.x, "y": c.y]
             update(m, shape)
@@ -189,7 +191,10 @@ struct MaskOverlay: View {
             i += 8
         }
         Task {
+            // one undo step for the whole stroke
+            _ = try? await engine.execute("develop.beginInteraction", ["label": "Brush"])
             for piece in pieces { _ = try? await engine.execute("mask.brushStroke", ["id": id, "points": piece.pts, "size": piece.size, "erase": er]) }
+            _ = try? await engine.execute("develop.endInteraction")
             onChange()
         }
     }
@@ -239,7 +244,7 @@ struct MaskPanel: View {
                 Menu {
                     Section("Local") {
                         Button("Linear gradient") { add(["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }
-                        Button("Radial gradient") { add(["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 0.5]) }
+                        Button("Radial gradient") { add(["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }
                         Button("Brush") { add(["kind": "brush"]) }
                         Button("Luminance range") { add(["kind": "luminanceRange"]) }
                         Button("Colour range") { add(["kind": "colorRange"]) }
@@ -260,7 +265,7 @@ struct MaskPanel: View {
                         ForEach([("add", "Add"), ("subtract", "Subtract"), ("intersect", "Intersect")], id: \.0) { op in
                             Menu(op.1) {
                                 Button("Linear gradient") { addComponent(op.0, ["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }
-                                Button("Radial gradient") { addComponent(op.0, ["kind": "radial", "center": [0.5, 0.5], "rx": 0.2, "ry": 0.2, "angle": 0, "feather": 0.5]) }
+                                Button("Radial gradient") { addComponent(op.0, ["kind": "radial", "center": [0.5, 0.5], "rx": 0.2, "ry": 0.2, "angle": 0, "feather": 50]) }
                                 Button("Brush") { addComponent(op.0, ["kind": "brush"]) }
                                 Button("Luminance range") { addComponent(op.0, ["kind": "luminanceRange"]) }
                                 Button("Colour range") { addComponent(op.0, ["kind": "colorRange"]) }
@@ -313,7 +318,7 @@ struct MaskPanel: View {
                 ForEach(adjustments, id: \.key) { a in
                     let c = Control(id: a.key, label: a.label, section: "mask", min: a.min, max: a.max, def: 0, value: m.adjust[a.key] ?? 0,
                                     step: a.step, decimals: a.dec, track: a.key == "temp" ? .temp : a.key == "tint" ? .tint : .centered)
-                    ColorSlider(control: c, onChange: { v in set(a.key, v) }, onEnd: {}, reset: { set(a.key, 0) })
+                    ColorSlider(control: c, onChange: { v in set(a.key, v) }, onEnd: { _ in }, reset: { set(a.key, 0) })
                 }
             }
         }

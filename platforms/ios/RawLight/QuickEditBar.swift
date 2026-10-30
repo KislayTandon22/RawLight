@@ -22,9 +22,6 @@ struct QuickEditBar: View {
                     if bw { pill("Auto B&W", "slider.horizontal.below.rectangle") { await run("develop.autoBwMix") } }
                     pill("HDR", "sun.max") { await run("develop.hdr") }
                     Menu {
-                        ForEach(wbModes, id: \.0) { m in Button { Task { await run("develop.wb", ["mode": m.0]) } } label: { if wb == m.0 { Label(m.1, systemImage: "checkmark") } else { Text(m.1) } } }
-                    } label: { chip("White balance", "thermometer.medium") }
-                    Menu {
                         Button("Paste from previous") { Task { await run("develop.pastePrevious") } }
                         Button("Match exposure") { Task { await run("develop.matchExposure") } }
                     } label: { chip("More", "ellipsis") }

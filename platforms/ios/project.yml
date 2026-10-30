@@ -62,3 +62,24 @@ targets:
           mkdir -p "${PROJECT_DIR}/build"
           (cd "$ROOT" && cargo build -p lightcraft-bridge --target "$T" --release)
           cp "$ROOT/target/$T/release/liblightcraft_bridge.a" "${PROJECT_DIR}/build/liblightcraft_bridge.a"
+  RawLightUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: RawLight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kislay.rawlight.uitests
+        DEVELOPMENT_TEAM: ZW9T4T3ZDY
+        TEST_TARGET_NAME: RawLight
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  RawLight:
+    build:
+      targets:
+        RawLight: all
+    test:
+      targets:
+        - RawLightUITests

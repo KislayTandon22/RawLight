@@ -96,7 +96,7 @@ final class Engine: @unchecked Sendable {
         // 1. build the job on the command queue (cheap)
         let job: OpaquePointer? = await withCheckedContinuation { cont in
             queue.async {
-                if let m = maskOverlay, kind != .thumb, kind != .uncropped {
+                if let m = maskOverlay, kind != .thumb {
                     cont.resume(returning: rl_job_new_mask_overlay(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue, UInt32(m)))
                 } else {
                     cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue))
@@ -120,6 +120,25 @@ final class Engine: @unchecked Sendable {
         // 3. return it so the session keeps the decoded source and thumbnail
         queue.async { rl_job_finish(self.session, job) }
         return result
+    }
+
+    /// A preview of `id` as if the look `preset` were applied; the photo's edits are not touched.
+    func renderPreset(_ id: UInt64, preset: String, amount: Int = 100, edge: Int = 240) async -> UIImage? {
+        let job: OpaquePointer? = await withCheckedContinuation { cont in
+            queue.async { cont.resume(returning: rl_job_new_preset(self.session, id, UInt32(edge), UInt32(edge), preset, UInt32(amount))) }
+        }
+        guard let job else { return nil }
+        let img: UIImage? = await withCheckedContinuation { cont in
+            thumbQueue.addOperation {
+                var w: UInt32 = 0, h: UInt32 = 0, len: UInt = 0
+                guard let p = rl_job_run(job, &w, &h, &len, nil) else { return cont.resume(returning: nil) }
+                let data = Data(bytes: p, count: Int(len))
+                rl_buffer_free(p, len)
+                cont.resume(returning: Self.image(rgba: data, width: Int(w), height: Int(h)))
+            }
+        }
+        queue.async { rl_job_finish(self.session, job) }
+        return img
     }
 
     private static func image(rgba: Data, width: Int, height: Int) -> UIImage? {
@@ -166,11 +185,14 @@ final class Engine: @unchecked Sendable {
                          flag: d["flag"] as? String ?? "none", edited: !(d["edited"] is NSNull) && d["edited"] != nil)
     }
 
-    /// Point curve of one channel from `develop.get`.
+    /// Point curve of one channel from `develop.get` (the engine stores points as `{x, y}`), end points included.
     func curve(_ channel: String) async -> [CGPoint] {
         guard let d = try? await execute("develop.get") as? [String: Any],
-              let c = (d["curve"] as? [String: Any])?[channel] as? [[NSNumber]] else { return [] }
-        return c.compactMap { $0.count == 2 ? CGPoint(x: $0[0].doubleValue, y: $0[1].doubleValue) : nil }
+              let c = (d["curve"] as? [String: Any])?[channel] as? [[String: Any]] else { return [] }
+        return c.compactMap { p in
+            guard let x = (p["x"] as? NSNumber)?.doubleValue, let y = (p["y"] as? NSNumber)?.doubleValue else { return nil }
+            return CGPoint(x: x, y: y)
+        }
     }
 }
 
@@ -209,6 +231,24 @@ extension Engine {
         busy = true
         Task {
             while let w = pending { pending = nil; await w() }
+            busy = false
+        }
+    }
+}
+
+
+/// Runs engine writes strictly in the order they were issued, so an interaction's begin, its edits and its
+/// end can never be reordered. Consecutive live edits collapse into the newest one; steps never do.
+@MainActor final class OrderedQueue {
+    enum Kind { case live, step }
+    private var ops: [(Kind, () async -> Void)] = []
+    private var busy = false
+    func add(_ kind: Kind, _ work: @escaping () async -> Void) {
+        if kind == .live, let last = ops.last, last.0 == .live { ops[ops.count - 1] = (kind, work) } else { ops.append((kind, work)) }
+        guard !busy else { return }
+        busy = true
+        Task {
+            while !ops.isEmpty { let (_, w) = ops.removeFirst(); await w() }
             busy = false
         }
     }

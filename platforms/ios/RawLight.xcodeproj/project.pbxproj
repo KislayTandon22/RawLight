@@ -17,11 +17,14 @@
 		3E4BA2F8EFFB2BCEED3CA64B /* HEICConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */; };
 		6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152DED07BD4B22C089F27083 /* AppModel.swift */; };
 		719E99E7BC32BEFA09BD09FA /* ColorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AD332855C4111D6E843DC0 /* ColorSlider.swift */; };
+		7AF2CA2A6C9AA67A01162E3A /* DetailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B338610ED569669C9221C258 /* DetailPanel.swift */; };
 		7C236BFC68456C18831CD622 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773D225FB743BF09F0786159 /* Engine.swift */; };
+		8B2927AE423EEFADDD9F3FE2 /* RawLightUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */; };
 		8B8622516CB2417190BC36AD /* CropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C0A5D018031985E8DCD890 /* CropView.swift */; };
 		8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */; };
 		90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62BE11F6376A150B4F7F7A /* RootView.swift */; };
 		9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 793784F1303D4D3381740077 /* Assets.xcassets */; };
+		B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277B51930533BFDC91FF340B /* SliderTouch.swift */; };
 		C5735DAD209D36E1619418F5 /* PencilCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */; };
 		D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */; };
 		DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8560E8AC4BC45B87ADF19267 /* Theme.swift */; };
@@ -30,14 +33,26 @@
 		EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0017D18B656BA9A6950B0FC0 /* LooksView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		2020EAD83EEE6199E0CD75C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A4CF4E53CF131E029F01B120 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5269EFC45AA7061E25975341;
+			remoteInfo = RawLight;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		0017D18B656BA9A6950B0FC0 /* LooksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LooksView.swift; sourceTree = "<group>"; };
 		152DED07BD4B22C089F27083 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		188A661C8121EDA12A429069 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		1C6546856C997D6BFE63CC7F /* HistogramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistogramView.swift; sourceTree = "<group>"; };
 		1CFD216B06873D6E60DE5790 /* HealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealView.swift; sourceTree = "<group>"; };
+		277B51930533BFDC91FF340B /* SliderTouch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SliderTouch.swift; sourceTree = "<group>"; };
 		48C0A5D018031985E8DCD890 /* CropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropView.swift; sourceTree = "<group>"; };
 		59AD332855C4111D6E843DC0 /* ColorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorSlider.swift; sourceTree = "<group>"; };
+		5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawLightUITests.swift; sourceTree = "<group>"; };
 		5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HEICConverter.swift; sourceTree = "<group>"; };
 		746AE174CA016CAF647AD43E /* MaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskView.swift; sourceTree = "<group>"; };
 		773D225FB743BF09F0786159 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
@@ -48,6 +63,7 @@
 		A475B1E68A117F49D9DE92CD /* CurveEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurveEditor.swift; sourceTree = "<group>"; };
 		AE62BE11F6376A150B4F7F7A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B29C664979A0E27C1CBD431C /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
+		B338610ED569669C9221C258 /* DetailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPanel.swift; sourceTree = "<group>"; };
 		B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEditBar.swift; sourceTree = "<group>"; };
 		BECC7399FD2375C6CDB41443 /* ColourPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourPanel.swift; sourceTree = "<group>"; };
 		C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PencilCanvas.swift; sourceTree = "<group>"; };
@@ -55,13 +71,23 @@
 		D206DF744DE049ABECA7CEDA /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionSegmenter.swift; sourceTree = "<group>"; };
 		D934F9B15D5972DDA61E86D6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E01EA1FF9FF1F0A27F722E35 /* RawLightUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawLightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		5BB5B15BA41707CD142F483C /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		70B8AA074D518F7D4FF2B953 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				CB1E46860D465391ACFBEF6F /* RawLight.app */,
+				E01EA1FF9FF1F0A27F722E35 /* RawLightUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -75,6 +101,7 @@
 				BECC7399FD2375C6CDB41443 /* ColourPanel.swift */,
 				48C0A5D018031985E8DCD890 /* CropView.swift */,
 				A475B1E68A117F49D9DE92CD /* CurveEditor.swift */,
+				B338610ED569669C9221C258 /* DetailPanel.swift */,
 				188A661C8121EDA12A429069 /* EditorView.swift */,
 				773D225FB743BF09F0786159 /* Engine.swift */,
 				B29C664979A0E27C1CBD431C /* ExportSheet.swift */,
@@ -90,6 +117,7 @@
 				A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */,
 				9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */,
 				AE62BE11F6376A150B4F7F7A /* RootView.swift */,
+				277B51930533BFDC91FF340B /* SliderTouch.swift */,
 				8560E8AC4BC45B87ADF19267 /* Theme.swift */,
 				D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */,
 			);
@@ -100,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				81B94FAE8AB787C7D0D3440A /* RawLight */,
+				5BB5B15BA41707CD142F483C /* UITests */,
 				70B8AA074D518F7D4FF2B953 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -126,6 +155,24 @@
 			productReference = CB1E46860D465391ACFBEF6F /* RawLight.app */;
 			productType = "com.apple.product-type.application";
 		};
+		9FF8ABB82225530105BFB205 /* RawLightUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A4A57A2A8532ABAC69B0CF1 /* Build configuration list for PBXNativeTarget "RawLightUITests" */;
+			buildPhases = (
+				52BB72004C275F18E8735BFE /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				263D584A3E0FE7F00F7C6302 /* PBXTargetDependency */,
+			);
+			name = RawLightUITests;
+			packageProductDependencies = (
+			);
+			productName = RawLightUITests;
+			productReference = E01EA1FF9FF1F0A27F722E35 /* RawLightUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -138,6 +185,10 @@
 					5269EFC45AA7061E25975341 = {
 						DevelopmentTeam = ZW9T4T3ZDY;
 						ProvisioningStyle = Automatic;
+					};
+					9FF8ABB82225530105BFB205 = {
+						DevelopmentTeam = ZW9T4T3ZDY;
+						TestTargetID = 5269EFC45AA7061E25975341;
 					};
 				};
 			};
@@ -156,6 +207,7 @@
 			projectRoot = "";
 			targets = (
 				5269EFC45AA7061E25975341 /* RawLight */,
+				9FF8ABB82225530105BFB205 /* RawLightUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -195,6 +247,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		52BB72004C275F18E8735BFE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B2927AE423EEFADDD9F3FE2 /* RawLightUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		96D3FAC69EA1865E403FCF92 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -204,6 +264,7 @@
 				36664514EEF83F8D61D1B199 /* ColourPanel.swift in Sources */,
 				8B8622516CB2417190BC36AD /* CropView.swift in Sources */,
 				326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */,
+				7AF2CA2A6C9AA67A01162E3A /* DetailPanel.swift in Sources */,
 				17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */,
 				7C236BFC68456C18831CD622 /* Engine.swift in Sources */,
 				02C29839F2ECC7641EBFC5F6 /* ExportSheet.swift in Sources */,
@@ -217,6 +278,7 @@
 				8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */,
 				D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */,
 				90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */,
+				B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */,
 				DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */,
 				28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */,
 			);
@@ -224,7 +286,33 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		263D584A3E0FE7F00F7C6302 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5269EFC45AA7061E25975341 /* RawLight */;
+			targetProxy = 2020EAD83EEE6199E0CD75C9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		0291EF3A27F7D7C97126EBC4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.rawlight.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RawLight;
+			};
+			name = Debug;
+		};
 		0B16B5513FF7A87BF8A7EE36 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -436,9 +524,36 @@
 			};
 			name = Release;
 		};
+		E5F128E335F3B382F3CDA354 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.rawlight.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RawLight;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		7A4A57A2A8532ABAC69B0CF1 /* Build configuration list for PBXNativeTarget "RawLightUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0291EF3A27F7D7C97126EBC4 /* Debug */,
+				E5F128E335F3B382F3CDA354 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		8D527A821FE150C10D05F301 /* Build configuration list for PBXProject "RawLight" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

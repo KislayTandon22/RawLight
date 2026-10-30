@@ -154,6 +154,7 @@ struct LibraryView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(selected ? Theme.accent : .clear, lineWidth: 3))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("tile")
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in if !model.selecting { model.selecting = true; model.selection = [id] } })
         .task { await model.thumbnail(id); await model.loadInfo(id) }
     }

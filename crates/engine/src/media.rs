@@ -1160,6 +1160,17 @@ impl crate::Session {
         self.build_job(id, max_w, max_h, before, apply_crop, None)
     }
 
+    /// A job that renders `id` as if preset `preset_id` (at `amount`, 0..2) were applied, without
+    /// touching the photo's edits: a "preview of this look" for pickers. `None` when the photo or the
+    /// preset does not exist.
+    pub fn preview_job_with_preset(&mut self, id: PhotoId, max_w: usize, max_h: usize, preset_id: &str, amount: f64) -> Option<RenderJob> {
+        let preset = self.presets.iter().find(|p| p.id == preset_id)?.clone();
+        let mut job = self.render_job(id, max_w, max_h, false, true)?;
+        job.settings = Arc::new(preset.apply(&job.settings, amount));
+        job.key ^= Hasher128::new().str(preset_id).finish().0 as u64 ^ amount.to_bits();
+        Some(job)
+    }
+
     /// A grid/filmstrip thumbnail job: the long edge is rounded up to one of [`THUMB_SIZES`]
     /// (≥ `long_edge`) and the result comes from / goes to the thumbnail cache (memory + disk).
     pub fn thumb_job(&mut self, id: PhotoId, long_edge: usize) -> Option<RenderJob> {
