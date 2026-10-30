@@ -6,6 +6,16 @@ through `rl_execute(id, json)`. Status: **E** engine ready, **U** UI built, **-*
 
 Legend for devices: **iPad** = landscape/portrait boards, **iPhone** = compact sheet variant (V4).
 
+## 0. Libraries (multiple catalogs)
+| Feature | Engine | UI |
+|---|---|---|
+| Create a new library (name, location: app storage, iCloud Drive or any Files folder) | `Session::open_library(dir, seed_demo)` via `rl_open_library` | - (app opens one default library) |
+| Open / switch between libraries, recent list, rename, delete, duplicate | open_library + per-library folder | - |
+| Library picker at launch and in Settings; first-run "Create library / Open library / Try demo" | n/a | - |
+| Per-library settings (originals copy vs reference, cache budget, XMP sidecars) | `library.preferences`, `library.xmpPreferences` | - |
+
+Needs one bridge addition: close/replace the active session so switching libraries releases the previous one.
+
 ## 1. Library
 | Feature | Engine commands | UI status |
 |---|---|---|
@@ -44,7 +54,9 @@ All sliders come from `develop.controls` (13 sections, ~180 controls).
 | Profile + Auto / B&W / HDR | `develop.profile`, `develop.auto`, `develop.treatment`, `develop.hdr`, `profiles.*`, `profile.*` | - (profile row) |
 | Light | exposure, contrast, highlights, shadows, whites, blacks … | U (generic sliders) |
 | Colour | WB (temp/tint, picker), vibrance, saturation, HSL mixer, B&W mix, colour grading, calibration | U (temp/tint/vibrance only) |
-| Tone curve (point + parametric, presets) | `curve.*` | - |
+| **Tone curve graph**: interactive point curve (RGB + R/G/B channels), parametric curve with region sliders, drag points, add/remove, presets, targeted-adjustment tool (drag on photo) | `curve.*`, `develop.curve`, `develop.targeted` | - |
+| **Colour graphs**: HSL/Colour mixer (hue, saturation, luminance per 8 colours, with colour-swatch tracks), B&W mix, Colour grading wheels (shadows, midtones, highlights, global + blending/balance), Calibration, Point colour picker | `develop.set` (`mixer.*`, `bw.*`, `grading.*`, `calibration.*`), `pointColor.*`, `develop.wbPick`, `develop.autoBwMix` | - (only flat sliders for a few) |
+| **Histogram and graphs**: live RGB/luminance histogram with clipping triangles, waveform option, HDR histogram, RGB readout under finger | render `Rendered.histogram` (add `rl_histogram` to bridge) | - |
 | Effects | texture, clarity, dehaze, vignette, grain | U |
 | Detail | sharpening, noise reduction, AI Denoise (`denoise.*`, model download) | U (sliders), - (AI denoise) |
 | Optics | lens profile, distortion, CA, defringe | U |
@@ -99,9 +111,9 @@ Engine: `library.preferences`, `library.xmpPreferences`, `app.gpu`, `app.memoryB
 - Clean-room: no Adobe assets; attribution in `assets/ATTRIBUTION.md`.
 
 ## 13. Build order (each step verified on the iPad against its V4 board)
-1. **Foundation**: persistent library (done), import (done), Metal canvas with zoom/pan, async render with proxy then full-res, error toasts.
+1. **Foundation**: persistent library (done), import (done), library create/open/switch, Metal canvas with zoom/pan, async render with proxy then full-res, error toasts.
 2. **Library** to V4: filters, sort, select mode, ratings/flags, albums, source sidebar, empty/import states.
-3. **Photo view + Edit** to V4: top bar, filmstrip, histogram, profile row, capsule sliders, tone curve, undo/redo, before/after.
+3. **Photo view + Edit** to V4: top bar, filmstrip, histogram, profile row, capsule sliders, **tone curve graph, colour mixer / grading graphs**, undo/redo, before/after.
 4. **Export** (full sheet) so work can leave the app.
 5. **Crop + geometry**.
 6. **Masking** (Vision + brush + gradients + range).
