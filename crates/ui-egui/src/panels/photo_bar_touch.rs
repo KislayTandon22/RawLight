@@ -113,7 +113,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) -> bool {
     let extra = if phone { GROUP_GAP + PHONE_PILL_H } else { 0.0 };
     let outer = Margin {
         left: 8 + insets[2].round() as i8,
-        right: 8 + insets[3].round() as i8,
+        right: right_inset(app, ui).saturating_add(insets[3].round() as i8),
         top: safe_top.round() as i8 + 8,
         bottom: 8,
     };
@@ -134,6 +134,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) -> bool {
             });
             ui.add_space(GROUP_GAP);
             ui.horizontal_centered(|ui| {
+                // the spacer and the pill are two items: without this, item spacing would push the
+                // pill right of centre by that gap
+                ui.spacing_mut().item_spacing.x = 0.0;
                 ui.add_space(((ui.available_width() - PHONE_PILL_W) / 2.0).max(0.0));
                 Frame::NONE.fill(soft(PILL_ALPHA)).corner_radius(CornerRadius::same((PHONE_PILL_H / 2.0).round() as u8)).show(ui, |ui| {
                     let (rect, _) = ui.allocate_exact_size(vec2(PHONE_PILL_W, PHONE_PILL_H), Sense::hover());
