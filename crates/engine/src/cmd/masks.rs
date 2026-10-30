@@ -66,14 +66,22 @@ fn seg_param(p: &Value) -> Option<lightcraft_develop::SegMask> {
 }
 
 /// Where the host has its own segmenter (Apple Vision on iPad), a Subject mask is its foreground
-/// selection instead of the built-in estimate; when it finds nothing the estimate stays.
-fn platform_subject(s: &mut Session, shape: &mut MaskShape) {
-    if !matches!(shape, MaskShape::Subject) || crate::segment::platform::platform_segmenter().is_none() {
-        return;
+/// selection and a Background mask is that same selection inverted; when it finds nothing that
+/// is an error (a guess would select an arbitrary blob). Returns `true` when a Background was
+/// turned into an inverted selection (the caller sets the invert flag).
+fn platform_subject(s: &mut Session, shape: &mut MaskShape) -> Result<bool> {
+    let background = matches!(shape, MaskShape::Background);
+    if !(background || matches!(shape, MaskShape::Subject)) || crate::segment::platform::platform_segmenter().is_none() {
+        return Ok(false);
     }
-    let Some(id) = s.active() else { return };
-    if let Ok(Some(seg)) = s.segment_subject(id) {
-        *shape = MaskShape::Object { hint: Vec::new(), exclude: Vec::new(), seg: Some(seg), detail: Vec::new(), edge: 0.0 };
+    let Some(id) = s.active() else { return Ok(false) };
+    match s.segment_subject(id) {
+        Ok(Some(seg)) => {
+            *shape = MaskShape::Object { hint: Vec::new(), exclude: Vec::new(), seg: Some(seg), detail: Vec::new(), edge: 0.0 };
+            Ok(background)
+        }
+        Ok(None) => Err(ai_err("no subject found in this photo; try Object and tap what you want")),
+        Err(_) => Ok(false),
     }
 }
 
@@ -182,7 +190,7 @@ pub fn specs() -> Vec<CommandSpec> {
             |s, p| {
                 let kind = str_param(p, "kind").unwrap_or("radial").to_string();
                 let mut shape = shape_from(&kind, p, "mask.add")?;
-                platform_subject(s, &mut shape);
+                let inverted = platform_subject(s, &mut shape)?;
                 let later = resolve_ai(s, &mut shape, "mask.add")?;
                 let name = str_param(p, "name").map(str::to_string);
                 if let Later::Text(text) = &later {
@@ -196,6 +204,7 @@ pub fn specs() -> Vec<CommandSpec> {
                         id: next,
                         name: name.unwrap_or_else(|| format!("Mask {next}")),
                         components: vec![MaskComponent { name: None, op: MaskOp::Add, invert: false, shape }],
+                        invert: inverted,
                         ..Default::default()
                     });
                     *active = Some(next);
@@ -222,7 +231,7 @@ pub fn specs() -> Vec<CommandSpec> {
                     return Err(bad("mask.addComponent", format!("no mask {mid}")));
                 }
                 let mut shape = shape_from(&kind, p, "mask.addComponent")?;
-                platform_subject(s, &mut shape);
+                let inverted = platform_subject(s, &mut shape)?;
                 let later = resolve_ai(s, &mut shape, "mask.addComponent")?;
                 if let Later::Text(text) = &later {
                     let op = p.get("op").and_then(Value::as_str).unwrap_or("add");
@@ -232,7 +241,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 let mut comp = 0;
                 let out = masks_edit(s, "mask.addComponent", "Edit Mask", |masks, _| {
                     let i = find(masks, mid, "mask.addComponent")?;
-                    masks[i].components.push(MaskComponent { name: None, op, invert: bool_or(p, "invert", false), shape });
+                    masks[i].components.push(MaskComponent { name: None, op, invert: bool_or(p, "invert", false) != inverted, shape });
                     comp = masks[i].components.len() - 1;
                     Ok(())
                 })?;

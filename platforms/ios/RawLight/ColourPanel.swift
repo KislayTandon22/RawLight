@@ -32,13 +32,11 @@ struct ColourPanel: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(["Basic", "Mixer", "Grading", "More"], id: \.self) { t in
-                        Button { withAnimation(.snappy) { tab = t } } label: {
-                            Text(t).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38)
-                                .fieldBackground(tab == t, in: Capsule()).foregroundStyle(tab == t ? .white : .primary)
-                        }
+            HStack(spacing: 6) {
+                ForEach(["Basic", "Mixer", "Grading", "More"], id: \.self) { t in
+                    Button { withAnimation(.snappy) { tab = t } } label: {
+                        Text(t).font(.subheadline.weight(.medium)).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity).frame(height: 38)
+                            .fieldBackground(tab == t, in: Capsule()).foregroundStyle(tab == t ? .white : .primary)
                     }
                 }
             }
@@ -66,23 +64,24 @@ struct ColourPanel: View {
     }
 
     private var mixer: some View {
-        VStack(spacing: 8) {
-            hint("Pick a colour, then shift its hue, saturation and brightness.")
-            Button { picking.toggle() } label: {
-                Label(picking ? "Tap a colour in the photo…" : "Pick colour from photo", systemImage: "eyedropper")
-                    .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44)
-                    .fieldBackground(picking, in: Capsule()).foregroundStyle(picking ? .white : .primary)
-            }
-            HStack(spacing: 10) {
+        VStack(spacing: 6) {
+            HStack(spacing: 0) {
+                Button { picking.toggle() } label: {
+                    Image(systemName: "eyedropper").font(.system(size: 15, weight: .medium))
+                        .frame(width: 34, height: 34).fieldBackground(picking, in: Circle()).foregroundStyle(picking ? .white : .primary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityLabel("Pick colour from photo")
                 ForEach(bands, id: \.id) { b in
                     Button { withAnimation(.snappy) { band = b.id } } label: {
-                        Circle().fill(b.color).frame(width: 30, height: 30)
+                        Circle().fill(b.color).frame(width: 28, height: 28)
                             .overlay(Circle().stroke(.white, lineWidth: band == b.id ? 3 : 0))
-                            .frame(width: 38, height: 44)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .accessibilityLabel(b.name)
                 }
             }
+            if picking { hint("Tap a colour in the photo") }
             slider("mixer.\(band).hue", label: "Hue"); slider("mixer.\(band).sat", label: "Saturation"); slider("mixer.\(band).lum", label: "Luminance")
             Button("Reset \(bands.first { $0.id == band }?.name ?? "colour")") {
                 for k in ["hue", "sat", "lum"] { if let c = ctl("mixer.\(band).\(k)") { set(c.id, c.def, true) } }
@@ -92,7 +91,6 @@ struct ColourPanel: View {
 
     private var grading: some View {
         VStack(spacing: 8) {
-            hint("Tint the shadows, midtones and highlights separately.")
             Picker("Range", selection: $range) { ForEach(ranges, id: \.0) { Text($0.1).tag($0.0) } }.pickerStyle(.segmented)
             slider("grading.\(range).hue", label: "Hue"); slider("grading.\(range).sat", label: "Saturation"); slider("grading.\(range).lum", label: "Luminance")
             if range == "global" { EmptyView() } else { slider("grading.blending"); slider("grading.balance") }

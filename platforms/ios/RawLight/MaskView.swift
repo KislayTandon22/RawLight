@@ -271,14 +271,14 @@ struct MaskPanel: View {
                                 Button("Colour range") { addComponent(op.0, ["kind": "colorRange"]) }
                             }
                         }
-                    } label: { Text("Combine").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).fieldBackground(in: Capsule()) }
+                    } label: { Text("Combine").font(.subheadline.weight(.medium)).lineLimit(1).fixedSize().padding(.horizontal, 14).frame(height: 44).fieldBackground(in: Capsule()) }
                 }
                 if current != nil {
                     Button { showMask.toggle(); onChange() } label: {
                         Image(systemName: showMask ? "eye.fill" : "eye.slash").frame(width: 44, height: 44)
                     }.fieldBackground(showMask, in: Circle()).buttonStyle(.plain).accessibilityLabel("Show mask overlay")
                 }
-                if !masks.isEmpty { Button("Delete all", role: .destructive) { run("mask.deleteAll") }.font(.footnote) }
+                if !masks.isEmpty { Button("Delete all", role: .destructive) { run("mask.deleteAll") }.font(.footnote).lineLimit(1).fixedSize() }
             }
             if objectPick {
                 HStack(spacing: 8) {
@@ -351,10 +351,11 @@ struct MaskPanel: View {
     private func select(_ id: Int) { Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
     private func add(_ p: [String: Any]) {
         Task {
-            do { _ = try await engine.execute("mask.add", p); message = nil; showMask = true } catch { message = error.localizedDescription }
+            var failed = false
+            do { _ = try await engine.execute("mask.add", p); message = nil; showMask = true } catch { message = error.localizedDescription; failed = true }
             await reload(); onChange()
             // AI masks are found in the background; refresh until the region shows up
-            if ["subject", "sky", "background", "object"].contains(p["kind"] as? String ?? "") {
+            if !failed, ["subject", "sky", "background", "object"].contains(p["kind"] as? String ?? "") {
                 message = "Finding the \(p["kind"] as? String ?? "") on this device…"
                 for _ in 0..<10 { try? await Task.sleep(for: .milliseconds(700)); onChange() }
                 message = nil

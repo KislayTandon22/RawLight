@@ -229,19 +229,8 @@ pub fn shape_alpha(shape: &MaskShape, frame: &Frame, w: usize, h: usize, img: &R
             }
         }
         MaskShape::Sky => {
-            // Classical sky heuristic until the segmenter lands (M12): bright, smooth, blue-ish or
-            // unsaturated, and connected to the top of the frame.
-            let m = frame.out_to_norm(w, h);
-            for (i, v) in out.data.iter_mut().enumerate() {
-                let (x, y) = (i % w, i / w);
-                let n = m.apply(Point::new(x as f64 + 0.5, y as f64 + 0.5));
-                let c = img.data[i].map(|v| v * gain);
-                let l = log_l.data[i] + ev;
-                let blue = (c[2] - c[0]).max(0.0) / (c[2] + 1e-4);
-                let top = 1.0 - smooth(0.25, 0.7, n.y as f32);
-                *v = top * smooth(-3.5, -1.0, l) * (0.4 + 0.6 * smooth(0.0, 0.3, blue).max(smooth(0.0, 1.5, l)));
-            }
-            smooth_plane(&mut out, 0.01 * frame_px(frame, w));
+            out = sky_alpha(img, log_l, gain, ev, w, h);
+            smooth_plane(&mut out, 0.006 * frame_px(frame, w));
         }
         MaskShape::Object { seg, detail, edge, .. } | MaskShape::Prompt { seg, detail, edge, .. } if seg.is_some() || !detail.is_empty() => {
             // Edge: below 0 a steeper transition (up to 8× the logits), above 0 feathered (up to
@@ -277,6 +266,86 @@ pub fn shape_alpha(shape: &MaskShape, frame: &Frame, w: usize, h: usize, img: &R
         MaskShape::DepthRange { .. } | MaskShape::Landscape { .. } => {}
     }
     out
+}
+
+/// Sky by region growing: seeds are smooth, bright cells along the top of the frame; the region
+/// spreads to neighbours whose brightness and blue-ness change gently (so a sunset gradient is
+/// followed) and stops at edges, e.g. the horizon or a roof line. Clouds are allowed through where
+/// they stay bright and unsaturated. Runs on a reduced grid, then scales back up.
+fn sky_alpha(img: &Rgb32f, log_l: &Plane, gain: f32, ev: f32, w: usize, h: usize) -> Plane {
+    use lightcraft_raster::resample::{resize, Filter};
+    let scale = (320.0 / w.max(h).max(1) as f32).min(1.0);
+    let gw = ((w as f32 * scale).round() as usize).max(2);
+    let gh = ((h as f32 * scale).round() as usize).max(2);
+    let small = resize(img, gw, gh, Filter::Box);
+    let ls = resize(log_l, gw, gh, Filter::Box);
+    let lum: Vec<f32> = ls.data.iter().map(|v| v + ev).collect();
+    let chroma: Vec<f32> = small
+        .data
+        .iter()
+        .map(|c| {
+            let c = c.map(|v| v * gain);
+            (c[2] - c[0]) / (c[0] + c[1] + c[2] + 1e-4)
+        })
+        .collect();
+    let at = |x: isize, y: isize| lum.get(y.clamp(0, gh as isize - 1) as usize * gw + x.clamp(0, gw as isize - 1) as usize).copied().unwrap_or(0.0);
+    let grad: Vec<f32> = (0..gw * gh)
+        .map(|i| {
+            let (x, y) = ((i % gw) as isize, (i / gw) as isize);
+            (at(x + 1, y) - at(x - 1, y)).abs().max((at(x, y + 1) - at(x, y - 1)).abs())
+        })
+        .collect();
+    const EDGE: f32 = 0.25;
+    let seed_rows = ((gh as f32 * 0.06).ceil() as usize).max(1);
+    let mut seeds = Vec::new();
+    for i in 0..gw * seed_rows {
+        if grad.get(i).is_some_and(|g| *g < EDGE) && lum.get(i).is_some_and(|l| *l > -3.0) {
+            seeds.push(i);
+        }
+    }
+    let mut out = Plane::new(gw, gh);
+    if seeds.is_empty() {
+        return resize(&out, w, h, Filter::Bilinear);
+    }
+    let n = seeds.len() as f32;
+    let mean_l = seeds.iter().filter_map(|&i| lum.get(i)).sum::<f32>() / n;
+    let mean_c = seeds.iter().filter_map(|&i| chroma.get(i)).sum::<f32>() / n;
+    let mut seen = vec![false; gw * gh];
+    let mut queue = std::collections::VecDeque::new();
+    for i in seeds {
+        if let Some(s) = seen.get_mut(i) {
+            *s = true;
+            queue.push_back(i);
+        }
+    }
+    while let Some(p) = queue.pop_front() {
+        if let Some(v) = out.data.get_mut(p) {
+            *v = 1.0;
+        }
+        let (x, y) = (p % gw, p / gw);
+        let (pl, pc) = (lum.get(p).copied().unwrap_or(0.0), chroma.get(p).copied().unwrap_or(0.0));
+        let mut next = [None; 4];
+        if x > 0 { next[0] = Some(p - 1); }
+        if x + 1 < gw { next[1] = Some(p + 1); }
+        if y > 0 { next[2] = Some(p - gw); }
+        if y + 1 < gh { next[3] = Some(p + gw); }
+        for q in next.into_iter().flatten() {
+            let (Some(&ql), Some(&qc), Some(&qg), Some(&sn)) = (lum.get(q), chroma.get(q), grad.get(q), seen.get(q)) else { continue };
+            if sn {
+                continue;
+            }
+            let (dl, dc) = ((ql - pl).abs(), (qc - pc).abs());
+            let gradient = qg < EDGE * 2.0 && dl < 0.3 && dc < 0.12 && (qc - mean_c).abs() < 0.3 && ql > mean_l - 2.5;
+            let cloud = ql > mean_l - 0.4 && dc < 0.15 && dl < 0.45;
+            if gradient || cloud {
+                if let Some(s) = seen.get_mut(q) {
+                    *s = true;
+                }
+                queue.push_back(q);
+            }
+        }
+    }
+    resize(&out, w, h, Filter::Bilinear)
 }
 
 /// A decoded [`SegMask`]: its logits and the normalized rectangle they cover.
@@ -964,13 +1033,12 @@ mod tests {
         Image::from_fn(w / 2, h / 2, |x, _| if (x as f64 + 0.5) < frac * (w / 2) as f64 { 255 } else { 0 })
     }
 
-    /// The Sky mask follows the source's sky matte where it has one (here: the bottom-left of a
-    /// uniformly bright blue photo, where the heuristic sees no sky, and not its top right, where
-    /// it does), through user orientation, at any output size; without one it keeps the heuristic.
+    /// The Sky mask follows the source's sky matte where it has one (here: the bottom-left, dark
+    /// ground where region growing finds no sky, and not the top right, where it does), through user orientation, at any output size; without one it keeps the heuristic.
     #[test]
     fn sky_uses_the_sources_matte() {
         let (w, h) = (200, 100);
-        let img = Rgb32f::filled(w, h, [0.5, 0.7, 1.4]);
+        let img = Rgb32f::from_fn(w, h, |_, y| if y < h / 2 { [0.5, 0.7, 1.4] } else { [0.02, 0.02, 0.02] });
         let l = img.map(crate::local::log_lum);
         let mut mattes = Mattes::default();
         mattes.push(MatteKind::Sky, left_matte(w, h, 0.5));

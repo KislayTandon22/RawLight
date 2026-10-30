@@ -373,6 +373,7 @@ struct EditorView: View {
             catch { NSLog("[RawLight] EXPORT error %@", error.localizedDescription) }
         }
         if let g = env["RAWLIGHT_GROUP"] { group = g }
+        if let t = env["RAWLIGHT_COLOURTAB"] { colourTab = t }
         if env["RAWLIGHT_CURVE"] != nil { showCurve = true; _ = try? await model.engine.execute("develop.curve", ["channel": "master", "points": [[0, 0], [0.3, 0.2], [1, 1]]]); curvePoints = await model.engine.curve("master") }
         if let k = env["RAWLIGHT_AIMASK"] {
             do { let r = try await model.engine.execute("mask.add", ["kind": k]); NSLog("[RawLight] AIMASK %@ ok %@", k, "\(r)"); _ = try? await model.engine.execute("mask.adjust", ["values": ["exposure": -3.0]]); try? await Task.sleep(for: .seconds(4)) }

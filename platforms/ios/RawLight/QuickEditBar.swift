@@ -15,34 +15,28 @@ struct QuickEditBar: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    pill("Auto", "wand.and.stars") { await run("develop.auto") }
-                    pill("B&W", "circle.lefthalf.filled", on: bw) { await run("develop.treatment", ["bw": !bw]) }
-                    if bw { pill("Auto B&W", "slider.horizontal.below.rectangle") { await run("develop.autoBwMix") } }
-                    pill("HDR", "sun.max") { await run("develop.hdr") }
-                    Menu {
-                        Button("Paste from previous") { Task { await run("develop.pastePrevious") } }
-                        Button("Match exposure") { Task { await run("develop.matchExposure") } }
-                    } label: { chip("More", "ellipsis") }
-                }
-            }
-            HStack {
-                Text("Profile").font(.subheadline).foregroundStyle(.secondary)
-                Spacer()
+            HStack(spacing: 6) {
+                pill("Auto", "wand.and.stars") { await run("develop.auto") }
+                pill("B&W", "circle.lefthalf.filled", on: bw) { await run("develop.treatment", ["bw": !bw]) }
+                pill("HDR", "sun.max") { await run("develop.hdr") }
                 Menu {
-                    ForEach(Dictionary(grouping: profiles, by: \.group).keys.sorted(), id: \.self) { g in
-                        Section(g) {
-                            ForEach(profiles.filter { $0.group == g }, id: \.id) { p in
-                                Button { Task { await run("develop.profile", ["id": p.id]) } } label: {
-                                    if p.id == profileID { Label(p.name, systemImage: "checkmark") } else { Text(p.name) }
+                    if bw { Button("Auto B&W mix") { Task { await run("develop.autoBwMix") } } }
+                    Menu("Profile: \(profiles.first { $0.id == profileID }?.name ?? "Color")") {
+                        ForEach(Dictionary(grouping: profiles, by: \.group).keys.sorted(), id: \.self) { g in
+                            Section(g) {
+                                ForEach(profiles.filter { $0.group == g }, id: \.id) { p in
+                                    Button { Task { await run("develop.profile", ["id": p.id]) } } label: {
+                                        if p.id == profileID { Label(p.name, systemImage: "checkmark") } else { Text(p.name) }
+                                    }
                                 }
                             }
                         }
                     }
+                    Button("Paste from previous") { Task { await run("develop.pastePrevious") } }
+                    Button("Match exposure") { Task { await run("develop.matchExposure") } }
                 } label: {
-                    HStack(spacing: 4) { Text(profiles.first { $0.id == profileID }?.name ?? "Color"); Image(systemName: "chevron.up.chevron.down").font(.caption) }
-                        .font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40).fieldBackground(in: Capsule())
+                    Image(systemName: "ellipsis").font(.subheadline.weight(.semibold)).frame(width: 44, height: 40)
+                        .fieldBackground(in: Capsule()).foregroundStyle(.primary)
                 }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
@@ -52,7 +46,7 @@ struct QuickEditBar: View {
 
     private func pill(_ title: String, _ symbol: String, on: Bool = false, _ action: @escaping () async -> Void) -> some View {
         Button { Task { await action() } } label: {
-            Label(title, systemImage: symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
+            Label(title, systemImage: symbol).font(.subheadline.weight(.medium)).lineLimit(1).frame(maxWidth: .infinity).frame(height: 40)
                 .fieldBackground(on, in: Capsule()).foregroundStyle(on ? .white : .primary)
         }
     }
