@@ -3099,6 +3099,7 @@ dependencies = [
 name = "lightcraft-bridge"
 version = "0.8.0"
 dependencies = [
+ "lightcraft-catalog",
  "lightcraft-engine",
  "serde_json",
 ]

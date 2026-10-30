@@ -63,6 +63,50 @@ pub unsafe extern "C" fn rl_execute(session: *mut RlSession, id: *const c_char, 
     }
 }
 
+/// JSON array of the photo ids in the current view, in display order.
+///
+/// # Safety
+/// `session` must come from [`rl_session_new`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_visible_ids(session: *mut RlSession) -> *mut c_char {
+    let Some(session) = (unsafe { session.as_mut() }) else {
+        return reply(json!({"error": "null session"}));
+    };
+    let ids: Vec<u64> = session.0.visible_cloned().iter().map(|i| i.0).collect();
+    reply(json!({"ok": ids}))
+}
+
+/// Render photo `id` with its current edits, fitted inside `max_w` x `max_h`, as tightly packed
+/// RGBA8 (sRGB). Returns null on failure. Release with [`rl_buffer_free`].
+///
+/// # Safety
+/// `session` from [`rl_session_new`]; `out_w`, `out_h`, `out_len` valid for writes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_render(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, out_w: *mut u32, out_h: *mut u32, out_len: *mut usize) -> *mut u8 {
+    let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
+    let r = catch_unwind(AssertUnwindSafe(|| session.0.render_now(lightcraft_catalog::PhotoId(id), max_w as usize, max_h as usize)));
+    let Ok(Ok(rendered)) = r else { return std::ptr::null_mut() };
+    let img = rendered.image;
+    let mut bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
+    bytes.shrink_to_fit();
+    unsafe {
+        *out_w = img.width as u32;
+        *out_h = img.height as u32;
+        *out_len = bytes.len();
+    }
+    let mut bytes = std::mem::ManuallyDrop::new(bytes);
+    bytes.as_mut_ptr()
+}
+
+/// # Safety
+/// `ptr`/`len` exactly as returned by [`rl_render`], freed once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_buffer_free(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() {
+        drop(unsafe { Vec::from_raw_parts(ptr, len, len) });
+    }
+}
+
 /// # Safety
 /// `session` must come from [`rl_session_new`] and not be used afterwards.
 #[unsafe(no_mangle)]
@@ -98,6 +142,20 @@ mod tests {
         let s = rl_session_new(1);
         assert!(call(s, "no.such.command", "{}").get("error").is_some());
         assert!(call(s, "develop.set", "{not json").get("error").is_some());
+        unsafe { rl_session_free(s) };
+    }
+
+    #[test]
+    fn demo_photo_renders() {
+        let s = rl_session_new(1);
+        let ids = unsafe { rl_visible_ids(s) };
+        let v: Value = serde_json::from_str(unsafe { CStr::from_ptr(ids) }.to_str().unwrap()).unwrap();
+        unsafe { rl_string_free(ids) };
+        let id = v["ok"][0].as_u64().expect("demo has photos");
+        let (mut w, mut h, mut len) = (0u32, 0u32, 0usize);
+        let p = unsafe { rl_render(s, id, 256, 256, &mut w, &mut h, &mut len) };
+        assert!(!p.is_null() && w > 0 && h > 0 && len == (w * h * 4) as usize);
+        unsafe { rl_buffer_free(p, len) };
         unsafe { rl_session_free(s) };
     }
 

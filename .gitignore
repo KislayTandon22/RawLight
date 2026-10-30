@@ -21,3 +21,4 @@ ios/build/
 platforms/ios/DerivedData*/
 platforms/ios/build/
 platforms/ios/target/
+.build.log

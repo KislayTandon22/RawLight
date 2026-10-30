@@ -7,18 +7,25 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188A661C8121EDA12A429069 /* EditorView.swift */; };
+		2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D206DF744DE049ABECA7CEDA /* LibraryView.swift */; };
+		6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152DED07BD4B22C089F27083 /* AppModel.swift */; };
+		7C236BFC68456C18831CD622 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773D225FB743BF09F0786159 /* Engine.swift */; };
+		90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62BE11F6376A150B4F7F7A /* RootView.swift */; };
 		9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 793784F1303D4D3381740077 /* Assets.xcassets */; };
-		CBC46CA57561F64908AC608E /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CED3E14FB29C78F69F8691 /* main.swift */; };
-		D4D22B6733587176A1F4E1D7 /* PhotoPickerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 324A4F47B9EA6A132DF42A5D /* PhotoPickerBridge.swift */; };
-		DC4F2294474AB5EE12A87B62 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10D5ADD48B346B847862C362 /* SceneDelegate.swift */; };
+		D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		10D5ADD48B346B847862C362 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		324A4F47B9EA6A132DF42A5D /* PhotoPickerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerBridge.swift; sourceTree = "<group>"; };
+		152DED07BD4B22C089F27083 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		188A661C8121EDA12A429069 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		773D225FB743BF09F0786159 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
 		793784F1303D4D3381740077 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		C9CED3E14FB29C78F69F8691 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawLightApp.swift; sourceTree = "<group>"; };
+		A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RawLight-Bridging-Header.h"; sourceTree = "<group>"; };
+		AE62BE11F6376A150B4F7F7A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		CB1E46860D465391ACFBEF6F /* RawLight.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RawLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D206DF744DE049ABECA7CEDA /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		D934F9B15D5972DDA61E86D6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -34,11 +41,15 @@
 		81B94FAE8AB787C7D0D3440A /* RawLight */ = {
 			isa = PBXGroup;
 			children = (
+				152DED07BD4B22C089F27083 /* AppModel.swift */,
 				793784F1303D4D3381740077 /* Assets.xcassets */,
+				188A661C8121EDA12A429069 /* EditorView.swift */,
+				773D225FB743BF09F0786159 /* Engine.swift */,
 				D934F9B15D5972DDA61E86D6 /* Info.plist */,
-				C9CED3E14FB29C78F69F8691 /* main.swift */,
-				324A4F47B9EA6A132DF42A5D /* PhotoPickerBridge.swift */,
-				10D5ADD48B346B847862C362 /* SceneDelegate.swift */,
+				D206DF744DE049ABECA7CEDA /* LibraryView.swift */,
+				A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */,
+				9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */,
+				AE62BE11F6376A150B4F7F7A /* RootView.swift */,
 			);
 			path = RawLight;
 			sourceTree = "<group>";
@@ -58,7 +69,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9E751D3A36F3F3A694D95B3F /* Build configuration list for PBXNativeTarget "RawLight" */;
 			buildPhases = (
-				C00D3A2F4FCCB8B2C736A75E /* Build Rust static library */,
+				FB5993480D18CB0A66CDFDA7 /* Build Rust bridge */,
 				96D3FAC69EA1865E403FCF92 /* Sources */,
 				A165AEFA3D9CD5543AEA65C4 /* Resources */,
 			);
@@ -119,8 +130,9 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		C00D3A2F4FCCB8B2C736A75E /* Build Rust static library */ = {
+		FB5993480D18CB0A66CDFDA7 /* Build Rust bridge */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -128,14 +140,15 @@
 			);
 			inputPaths = (
 			);
-			name = "Build Rust static library";
+			name = "Build Rust bridge";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(PROJECT_DIR)/build/liblightcraft_bridge.a",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nexport PATH=\"/Users/kislayranjanneetandon/.rustup/toolchains/stable-aarch64-apple-darwin/bin:/opt/homebrew/bin:$PATH\"\nif which rustup >/dev/null 2>&1; then\n  TOOLCHAIN_BIN=\"$(dirname \"$(rustup which cargo)\")\"\n  export PATH=\"$TOOLCHAIN_BIN:$PATH\"\nfi\nif [[ \"$SDK_NAME\" == *simulator* ]]; then\n  export RUST_TARGET=aarch64-apple-ios-sim\nelse\n  export RUST_TARGET=aarch64-apple-ios\nfi\nmkdir -p \"${PROJECT_DIR}/build\"\ncargo build --manifest-path \"${PROJECT_DIR}/lightcraft-ios/Cargo.toml\" --target \"$RUST_TARGET\" --release\nif [ -f \"${PROJECT_DIR}/target/${RUST_TARGET}/release/liblightcraft_ios.a\" ]; then\n  cp \"${PROJECT_DIR}/target/${RUST_TARGET}/release/liblightcraft_ios.a\" \"${PROJECT_DIR}/build/liblightcraft_ios.a\"\nelif [ -f \"${PROJECT_DIR}/lightcraft-ios/../../target/${RUST_TARGET}/release/liblightcraft_ios.a\" ]; then\n  cp \"${PROJECT_DIR}/lightcraft-ios/../../target/${RUST_TARGET}/release/liblightcraft_ios.a\" \"${PROJECT_DIR}/build/liblightcraft_ios.a\"\nfi\n";
+			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:$PATH\"\nif [[ \"$SDK_NAME\" == *simulator* ]]; then T=aarch64-apple-ios-sim; else T=aarch64-apple-ios; fi\nROOT=\"${PROJECT_DIR}/../..\"\nmkdir -p \"${PROJECT_DIR}/build\"\n(cd \"$ROOT\" && cargo build -p lightcraft-bridge --target \"$T\" --release)\ncp \"$ROOT/target/$T/release/liblightcraft_bridge.a\" \"${PROJECT_DIR}/build/liblightcraft_bridge.a\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -144,9 +157,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D4D22B6733587176A1F4E1D7 /* PhotoPickerBridge.swift in Sources */,
-				DC4F2294474AB5EE12A87B62 /* SceneDelegate.swift in Sources */,
-				CBC46CA57561F64908AC608E /* main.swift in Sources */,
+				6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */,
+				17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */,
+				7C236BFC68456C18831CD622 /* Engine.swift in Sources */,
+				2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */,
+				D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */,
+				90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,7 +215,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -262,7 +278,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -283,9 +299,14 @@
 				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_PREVIEWS = NO;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../../crates/bridge/include";
 				INFOPLIST_FILE = RawLight/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				INFOPLIST_KEY_CFBundleDisplayName = RawLight;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -297,31 +318,16 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
-					"$(PROJECT_DIR)/build/liblightcraft_ios.a",
+					"$(PROJECT_DIR)/build/liblightcraft_bridge.a",
 					"-framework",
 					Metal,
 					"-framework",
-					UIKit,
-					"-framework",
-					Foundation,
-					"-framework",
-					QuartzCore,
-					"-framework",
-					CoreGraphics,
-					"-framework",
-					CoreFoundation,
-					"-framework",
-					ImageIO,
-					"-framework",
-					Photos,
-					"-framework",
-					PhotosUI,
-					"-framework",
-					UniformTypeIdentifiers,
+					Accelerate,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.rawlight;
 				PRODUCT_NAME = RawLight;
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "RawLight/RawLight-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -336,9 +342,14 @@
 				DEVELOPMENT_TEAM = ZW9T4T3ZDY;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_PREVIEWS = NO;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../../crates/bridge/include";
 				INFOPLIST_FILE = RawLight/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				INFOPLIST_KEY_CFBundleDisplayName = RawLight;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -350,32 +361,17 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
-					"$(PROJECT_DIR)/build/liblightcraft_ios.a",
+					"$(PROJECT_DIR)/build/liblightcraft_bridge.a",
 					"-framework",
 					Metal,
 					"-framework",
-					UIKit,
-					"-framework",
-					Foundation,
-					"-framework",
-					QuartzCore,
-					"-framework",
-					CoreGraphics,
-					"-framework",
-					CoreFoundation,
-					"-framework",
-					ImageIO,
-					"-framework",
-					Photos,
-					"-framework",
-					PhotosUI,
-					"-framework",
-					UniformTypeIdentifiers,
+					Accelerate,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.rawlight;
 				PRODUCT_NAME = RawLight;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_BRIDGING_HEADER = "RawLight/RawLight-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
