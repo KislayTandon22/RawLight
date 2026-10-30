@@ -11,6 +11,7 @@ pub mod detail;
 mod detail_touch;
 pub mod dialogs;
 pub mod edit;
+mod edit_touch;
 pub mod empty_library;
 pub mod export_touch;
 pub mod faces;
