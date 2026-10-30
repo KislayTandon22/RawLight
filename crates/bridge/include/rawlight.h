@@ -8,6 +8,8 @@ typedef struct RlSession RlSession;
 
 /* demo != 0 loads the generated demo library. NULL on failure. */
 RlSession *rl_session_new(int demo);
+/* Opens/creates a persistent library; seed_demo fills a new one with demo photos. */
+char *rl_open_library(RlSession *session, const char *dir, int seed_demo);
 /* Reply is {"ok": ...} or {"error": "..."}; free it with rl_string_free. */
 char *rl_execute(RlSession *session, const char *id, const char *params_json);
 /* {"ok":[ids]} of the photos in view, display order; free with rl_string_free. */

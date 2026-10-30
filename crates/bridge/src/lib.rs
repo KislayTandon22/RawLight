@@ -32,6 +32,25 @@ pub extern "C" fn rl_session_new(demo: i32) -> *mut RlSession {
     }
 }
 
+/// Open (or create) the persistent library in `dir`; `seed_demo` fills a new one with the demo photos.
+/// Returns `{"ok":...}` / `{"error":...}`; free with [`rl_string_free`].
+///
+/// # Safety
+/// `session` from [`rl_session_new`]; `dir` NUL-terminated.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_open_library(session: *mut RlSession, dir: *const c_char, seed_demo: i32) -> *mut c_char {
+    let Some(session) = (unsafe { session.as_mut() }) else { return reply(json!({"error": "null session"})) };
+    if dir.is_null() {
+        return reply(json!({"error": "null dir"}));
+    }
+    let Ok(dir) = unsafe { CStr::from_ptr(dir) }.to_str() else { return reply(json!({"error": "dir is not UTF-8"})) };
+    match catch_unwind(AssertUnwindSafe(|| session.0.open_library(dir, seed_demo != 0).map(|_| ()))) {
+        Ok(Ok(())) => reply(json!({"ok": true})),
+        Ok(Err(e)) => reply(json!({"error": e.to_string()})),
+        Err(_) => reply(json!({"error": "internal panic"})),
+    }
+}
+
 /// Run command `id` with JSON `params` (null or empty means no params).
 ///
 /// # Safety
