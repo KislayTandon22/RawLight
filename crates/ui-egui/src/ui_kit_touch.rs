@@ -42,11 +42,13 @@ const TRACK_ALPHA: u8 = 26;
 const TINT_ALPHA: u8 = 46;
 /// Red at 18%: a destructive capsule's fill.
 const DESTRUCTIVE_ALPHA: u8 = 46;
+/// White at 8%: a disabled pill's fill.
+pub const CAPSULE_DISABLED_ALPHA: u8 = 20;
 
 /// The inset of a segment's oval inside its slot, so the selected oval floats in the track.
 const SEGMENT_INSET: f32 = 4.0;
 /// A capsule's side padding around its label.
-const CAPSULE_PAD: f32 = 20.0;
+pub const CAPSULE_PAD: f32 = 20.0;
 
 /// A menu card's corner radius and its inset from the card's edge.
 const CARD_RADIUS: u8 = 28;
@@ -83,7 +85,7 @@ fn full_width(ui: &Ui) -> f32 {
 
 /// A neutral translucent fill: white at `white` percent on the dark glass look, the matching black
 /// in a light theme, where a white fill would disappear.
-fn soft(ui: &Ui, white: u8) -> Color32 {
+pub fn soft(ui: &Ui, white: u8) -> Color32 {
     if ui.visuals().dark_mode { Color32::from_white_alpha(white) } else { Color32::from_black_alpha(white.saturating_mul(2) / 3) }
 }
 
@@ -278,6 +280,44 @@ pub fn icon_segment(ui: &mut Ui, icons: &[Icon], selected: &mut usize) -> Respon
     if let Some(i) = picked.filter(|i| *i != *selected) {
         *selected = i;
         resp.mark_changed();
+    }
+    resp
+}
+
+/// An iOS switch: a 51×31 track with a 27-point knob that rests 2 points from the slot's edge,
+/// over a 44-point hit area so it can be missed by no finger. Tapping (or a screen reader's
+/// name) toggles `on`; the knob slides across with the context's standard animation. Announces
+/// "On" / "Off" with the selected state.
+pub fn switch(ui: &mut Ui, on: &mut bool) -> Response {
+    if !touch(ui.ctx()) {
+        return inert(ui);
+    }
+    let t = Tokens::get(ui.ctx());
+    const KNOB: f32 = 27.0;
+    const TRACK_W: f32 = 51.0;
+    const TRACK_H: f32 = 31.0;
+    let (hit, mut resp) = ui.allocate_exact_size(vec2(CONTROL_H.max(TRACK_W), CONTROL_H), Sense::click());
+    let track = Rect::from_center_size(hit.center(), vec2(TRACK_W, TRACK_H));
+    crate::widgets::announce_selected(&resp, crate::i18n::tr(if *on { "On" } else { "Off" }), *on);
+    if let Some(p) = resp.interact_pointer_pos()
+        && (resp.clicked() || resp.drag_stopped())
+        && track.contains(p)
+    {
+        *on = !*on;
+        resp.mark_changed();
+    }
+    if ui.is_rect_visible(hit) {
+        let p = ui.painter();
+        let knob_x = ui.ctx().animate_value_with_time(
+            resp.id.with("knob"),
+            if *on { track.right() - KNOB / 2.0 - 2.0 } else { track.left() + KNOB / 2.0 + 2.0 },
+            0.16,
+        );
+        let fill = if *on { t.accent } else { soft(ui, TRACK_ALPHA) };
+        p.rect_filled(track, TRACK_H / 2.0, fill);
+        let centre = pos2(knob_x, track.center().y);
+        p.circle_filled(centre + vec2(0.0, 1.0), KNOB / 2.0, Color32::from_black_alpha(45));
+        p.circle_filled(centre, KNOB / 2.0, Color32::WHITE);
     }
     resp
 }

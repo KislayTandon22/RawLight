@@ -294,14 +294,21 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
         Dialog::ViewOptions => "View Options",
     }
     .to_string();
-    let frame = egui::Frame::window(&ctx.global_style()).inner_margin(egui::Margin::symmetric(16, 12));
+    let touch_glass = crate::theme::touch_ui(ctx) && crate::glass::active(ctx);
+    let frame = if touch_glass {
+        crate::dialogs_touch::frame(ctx)
+    } else {
+        egui::Frame::window(&ctx.global_style()).inner_margin(egui::Margin::symmetric(16, 12))
+    };
     // The import review can be resized (its photo grid takes the room); it keeps a window id of its
     // own so the size it is given doesn't carry over to the other dialogs. Its content scrolls
     // rather than growing the window when the options below the grid get taller (e.g. Copy).
     // iPad: the Import review fits the screen like the other dialogs (its options scroll, the title and the button row stay
     // put) instead of a desktop-sized window whose Import button ends up below the screen edge.
     // iPad: a dialog's sliders and rows stretch to the width the window offers, so the widest ones get a calm reading width
-    let touch_cap = if crate::theme::touch_ui(ctx) {
+    let touch_cap = if touch_glass {
+        Some(560.0_f32)
+    } else if crate::theme::touch_ui(ctx) {
         match dlg {
             Dialog::Export { .. } => Some(660.0_f32),
             Dialog::Cull { .. } | Dialog::CreatePreset { .. } => Some(520.0),
@@ -324,9 +331,14 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
     // row stays where it is (centred like the others, the row jumped with each tab's height)
     let settings = matches!(dlg, Dialog::Settings { .. });
     let top = (screen.height() * 0.08).clamp(DIALOG_SCREEN_MARGIN, 96.0);
-    let body_max =
-        if settings { screen.height() - top - DIALOG_SCREEN_MARGIN - chrome } else { screen.height() - 2.0 * DIALOG_SCREEN_MARGIN - chrome }
-            .max(DIALOG_MIN_BODY);
+    let body_max = if touch_glass {
+        if crate::theme::phone(ctx) { screen.height() - 80.0 - chrome } else { screen.height() - 48.0 - chrome }
+    } else if settings {
+        screen.height() - top - DIALOG_SCREEN_MARGIN - chrome
+    } else {
+        screen.height() - 2.0 * DIALOG_SCREEN_MARGIN - chrome
+    }
+    .max(DIALOG_MIN_BODY);
     let widest_id = window_id.with("widest");
     let widest = if settings { ctx.data(|d| d.get_temp::<f32>(widest_id)).unwrap_or(0.0).min(screen.width() * 0.9) } else { 0.0 };
     let mut content_w = 0.0f32;
@@ -341,21 +353,42 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
         .vscroll(import)
         .resize(|r| if import { r.default_height(crate::import::DIALOG_SIZE[1]) } else { r })
         .frame(frame)
-        .anchor(if settings { egui::Align2::CENTER_TOP } else { egui::Align2::CENTER_CENTER }, [0.0, if settings { top } else { 0.0 }])
-        .min_width(widest)
-        .max_width(touch_cap.map_or(f32::INFINITY, |c| c.min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN)))
-        .default_width(match dlg {
-            _ if touch_cap.is_some() => touch_cap.unwrap_or(380.0),
-            Dialog::Import { .. } if import_fits => crate::import::DIALOG_SIZE[0].min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN),
-            Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
-            Dialog::SmartRules { .. } => 680.0,
-            Dialog::AllMetadata { .. } => 620.0,
-            Dialog::Print => 1100.0,
-            Dialog::FaceModel { .. } => 460.0,
-            Dialog::LightroomCatalog { .. } => 440.0,
-            Dialog::LightroomDestination { .. } => 480.0,
-            Dialog::ManageEffects { .. } => 560.0,
-            _ => 380.0,
+        .anchor(
+            if crate::theme::phone(ctx) && touch_glass {
+                egui::Align2::CENTER_BOTTOM
+            } else if settings && !touch_glass {
+                egui::Align2::CENTER_TOP
+            } else {
+                egui::Align2::CENTER_CENTER
+            },
+            [0.0, if crate::theme::phone(ctx) && touch_glass { -8.0 } else if settings && !touch_glass { top } else { 0.0 }],
+        )
+        .min_width(if touch_glass {
+            if crate::theme::phone(ctx) { screen.width() - 16.0 } else { 380.0_f32.min(screen.width() - 32.0) }
+        } else {
+            widest
+        })
+        .max_width(if touch_glass {
+            if crate::theme::phone(ctx) { screen.width() - 16.0 } else { 560.0_f32.min(screen.width() - 32.0) }
+        } else {
+            touch_cap.map_or(f32::INFINITY, |c| c.min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN))
+        })
+        .default_width(if touch_glass {
+            if crate::theme::phone(ctx) { screen.width() - 16.0 } else { 560.0_f32.min(screen.width() - 32.0) }
+        } else {
+            match dlg {
+                _ if touch_cap.is_some() => touch_cap.unwrap_or(380.0),
+                Dialog::Import { .. } if import_fits => crate::import::DIALOG_SIZE[0].min(screen.width() - 2.0 * DIALOG_SCREEN_MARGIN),
+                Dialog::Import { .. } => crate::import::DIALOG_SIZE[0],
+                Dialog::SmartRules { .. } => 680.0,
+                Dialog::AllMetadata { .. } => 620.0,
+                Dialog::Print => 1100.0,
+                Dialog::FaceModel { .. } => 460.0,
+                Dialog::LightroomCatalog { .. } => 440.0,
+                Dialog::LightroomDestination { .. } => 480.0,
+                Dialog::ManageEffects { .. } => 560.0,
+                _ => 380.0,
+            }
         })
         .show(ctx, |ui| {
             // Disabled, not skipped: the dialog keeps its layout and state, but a raw event in the
@@ -366,7 +399,14 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                 ui.disable();
             }
             ui.spacing_mut().item_spacing.y = 8.0;
-            if crate::theme::touch_ui(ctx) {
+            if touch_glass {
+                if crate::dialogs_touch::title_row(ui, &title) {
+                    close = true;
+                }
+                ui.add_space(4.0);
+                ui.spacing_mut().slider_width = 240.0;
+                ui.spacing_mut().scroll = egui::style::ScrollStyle::floating();
+            } else if crate::theme::touch_ui(ctx) {
                 ui.vertical_centered(|ui| ui.label(egui::RichText::new(crate::i18n::tr(&title)).font(t.semibold(17.0)).color(t.text)));
                 ui.add_space(4.0);
                 // egui's own sliders (Assisted Culling…) get a rail a thumb can travel along
@@ -399,7 +439,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     let r = ui.add(egui::Slider::new(reject_below, 0.0..=80.0).text(crate::i18n::tr("Reject below focus")).step_by(1.0));
                     crate::widgets::register(ui, "field:cullReject", r.rect);
                     ui.label(egui::RichText::new(crate::i18n::tr(if *reject_below > 0.0 { "Blurry photos below the score are flagged as rejects." } else { "0: nothing is rejected." })).color(t.text_dim));
-                    let r = ui.checkbox(pick_best, crate::i18n::tr("Pick the sharpest photo of each burst"));
+                    let r = toggle(ui, pick_best, "Pick the sharpest photo of each burst");
                     crate::widgets::register(ui, "check:cullPick", r.rect);
                     ui.add_space(6.0);
                     // the sliders drag over the usual range; their value fields take whatever
@@ -735,7 +775,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                             egui::RichText::new(crate::i18n::tr_format!("“{to}” is already a person. Combining them makes one person; Undo separates them again.", to = to.trim()))
                                 .color(t.caution),
                         );
-                        let r = ui.checkbox(merge, crate::i18n::tr("Combine with the existing person"));
+                        let r = toggle(ui, merge, "Combine with the existing person");
                         crate::widgets::register(ui, "check:personMerge", r.rect);
                     }
                 }
@@ -784,7 +824,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     // as in Lightroom, the option is only there when something is selected
                     if !*folder && !app.session.selected().is_empty() {
                         ui.add_space(6.0);
-                        let r = ui.checkbox(include_selected, crate::i18n::tr("Include selected photos"));
+                        let r = toggle(ui, include_selected, "Include selected photos");
                         crate::widgets::register(ui, "check:albumIncludeSelected", r.rect);
                     }
                 }
@@ -821,10 +861,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                         });
                         crate::widgets::name_combo(&c.response, crate::i18n::tr("Paper"));
                     });
-                    ui.checkbox(&mut options.landscape, crate::i18n::tr("Landscape"));
+                    toggle(ui, &mut options.landscape, "Landscape");
                     field(ui, "Columns", |ui| { ui.add(egui::DragValue::new(&mut options.columns).range(1..=8)); });
                     field(ui, "Rows", |ui| { ui.add(egui::DragValue::new(&mut options.rows).range(1..=10)); });
-                    ui.checkbox(&mut options.captions, crate::i18n::tr("Filename captions"));
+                    toggle(ui, &mut options.captions, "Filename captions");
                     ui.label(crate::i18n::tr("150 dpi · sRGB · current edits · fit without cropping"));
                     ui.label(crate::i18n::tr("Choose a PDF destination after confirming. Print the PDF from your viewer."));
                 }
@@ -897,7 +937,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     }
                     if matches!(opts.format, F::Jpeg | F::Tiff | F::Avif | F::Png | F::Jxl) {
                         let tip = crate::i18n::tr("Photos edited in HDR: JPEG with an HDR gain map (looks right everywhere, brighter highlights on HDR displays), AVIF as 10-bit, PNG and JPEG XL as 16-bit Rec. 2020 PQ; TIFF needs 32-bit float");
-                        ui.checkbox(&mut opts.hdr, crate::i18n::tr("HDR output")).on_hover_text(tip);
+                        toggle(ui, &mut opts.hdr, "HDR output").on_hover_text(tip);
                         if opts.hdr && !opts.hdr_output() {
                             ui.label(egui::RichText::new(crate::i18n::tr("HDR TIFF needs 32-bit float.")).color(t.text_dim));
                         }
@@ -943,7 +983,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     }
                     if opts.format == F::Jxl {
                         let tip = "Mathematically lossless: every pixel is kept exactly (larger files)";
-                        ui.checkbox(&mut opts.jxl_lossless, crate::i18n::tr("Lossless")).on_hover_text(crate::i18n::tr(tip));
+                        toggle(ui, &mut opts.jxl_lossless, "Lossless").on_hover_text(crate::i18n::tr(tip));
                     }
                     if matches!(opts.format, F::Jpeg | F::Avif) || (opts.format == F::Jxl && !opts.jxl_lossless) {
                         let mut q = opts.quality as f64;
@@ -955,7 +995,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                         use lightcraft_engine::export::JxlEffort as E;
                         choices(ui, "Effort", "exportJxlEffort", &[(E::Fast, "Fast"), (E::Normal, "Normal")], &mut opts.jxl_effort);
                         let tip = "Shows a coarse version first and refines it as the file loads";
-                        ui.checkbox(&mut opts.jxl_progressive, crate::i18n::tr("Progressive")).on_hover_text(crate::i18n::tr(tip));
+                        toggle(ui, &mut opts.jxl_progressive, "Progressive").on_hover_text(crate::i18n::tr(tip));
                     }
                     if opts.format == F::Jpeg {
                         let mut k = *limit_kb as f64;
@@ -993,10 +1033,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                         &mut opts.metadata,
                     );
                     if !matches!(opts.metadata, M::None | M::Copyright) {
-                        ui.checkbox(&mut opts.remove_location, crate::i18n::tr("Remove location info"));
+                        toggle(ui, &mut opts.remove_location, "Remove location info");
                     }
                     let mut wm_on = opts.watermark.is_some();
-                    if ui.checkbox(&mut wm_on, crate::i18n::tr("Watermark")).changed() {
+                    if toggle(ui, &mut wm_on, "Watermark").changed() {
                         opts.watermark = wm_on.then(|| lightcraft_engine::export::Watermark { text: "© ".into(), ..Default::default() });
                     }
                     let wm_shown = opts.watermark.clone();
@@ -1064,7 +1104,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                             wm.inset_y = (v / 100.0) as f32;
                         }
                         if !graphic {
-                            ui.checkbox(&mut wm.shadow, crate::i18n::tr("Shadow"));
+                            toggle(ui, &mut wm.shadow, "Shadow");
                         }
                     }
                     if opts.watermark != wm_shown {
@@ -1138,7 +1178,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     // After export: Apple Photos imports the files written (macOS only)
                     #[cfg(target_os = "macos")]
                     {
-                        let r = ui.checkbox(&mut opts.add_to_photos, crate::i18n::tr("Add to Apple Photos"));
+                        let r = toggle(ui, &mut opts.add_to_photos, "Add to Apple Photos");
                         crate::widgets::register(ui, "exportAddToPhotos", r.rect);
                         if opts.add_to_photos {
                             field(ui, "Album", |ui| {
@@ -1219,7 +1259,12 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     ui.add_space(6.0);
                     if editing.is_none() {
                         if let Some(p) = parent {
-                            let r = ui.checkbox(inside, crate::i18n::tr_format!("Put inside “{parent}”", parent = p.replace('|', " › ")));
+                            let label = crate::i18n::tr_format!("Put inside “{parent}”", parent = p.replace('|', " › "));
+                            let r = if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+                                crate::dialogs_touch::toggle(ui, inside, &label)
+                            } else {
+                                ui.checkbox(inside, label)
+                            };
                             crate::widgets::register(ui, "check:keywordInside", r.rect);
                         }
                         let n = app.session.selection.ids.len();
@@ -1234,7 +1279,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                         (export_synonyms, "Export Synonyms", "check:keywordExportSynonyms"),
                         (person, "Person", "check:keywordPerson"),
                     ] {
-                        let r = ui.checkbox(on, crate::i18n::tr(label));
+                        let r = toggle(ui, on, label);
                         crate::widgets::register(ui, id, r.rect);
                     }
                 }
@@ -1268,7 +1313,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     });
                     if replaces.is_some() {
                         ui.add_space(6.0);
-                        let r = ui.checkbox(as_new, crate::i18n::tr("Save as a new set"));
+                        let r = toggle(ui, as_new, "Save as a new set");
                         crate::widgets::register(ui, "check:keywordSetAsNew", r.rect);
                     }
                     // Return in any field saves the set
@@ -1330,7 +1375,7 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                     ui.label(crate::i18n::tr_format!("Move {n} photo{} to “{}”?", if n == 1 { "" } else { "s" }, name, n = n));
                     ui.label(egui::RichText::new(crate::i18n::tr("Their files and XMP sidecars move on disk. Edit → Undo moves them back.")).color(t.text_dim));
                     ui.add_space(4.0);
-                    let c = ui.checkbox(dont_ask, crate::i18n::tr("Don't ask again"));
+                    let c = toggle(ui, dont_ask, "Don't ask again");
                     crate::widgets::register(ui, "check:moveDontAsk", c.rect);
                     c.on_hover_text(crate::i18n::tr("Settings → Confirm before moving photos to another folder on disk turns it back on"));
                 }
@@ -1496,36 +1541,50 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                             // smart-album rules that can't mean anything wait to be fixed
                             && !matches!(&dlg, Dialog::SmartRules { id, rules, .. } if !rules.check_for(&app.session.catalog, id.map(lightcraft_catalog::AlbumId)).is_empty()));
                 let primary = !informational && can_confirm && confirm_style(&dlg) == ConfirmStyle::Primary;
-                use crate::button::{Button, Kind};
-                // (each kind of dialog its own buttons: the keyboard's place doesn't carry from a
-                // dialog to the one it opens)
-                let kind = std::mem::discriminant(&dlg);
-                let cancel_button = Button::new(cancel).widget("button:dialogCancel").id_salt(kind).min_width(72.0);
-                let ok_button = Button::new(ok)
-                    .kind(if primary { Kind::Primary } else { Kind::Secondary })
-                    .enabled(can_confirm)
-                    .widget("button:dialogOk")
-                    .id_salt(kind)
-                    .min_width(72.0);
-                // (Cancel first, then the confirm: the keyboard goes through them as the eye does)
-                let gap = ui.spacing().item_spacing.x;
-                let mut buttons_w = 0.0;
-                if !informational {
-                    buttons_w += cancel_button.desired_size(ui).x + gap;
-                }
-                if !ok.is_empty() {
-                    buttons_w += ok_button.desired_size(ui).x;
-                }
-                ui.add_space((ui.available_width() - buttons_w).max(0.0));
-                if !informational && cancel_button.show(ui).clicked() {
-                    close = true;
-                }
-                let r = (!ok.is_empty()).then(|| ok_button.show(ui));
-                if r.is_some_and(|r| r.clicked()) {
-                    if informational {
+                if touch_glass {
+                    let (c, o) = crate::dialogs_touch::footer(ui, cancel, ok, can_confirm, primary, informational);
+                    if c {
                         close = true;
-                    } else {
-                        confirm = true;
+                    }
+                    if o {
+                        if informational {
+                            close = true;
+                        } else {
+                            confirm = true;
+                        }
+                    }
+                } else {
+                    use crate::button::{Button, Kind};
+                    // (each kind of dialog its own buttons: the keyboard's place doesn't carry from a
+                    // dialog to the one it opens)
+                    let kind = std::mem::discriminant(&dlg);
+                    let cancel_button = Button::new(cancel).widget("button:dialogCancel").id_salt(kind).min_width(72.0);
+                    let ok_button = Button::new(ok)
+                        .kind(if primary { Kind::Primary } else { Kind::Secondary })
+                        .enabled(can_confirm)
+                        .widget("button:dialogOk")
+                        .id_salt(kind)
+                        .min_width(72.0);
+                    // (Cancel first, then the confirm: the keyboard goes through them as the eye does)
+                    let gap = ui.spacing().item_spacing.x;
+                    let mut buttons_w = 0.0;
+                    if !informational {
+                        buttons_w += cancel_button.desired_size(ui).x + gap;
+                    }
+                    if !ok.is_empty() {
+                        buttons_w += ok_button.desired_size(ui).x;
+                    }
+                    ui.add_space((ui.available_width() - buttons_w).max(0.0));
+                    if !informational && cancel_button.show(ui).clicked() {
+                        close = true;
+                    }
+                    let r = (!ok.is_empty()).then(|| ok_button.show(ui));
+                    if r.is_some_and(|r| r.clicked()) {
+                        if informational {
+                            close = true;
+                        } else {
+                            confirm = true;
+                        }
                     }
                 }
             });
@@ -1539,7 +1598,8 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
     }
     if let Some(w) = &shown {
         // (the import review keeps its hand-picked photos however the click lands)
-        if !raw_blocked && app.ui.settings.close_dialogs_outside && !import && clicked_backdrop(ctx, w.response.rect, popup_was_open) {
+        if !raw_blocked && (touch_glass || app.ui.settings.close_dialogs_outside) && !import && clicked_backdrop(ctx, w.response.rect, popup_was_open)
+        {
             close = true;
         } else if raw_blocked {
             // A press made under the prompt or library window must not be remembered as a
@@ -2245,7 +2305,7 @@ fn export_size(ui: &mut egui::Ui, full: &mut bool, r: &mut lightcraft_engine::ex
         (R::Megapixels, "Megapixels"),
         (R::Percent, "Percentage"),
     ];
-    let r_full = ui.checkbox(full, crate::i18n::tr("Full size"));
+    let r_full = toggle(ui, full, "Full size");
     crate::widgets::register(ui, "check:exportFullSize", r_full.rect);
     if !*full {
         field(ui, "Resize to", |ui| {
@@ -2287,7 +2347,7 @@ fn export_size(ui: &mut egui::Ui, full: &mut bool, r: &mut lightcraft_engine::ex
                 r.height = h as u32;
             }
         }
-        let c = ui.checkbox(&mut r.dont_enlarge, crate::i18n::tr("Don't enlarge"));
+        let c = toggle(ui, &mut r.dont_enlarge, "Don't enlarge");
         crate::widgets::register(ui, "check:exportDontEnlarge", c.rect);
     }
     let mut p = *ppi as f64;
@@ -2362,7 +2422,7 @@ fn slideshow_export_body(app: &mut LightcraftApp, ui: &mut egui::Ui, settings: &
     });
     let note = match settings.format {
         Format::Pdf => {
-            let r = ui.checkbox(&mut settings.full_screen, crate::i18n::tr("Automatically show full screen"));
+            let r = toggle(ui, &mut settings.full_screen, "Automatically show full screen");
             crate::widgets::register(ui, "check:slideshowExportFullScreen", r.rect);
             "One page per slide (the long side in pixels = points), with the slide duration and fade for the viewer's presentation mode."
         }
@@ -2378,14 +2438,23 @@ fn slideshow_export_body(app: &mut LightcraftApp, ui: &mut egui::Ui, settings: &
 
 fn field<R>(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let t = Tokens::get(ui.ctx());
-    ui.horizontal(|ui| {
-        ui.allocate_ui_with_layout(egui::vec2(LABEL_W, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-            ui.set_min_width(LABEL_W);
-            ui.label(egui::RichText::new(crate::i18n::tr(label)).color(t.text_label));
-        });
-        add(ui)
-    })
-    .inner
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+        ui.vertical(|ui| {
+            ui.label(egui::RichText::new(crate::i18n::tr(label).to_uppercase()).font(t.semibold(12.0)).color(t.text_dim));
+            ui.add_space(2.0);
+            add(ui)
+        })
+        .inner
+    } else {
+        ui.horizontal(|ui| {
+            ui.allocate_ui_with_layout(egui::vec2(LABEL_W, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.set_min_width(LABEL_W);
+                ui.label(egui::RichText::new(crate::i18n::tr(label)).color(t.text_label));
+            });
+            add(ui)
+        })
+        .inner
+    }
 }
 
 /// The rest of a [`field`] row, laid out right to left: `add` places its trailing button(s) first,
@@ -2398,14 +2467,43 @@ fn trailing_button_row(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
 
 /// A labelled row of mutually exclusive choice buttons (ids `button:{id}-{index}`).
 fn choices<V: PartialEq + Copy>(ui: &mut egui::Ui, label: &str, id: &str, options: &[(V, &str)], value: &mut V) {
-    field(ui, label, |ui| {
-        ui.spacing_mut().item_spacing.x = 4.0;
-        for (i, (v, l)) in options.iter().enumerate() {
-            if crate::widgets::text_button(ui, &format!("{id}-{i}"), l, *value == *v).clicked() {
+    let needed: f32 = options.iter().map(|(_, l)| l.chars().count() as f32 * 8.0 + 28.0).sum();
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) && needed <= ui.available_width() - 32.0 {
+        field(ui, label, |ui| {
+            let labels: Vec<&str> = options.iter().map(|(_, l)| *l).collect();
+            let mut sel = options.iter().position(|(v, _)| v == value).unwrap_or(0);
+            crate::ui_kit_touch::segmented(ui, &labels, &mut sel);
+            if let Some((v, _)) = options.get(sel) {
                 *value = *v;
             }
+        });
+        return;
+    }
+    let touch = crate::theme::touch_ui(ui.ctx());
+    field(ui, label, |ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let mut chips = |ui: &mut egui::Ui| {
+            for (i, (v, l)) in options.iter().enumerate() {
+                if crate::widgets::text_button(ui, &format!("{id}-{i}"), l, *value == *v).clicked() {
+                    *value = *v;
+                }
+            }
+        };
+        if touch {
+            ui.horizontal_wrapped(chips);
+        } else {
+            chips(ui);
         }
     });
+}
+
+/// A toggle: iOS switch on touch, checkbox on desktop.
+fn toggle(ui: &mut egui::Ui, value: &mut bool, label: &str) -> egui::Response {
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+        crate::dialogs_touch::toggle(ui, value, label)
+    } else {
+        ui.checkbox(value, crate::i18n::tr(label))
+    }
 }
 
 /// Dialogs that Return confirms with nothing focused (those with text fields confirm from the
