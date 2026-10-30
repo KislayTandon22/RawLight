@@ -92,10 +92,16 @@ final class Engine: @unchecked Sendable {
     enum Kind: Int32 { case full = 0, thumb = 1, draft = 2, uncropped = 3 }
 
     /// Render a photo with its current edits, fitted in `maxEdge` x `maxEdge`.
-    func render(_ id: UInt64, maxEdge: Int, kind: Kind = .full) async -> Rendered? {
+    func render(_ id: UInt64, maxEdge: Int, kind: Kind = .full, maskOverlay: Int? = nil) async -> Rendered? {
         // 1. build the job on the command queue (cheap)
         let job: OpaquePointer? = await withCheckedContinuation { cont in
-            queue.async { cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue)) }
+            queue.async {
+                if let m = maskOverlay, kind != .thumb, kind != .uncropped {
+                    cont.resume(returning: rl_job_new_mask_overlay(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue, UInt32(m)))
+                } else {
+                    cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue))
+                }
+            }
         }
         guard let job else { return nil }
         // 2. run it off the command queue (slow)

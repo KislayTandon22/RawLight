@@ -22,9 +22,9 @@ private struct FieldBackground<S: Shape>: ViewModifier {
     let shape: S
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(selected ? Glass.regular.tint(Theme.accent).interactive() : Glass.regular.interactive(), in: shape)
+            content.glassEffect(selected ? Glass.regular.tint(Theme.accent.opacity(0.42)).interactive() : Glass.regular.interactive(), in: shape)
         } else {
-            content.background(selected ? Theme.accent : Theme.field, in: shape)
+            content.background(selected ? Theme.accent.opacity(0.55) : Theme.field, in: shape)
         }
     }
 }

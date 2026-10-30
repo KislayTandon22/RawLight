@@ -24,6 +24,7 @@ unsigned char *rl_render_hist(RlSession *session, unsigned long long id, unsigne
    kind: 0 full, 1 thumbnail (disk cached), 2 draft, 3 uncropped. */
 typedef struct RlJob RlJob;
 RlJob *rl_job_new(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind);
+RlJob *rl_job_new_mask_overlay(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind, unsigned mask_id);
 unsigned char *rl_job_run(RlJob *job, unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
 void rl_job_finish(RlSession *session, RlJob *job);
 /* Registers the host's segmenter (Apple Vision). cb(rgb, w, h, key, clicks[x,y,include]*, n, out_logits, side) -> 1 ok, 0 none, <0 error. */

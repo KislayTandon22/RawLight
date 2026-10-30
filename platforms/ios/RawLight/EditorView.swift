@@ -37,6 +37,8 @@ struct EditorView: View {
     @State private var objectPick = false
     @State private var objectExclude = false
     @State private var objectMask: Int?
+    @State private var showMask = true
+    @State private var activeMask: Int?
     @State private var copied = false
     @State private var showCurve = false
     @State private var colourTab = "Basic"
@@ -65,6 +67,7 @@ struct EditorView: View {
             }
         }
         .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
+        .onReceive(NotificationCenter.default.publisher(for: .masksChanged)) { n in activeMask = n.object as? Int }
         .onChange(of: objectPick) { _, on in if on { objectMask = nil } }
         .task(id: photoID) { await open() }
     }
@@ -136,7 +139,8 @@ struct EditorView: View {
                     }
                     if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } }.transition(.opacity) }
                     if mode == .heal { HealOverlay(engine: model.engine, imageRect: rect, tool: healTool, spotMode: spotMode, spotSize: spotSize, pet: pet) { live.run { await render(draft: true) } }.transition(.opacity) }
-                    if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase) { live.run { await render(draft: true) } }.transition(.opacity) }
+                    if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase, pencilOnly: UserDefaults.standard.bool(forKey: "pencilOnly"),
+                        onUndo: { Task { await command("edit.undo") } }, onRedo: { Task { await command("edit.redo") } }, onPencilTap: { erase.toggle() }) { live.run { await render(draft: true) } }.transition(.opacity) }
                 } else {
                     ProgressView()
                 }
@@ -197,18 +201,25 @@ struct EditorView: View {
     }
 
     private var modeBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 4) {
+        HStack(spacing: 0) {
             ForEach(EditMode.allCases, id: \.self) { m in
                 Button { setMode(m) } label: {
-                    Label(m.rawValue, systemImage: m.symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 16).frame(height: 44)
-                        .fieldBackground(mode == m, in: Capsule())
-                        .foregroundStyle(mode == m ? Theme.accentSoft : .primary)
+                    VStack(spacing: 4) {
+                        Image(systemName: m.symbol).font(.system(size: 19, weight: .medium)).frame(height: 24)
+                        Text(m.rawValue).font(.system(size: 11, weight: .semibold)).tracking(0.2)
+                    }
+                    .frame(maxWidth: .infinity).frame(height: 54)
+                    .foregroundStyle(mode == m ? Color.white : Color.white.opacity(0.55))
+                    .overlay(alignment: .bottom) { Capsule().fill(Theme.accent).frame(width: mode == m ? 16 : 0, height: 3).offset(y: -2) }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
         }
-        .padding(4) }
-        .scrollBounceBehavior(.basedOnSize).frame(maxWidth: 700).fixedSize(horizontal: false, vertical: true)
-        .panelBackground(in: Capsule()).padding(.bottom, 6)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: 560)
+        .panelBackground(in: Capsule())
+        .padding(.bottom, 6).padding(.horizontal, 12)
     }
 
     private func setMode(_ m: EditMode) {
@@ -272,7 +283,7 @@ struct EditorView: View {
                     HistoryPanel(engine: model.engine, photoID: photoID) { Task { await reloadControls(); await render() } }
                         .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else if mode == .mask {
-                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase, objectPick: $objectPick, objectExclude: $objectExclude) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
+                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase, objectPick: $objectPick, objectExclude: $objectExclude, showMask: $showMask) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else {
                 VStack(spacing: 8) {
                     if !histogram.isEmpty { HistogramView(bins: histogram) }
@@ -300,6 +311,9 @@ struct EditorView: View {
                 }.padding(.horizontal, 16)
                 }
             }
+            .contentMargins(.top, 8, for: .scrollContent)
+            .contentMargins(.bottom, 36, for: .scrollContent)
+            .scrollIndicators(.hidden)
             if mode == .edit { Picker("Group", selection: $group) { ForEach(groups, id: \.name) { Text($0.name).tag($0.name) } }
                   .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 12) }
         }
@@ -359,7 +373,8 @@ struct EditorView: View {
     /// Fast draft while dragging; full quality when the finger lifts.
     private func render(draft: Bool = false) async {
         let id = photoID
-        if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: mode == .crop ? .uncropped : (draft ? .draft : .full)), id == photoID {
+        if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: mode == .crop ? .uncropped : (draft ? .draft : .full),
+                                            maskOverlay: mode == .mask && showMask ? (activeMask ?? 0) : nil), id == photoID {
             image = r.image; histogram = r.histogram
             if !draft { info.edited = true }
         }

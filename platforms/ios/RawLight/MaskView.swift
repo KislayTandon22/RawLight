@@ -41,15 +41,21 @@ struct MaskOverlay: View {
     let imageRect: CGRect
     let brushSize: Double
     let erase: Bool
+    var pencilOnly = false
+    var onUndo: () -> Void = {}
+    var onRedo: () -> Void = {}
+    var onPencilTap: () -> Void = {}
     let onChange: () -> Void
     @State private var mask: MaskItem?
-    @State private var stroke: [CGPoint] = []
+    @State private var samples: [StrokeSample] = []
     @State private var drag: String?
     @State private var throttle = Throttle()
     @State private var reload = 0
 
-    init(engine: Engine, imageRect: CGRect, brushSize: Double, erase: Bool, onChange: @escaping () -> Void) {
-        self.engine = engine; self.imageRect = imageRect; self.brushSize = brushSize; self.erase = erase; self.onChange = onChange
+    init(engine: Engine, imageRect: CGRect, brushSize: Double, erase: Bool, pencilOnly: Bool = false, onUndo: @escaping () -> Void = {},
+         onRedo: @escaping () -> Void = {}, onPencilTap: @escaping () -> Void = {}, onChange: @escaping () -> Void) {
+        self.engine = engine; self.imageRect = imageRect; self.brushSize = brushSize; self.erase = erase; self.pencilOnly = pencilOnly
+        self.onUndo = onUndo; self.onRedo = onRedo; self.onPencilTap = onPencilTap; self.onChange = onChange
     }
 
     private func toScreen(_ p: CGPoint) -> CGPoint { CGPoint(x: imageRect.minX + p.x * imageRect.width, y: imageRect.minY + p.y * imageRect.height) }
@@ -81,14 +87,23 @@ struct MaskOverlay: View {
                 default:
                     break
                 }
-                if m.kind == "brush", stroke.count > 1 {
-                    var p = Path(); p.addLines(stroke)
-                    ctx.stroke(p, with: .color(erase ? .black.opacity(0.5) : Theme.accent.opacity(0.55)),
-                               style: StrokeStyle(lineWidth: brushSize * max(imageRect.width, imageRect.height), lineCap: .round, lineJoin: .round))
+                if m.kind == "brush", samples.count > 1 {
+                    let base = brushSize * max(imageRect.width, imageRect.height)
+                    for i in 1..<samples.count {
+                        var seg = Path(); seg.move(to: samples[i - 1].point); seg.addLine(to: samples[i].point)
+                        ctx.stroke(seg, with: .color(erase ? .black.opacity(0.5) : Theme.accent.opacity(0.55)),
+                                   style: StrokeStyle(lineWidth: base * sizeFactor(samples[i].pressure), lineCap: .round, lineJoin: .round))
+                    }
                 }
             }
             .allowsHitTesting(false)
-            if let m = mask {
+            if let m = mask, m.kind == "brush" {
+                PencilCanvas(pencilOnly: pencilOnly,
+                             onBegan: { samples = [$0] },
+                             onMoved: { samples.append(contentsOf: $0) },
+                             onEnded: { finishBrush(m) },
+                             onUndo: onUndo, onRedo: onRedo, onPencilTap: onPencilTap)
+            } else if let m = mask {
                 Color.clear.contentShape(Rectangle())
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { v in handle(m, v) }
@@ -145,7 +160,7 @@ struct MaskOverlay: View {
             shape["center"] = shape["center"] ?? ["x": c.x, "y": c.y]
             update(m, shape)
         default:
-            stroke.append(v.location)
+            break
         }
     }
 
@@ -153,13 +168,29 @@ struct MaskOverlay: View {
 
     private func finish(_ m: MaskItem, _ v: DragGesture.Value) {
         drag = nil
-        if m.kind == "brush", !stroke.isEmpty {
-            let pts = stroke.map { toNorm($0) }.map { [$0.x, $0.y] }
-            stroke = []
-            let id = m.id, size = brushSize, er = erase
-            Task { _ = try? await engine.execute("mask.brushStroke", ["id": id, "points": pts, "size": size, "erase": er]); onChange() }
-        } else {
-            Task { await refresh(); onChange() }
+        Task { await refresh(); onChange() }
+    }
+
+    /// Pressure maps to brush size: light pressure is a fine line, firm pressure a broad one.
+    private func sizeFactor(_ pressure: CGFloat) -> Double { 0.35 + 1.3 * Double(pressure) }
+
+    /// Sends the stroke in short pieces, each at the size its pressure asks for.
+    private func finishBrush(_ m: MaskItem) {
+        let s = samples
+        samples = []
+        guard s.count > 1 else { return }
+        let id = m.id, base = brushSize, er = erase
+        var pieces: [(pts: [[Double]], size: Double)] = []
+        var i = 0
+        while i < s.count - 1 {
+            let chunk = Array(s[i..<min(i + 9, s.count)])   // 8 segments per piece, sharing an end point
+            let avg = chunk.map { Double($0.pressure) }.reduce(0, +) / Double(chunk.count)
+            pieces.append((chunk.map { p in let n = toNorm(p.point); return [Double(n.x), Double(n.y)] }, base * (0.35 + 1.3 * avg)))
+            i += 8
+        }
+        Task {
+            for piece in pieces { _ = try? await engine.execute("mask.brushStroke", ["id": id, "points": piece.pts, "size": piece.size, "erase": er]) }
+            onChange()
         }
     }
 
@@ -180,14 +211,16 @@ struct MaskPanel: View {
     @Binding var erase: Bool
     @Binding var objectPick: Bool
     @Binding var objectExclude: Bool
+    @Binding var showMask: Bool
+    @AppStorage("pencilOnly") private var pencilOnly = false
     let onChange: () -> Void
     @State private var masks: [MaskItem] = []
     @State private var active: Int?
     @State private var message: String?
     @State private var throttle = Throttle()
 
-    init(engine: Engine, photoID: UInt64, brushSize: Binding<Double>, erase: Binding<Bool>, objectPick: Binding<Bool>, objectExclude: Binding<Bool>, onChange: @escaping () -> Void) {
-        self.engine = engine; self.photoID = photoID; _brushSize = brushSize; _erase = erase; _objectPick = objectPick; _objectExclude = objectExclude; self.onChange = onChange
+    init(engine: Engine, photoID: UInt64, brushSize: Binding<Double>, erase: Binding<Bool>, objectPick: Binding<Bool>, objectExclude: Binding<Bool>, showMask: Binding<Bool>, onChange: @escaping () -> Void) {
+        self.engine = engine; self.photoID = photoID; _brushSize = brushSize; _erase = erase; _objectPick = objectPick; _objectExclude = objectExclude; _showMask = showMask; self.onChange = onChange
     }
 
     private var current: MaskItem? { masks.first { $0.id == active } }
@@ -218,7 +251,7 @@ struct MaskPanel: View {
                         Button("Background") { add(["kind": "background"]) }
                     }
                 } label: {
-                    Label("Add mask", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 16).frame(height: 44)
+                    Label("Add mask", systemImage: "plus").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(height: 44)
                         .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                 }
                 Spacer()
@@ -234,6 +267,11 @@ struct MaskPanel: View {
                             }
                         }
                     } label: { Text("Combine").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).fieldBackground(in: Capsule()) }
+                }
+                if current != nil {
+                    Button { showMask.toggle(); onChange() } label: {
+                        Image(systemName: showMask ? "eye.fill" : "eye.slash").frame(width: 44, height: 44)
+                    }.fieldBackground(showMask, in: Circle()).buttonStyle(.plain).accessibilityLabel("Show mask overlay")
                 }
                 if !masks.isEmpty { Button("Delete all", role: .destructive) { run("mask.deleteAll") }.font(.footnote) }
             }
@@ -267,6 +305,9 @@ struct MaskPanel: View {
                         HStack { Text("Brush size").font(.subheadline); Spacer(); Text(String(format: "%.0f%%", brushSize * 100)).foregroundStyle(.secondary) }
                         Slider(value: $brushSize, in: 0.005...0.15).tint(Theme.accent)
                         Toggle("Erase", isOn: $erase).tint(Theme.accent)
+                        Toggle("Pencil only", isOn: $pencilOnly).tint(Theme.accent)
+                        Text("Press harder for a bigger brush. Double-tap the Pencil to switch erase. Two-finger tap undoes, three-finger tap redoes.")
+                            .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     }.padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 ForEach(adjustments, id: \.key) { a in
@@ -305,8 +346,14 @@ struct MaskPanel: View {
     private func select(_ id: Int) { Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
     private func add(_ p: [String: Any]) {
         Task {
-            do { _ = try await engine.execute("mask.add", p); message = nil } catch { message = error.localizedDescription }
+            do { _ = try await engine.execute("mask.add", p); message = nil; showMask = true } catch { message = error.localizedDescription }
             await reload(); onChange()
+            // AI masks are found in the background; refresh until the region shows up
+            if ["subject", "sky", "background", "object"].contains(p["kind"] as? String ?? "") {
+                message = "Finding the \(p["kind"] as? String ?? "") on this device…"
+                for _ in 0..<10 { try? await Task.sleep(for: .milliseconds(700)); onChange() }
+                message = nil
+            }
         }
     }
     private func run(_ id: String, _ p: [String: Any] = [:]) { Task { _ = try? await engine.execute(id, p); await reload(); onChange() } }

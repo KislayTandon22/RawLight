@@ -22,6 +22,7 @@
 		8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */; };
 		90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62BE11F6376A150B4F7F7A /* RootView.swift */; };
 		9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 793784F1303D4D3381740077 /* Assets.xcassets */; };
+		C5735DAD209D36E1619418F5 /* PencilCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */; };
 		D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */; };
 		DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8560E8AC4BC45B87ADF19267 /* Theme.swift */; };
 		DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 746AE174CA016CAF647AD43E /* MaskView.swift */; };
@@ -49,6 +50,7 @@
 		B29C664979A0E27C1CBD431C /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEditBar.swift; sourceTree = "<group>"; };
 		BECC7399FD2375C6CDB41443 /* ColourPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColourPanel.swift; sourceTree = "<group>"; };
+		C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PencilCanvas.swift; sourceTree = "<group>"; };
 		CB1E46860D465391ACFBEF6F /* RawLight.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RawLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D206DF744DE049ABECA7CEDA /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionSegmenter.swift; sourceTree = "<group>"; };
@@ -83,6 +85,7 @@
 				D206DF744DE049ABECA7CEDA /* LibraryView.swift */,
 				0017D18B656BA9A6950B0FC0 /* LooksView.swift */,
 				746AE174CA016CAF647AD43E /* MaskView.swift */,
+				C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */,
 				B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */,
 				A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */,
 				9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */,
@@ -210,6 +213,7 @@
 				2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */,
 				EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */,
 				DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */,
+				C5735DAD209D36E1619418F5 /* PencilCanvas.swift in Sources */,
 				8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */,
 				D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */,
 				90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */,
@@ -267,7 +271,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -330,7 +334,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

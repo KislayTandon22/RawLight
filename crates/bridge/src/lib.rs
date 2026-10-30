@@ -173,6 +173,33 @@ pub unsafe extern "C" fn rl_job_new(session: *mut RlSession, id: u64, max_w: u32
     }
 }
 
+/// Like [`rl_job_new`] (kind 0 full, 2 draft) with the region of mask `mask_id` tinted rose over the
+/// photo; `mask_id` 0 tints every visible mask. Null when the photo does not exist.
+///
+/// # Safety
+/// `session` from [`rl_session_new`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_job_new_mask_overlay(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, kind: i32, mask_id: u32) -> *mut RlJob {
+    let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
+    let pid = lightcraft_catalog::PhotoId(id);
+    let color = [242, 58, 92];
+    let overlay = if mask_id == 0 {
+        lightcraft_engine::pipeline::Overlay::AllMasks { view: lightcraft_engine::pipeline::MaskView::Color, color, opacity: 55 }
+    } else {
+        lightcraft_engine::pipeline::Overlay::Mask { id: mask_id as u16, view: lightcraft_engine::pipeline::MaskView::Color, color, opacity: 55 }
+    };
+    let job = catch_unwind(AssertUnwindSafe(|| {
+        session.0.render_job(pid, max_w as usize, max_h as usize, false, true).map(|j| {
+            let j = if kind == 2 { j.draft() } else { j };
+            j.with_overlay(overlay)
+        })
+    }));
+    match job {
+        Ok(Some(job)) => Box::into_raw(Box::new(RlJob { job: Some(job), result: None })),
+        _ => std::ptr::null_mut(),
+    }
+}
+
 /// Run the job; same outputs as [`rl_render_hist`]. Call once, on any thread.
 ///
 /// # Safety
