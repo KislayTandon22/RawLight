@@ -154,8 +154,8 @@ final class Engine: @unchecked Sendable {
     }
 
     /// Facts about the active photo (`photo.inspect`): name, rating, flag.
-    func info() async -> PhotoInfo? {
-        guard let d = try? await execute("photo.inspect") as? [String: Any] else { return nil }
+    func info(_ id: UInt64? = nil) async -> PhotoInfo? {
+        guard let d = try? await execute("photo.inspect", id.map { ["id": $0] } ?? [:]) as? [String: Any] else { return nil }
         return PhotoInfo(name: d["file_name"] as? String ?? "", rating: (d["rating"] as? NSNumber)?.intValue ?? 0,
                          flag: d["flag"] as? String ?? "none", edited: !(d["edited"] is NSNull) && d["edited"] != nil)
     }

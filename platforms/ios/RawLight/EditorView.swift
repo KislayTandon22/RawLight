@@ -25,6 +25,11 @@ struct EditorView: View {
     @State private var curveChannel = "master"
     @State private var curvePoints: [CGPoint] = []
     @State private var mode: EditMode = .edit
+    @State private var showCurve = false
+    @State private var colourTab = "Basic"
+    @State private var colourBand = "red"
+    @State private var picking = false
+    @State private var pickMessage: String?
     @State private var brushSize = 0.03
     @State private var erase = false
     @State private var live = Throttle()
@@ -46,7 +51,7 @@ struct EditorView: View {
                 inspector.frame(width: wide ? 360 : nil, height: wide ? nil : min(geo.size.height * 0.45, 420))
             }
         }
-        .sheet(isPresented: $showExport) { ExportSheet(photoID: photoID) }
+        .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
         .task(id: photoID) { await open() }
     }
 
@@ -104,8 +109,13 @@ struct EditorView: View {
                         .simultaneousGesture(DragGesture().onChanged { if mode == .edit, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
                             .onEnded { _ in baseOffset = offset })
                         .onTapGesture(count: 2) { if mode == .edit { withAnimation(.snappy) { scale = scale > 1 ? 1 : 3; baseScale = scale; offset = .zero; baseOffset = .zero } } }
-                    if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } } }
-                    if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase) { live.run { await render(draft: true) } } }
+                    if picking {
+                        Color.clear.contentShape(Rectangle())
+                            .gesture(SpatialTapGesture().onEnded { pickColour(at: $0.location, in: rect) })
+                            .overlay(alignment: .top) { Text(pickMessage ?? "Tap the colour you want to edit").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38).background(.ultraThinMaterial, in: Capsule()).padding(.top, 10) }
+                    }
+                    if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } }.transition(.opacity) }
+                    if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase) { live.run { await render(draft: true) } }.transition(.opacity) }
                 } else {
                     ProgressView()
                 }
@@ -113,6 +123,33 @@ struct EditorView: View {
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
         }
+    }
+
+    /// Reads the colour under a tap from the rendered image and selects the nearest Mixer colour.
+    private func pickColour(at p: CGPoint, in rect: CGRect) {
+        guard let cg = image?.cgImage, rect.width > 0 else { return }
+        let u = (p.x - rect.minX) / rect.width, v = (p.y - rect.minY) / rect.height
+        guard (0...1).contains(u), (0...1).contains(v) else { return }
+        let cx = Int(u * Double(cg.width - 1)), cy = Int(v * Double(cg.height - 1))
+        var r = 0.0, g = 0.0, b = 0.0, n = 0.0
+        if let data = cg.dataProvider?.data, let ptr = CFDataGetBytePtr(data) {
+            let bpp = cg.bitsPerPixel / 8
+            for dy in -3...3 { for dx in -3...3 {
+                let x = min(max(cx + dx, 0), cg.width - 1), y = min(max(cy + dy, 0), cg.height - 1)
+                let o = y * cg.bytesPerRow + x * bpp
+                r += Double(ptr[o]); g += Double(ptr[o + 1]); b += Double(ptr[o + 2]); n += 1
+            } }
+        }
+        guard n > 0 else { return }
+        let ui = UIColor(red: r / n / 255, green: g / n / 255, blue: b / n / 255, alpha: 1)
+        var h: CGFloat = 0, s: CGFloat = 0, br: CGFloat = 0, a: CGFloat = 0
+        ui.getHue(&h, saturation: &s, brightness: &br, alpha: &a)
+        if s < 0.08 { pickMessage = "That area is neutral, try a coloured spot"; return }
+        let deg = Double(h) * 360
+        let centres: [(String, Double)] = [("red", 0), ("orange", 30), ("yellow", 60), ("green", 120), ("aqua", 180), ("blue", 230), ("purple", 275), ("magenta", 320)]
+        func dist(_ a: Double, _ b: Double) -> Double { let d = abs(a - b).truncatingRemainder(dividingBy: 360); return min(d, 360 - d) }
+        colourBand = centres.min { dist($0.1, deg) < dist($1.1, deg) }?.0 ?? "red"
+        colourTab = "Mixer"; picking = false; pickMessage = nil
     }
 
     private func fitRect(_ s: CGSize, in box: CGSize) -> CGRect {
@@ -136,7 +173,7 @@ struct EditorView: View {
     }
 
     private func setMode(_ m: EditMode) {
-        mode = m
+        withAnimation(.snappy(duration: 0.3)) { mode = m }
         scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero
         Task { await render() }
     }
@@ -182,22 +219,33 @@ struct EditorView: View {
             .padding(.horizontal, 20).padding(.top, 12)
             ScrollView {
                 if mode == .crop {
-                    CropPanel(engine: model.engine, photoID: photoID) { live.run { await render(draft: true) } }.padding(.horizontal, 16)
+                    CropPanel(engine: model.engine, photoID: photoID) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else if mode == .mask {
-                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase) { live.run { await render(draft: true) } }.padding(.horizontal, 16)
+                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else {
                 VStack(spacing: 8) {
                     if !histogram.isEmpty { HistogramView(bins: histogram) }
+                    QuickEditBar(engine: model.engine) { Task { await reloadControls(); await render() } }.id(photoID)
                     if group == "Light" {
+                        Button { withAnimation(.snappy) { showCurve.toggle() } } label: {
+                            HStack { Text("Tone curve").font(.subheadline.weight(.medium)); Spacer()
+                                Text(curvePoints.isEmpty ? "Linear" : "Custom").font(.subheadline).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary).rotationEffect(.degrees(showCurve ? 90 : 0)) }
+                                .padding(.horizontal, 14).frame(height: 48).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }.buttonStyle(.plain)
+                    }
+                    if group == "Light" && showCurve {
                         CurveEditor(channel: $curveChannel, points: $curvePoints, histogram: histogram,
                                     onChange: { pts in setCurve(pts, commit: false) }, onEnd: { setCurve(curvePoints, commit: true) })
                             .padding(.vertical, 4)
                             .onChange(of: curveChannel) { _, c in Task { curvePoints = await model.engine.curve(c) } }
                     }
-                    ForEach(visible) { c in
+                    if group == "Colour" {
+                        ColourPanel(controls: controls, set: { id, v, commit in set(id, v, commit: commit) }, tab: $colourTab, band: $colourBand, picking: $picking)
+                    } else { ForEach(visible) { c in
                         ColorSlider(control: c, onChange: { v in set(c.id, v, commit: false) }, onEnd: { set(c.id, c.value, commit: true) },
                                     reset: { set(c.id, c.def, commit: true) })
-                    }
+                    } }
                 }.padding(.horizontal, 16)
                 }
             }
@@ -205,6 +253,7 @@ struct EditorView: View {
                   .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 12) }
         }
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .animation(.snappy(duration: 0.3), value: mode)
         .padding(8)
     }
 

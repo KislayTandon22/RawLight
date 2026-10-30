@@ -219,6 +219,19 @@ struct MaskPanel: View {
                         .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                 }
                 Spacer()
+                if current != nil {
+                    Menu {
+                        ForEach([("add", "Add"), ("subtract", "Subtract"), ("intersect", "Intersect")], id: \.0) { op in
+                            Menu(op.1) {
+                                Button("Linear gradient") { addComponent(op.0, ["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }
+                                Button("Radial gradient") { addComponent(op.0, ["kind": "radial", "center": [0.5, 0.5], "rx": 0.2, "ry": 0.2, "angle": 0, "feather": 0.5]) }
+                                Button("Brush") { addComponent(op.0, ["kind": "brush"]) }
+                                Button("Luminance range") { addComponent(op.0, ["kind": "luminanceRange"]) }
+                                Button("Colour range") { addComponent(op.0, ["kind": "colorRange"]) }
+                            }
+                        }
+                    } label: { Text("Combine").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).background(Theme.field, in: Capsule()) }
+                }
                 if !masks.isEmpty { Button("Delete all", role: .destructive) { run("mask.deleteAll") }.font(.footnote) }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
@@ -271,6 +284,14 @@ struct MaskPanel: View {
         let r = await engine.masks()
         masks = r.items; active = r.active
         NotificationCenter.default.post(name: .masksChanged, object: nil)
+    }
+    private func addComponent(_ op: String, _ shape: [String: Any]) {
+        guard let id = active else { return }
+        var p = shape; p["id"] = id; p["op"] = op
+        Task {
+            do { _ = try await engine.execute("mask.addComponent", p); message = nil } catch { message = error.localizedDescription }
+            await reload(); onChange()
+        }
     }
     private func select(_ id: Int) { Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
     private func add(_ p: [String: Any]) {

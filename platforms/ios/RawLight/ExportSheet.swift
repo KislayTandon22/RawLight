@@ -3,13 +3,14 @@ import SwiftUI
 struct ExportSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let photoID: UInt64
+    let ids: [UInt64]
     @State private var format = "jpeg"
     @State private var quality = 90.0
     @State private var longEdge = 3000
     @State private var colorSpace = "srgb"
     @State private var working = false
-    @State private var result: URL?
+    @State private var results: [URL] = []
+    @State private var progress: Int = 0
     @State private var error: String?
 
     private let sizes: [(String, Int)] = [("1600", 1600), ("3000", 3000), ("Full", 0)]
@@ -17,7 +18,7 @@ struct ExportSheet: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("Export").font(.title2.weight(.semibold))
+                Text(ids.count > 1 ? "Export \(ids.count) photos" : "Export").font(.title2.weight(.semibold))
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle()) }
             }
@@ -38,8 +39,8 @@ struct ExportSheet: View {
             }
             if let error { Text(error).font(.footnote).foregroundStyle(Theme.accentSoft) }
             Spacer()
-            if let result {
-                ShareLink(item: result) { footer("Share or Save", "square.and.arrow.up") }
+            if !results.isEmpty {
+                ShareLink(items: results) { footer(results.count > 1 ? "Share \(results.count) files" : "Share or Save", "square.and.arrow.up") }
             } else {
                 Button { Task { await run() } } label: { footer(working ? "Exporting…" : "Export", "arrow.down.circle") }.disabled(working)
             }
@@ -59,12 +60,15 @@ struct ExportSheet: View {
         working = true; error = nil
         defer { working = false }
         let ext = ["jpeg": "jpg", "png": "png", "tiff": "tif", "webp": "webp"][format] ?? "jpg"
-        let url = FileManager.default.temporaryDirectory.appending(path: "RawLight-\(photoID).\(ext)")
-        try? FileManager.default.removeItem(at: url)
+        let dir = FileManager.default.temporaryDirectory.appending(path: "RawLight-Export-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var p: [String: Any] = ["ids": ids, "format": format, "quality": Int(quality), "longEdge": longEdge, "colorSpace": colorSpace]
+        if ids.count == 1 { p["path"] = dir.appending(path: "RawLight-\(ids[0]).\(ext)").path } else { p["dir"] = dir.path }
         do {
-            try await model.engine.execute("app.export", ["path": url.path, "ids": [photoID], "format": format, "quality": Int(quality),
-                                                          "longEdge": longEdge, "colorSpace": colorSpace])
-            result = url
+            let r = try await model.engine.execute("app.export", p)
+            let files = ((r as? [String: Any])?["files"] as? [[String: Any]]) ?? []
+            results = files.compactMap { ($0["path"] as? String).map { URL(fileURLWithPath: $0) } }
+            if results.isEmpty { error = "Nothing was exported" }
         } catch { self.error = error.localizedDescription }
     }
 }

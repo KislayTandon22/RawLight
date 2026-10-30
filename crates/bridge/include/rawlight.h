@@ -26,6 +26,9 @@ typedef struct RlJob RlJob;
 RlJob *rl_job_new(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind);
 unsigned char *rl_job_run(RlJob *job, unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
 void rl_job_finish(RlSession *session, RlJob *job);
+/* Registers the host's segmenter (Apple Vision). cb(rgb, w, h, key, clicks[x,y,include]*, n, out_logits, side) -> 1 ok, 0 none, <0 error. */
+typedef int (*RlSegmentCb)(const unsigned char *, int, int, unsigned long long, const float *, int, float *, int);
+void rl_set_segmenter(RlSegmentCb cb);
 void rl_buffer_free(unsigned char *ptr, unsigned long len);
 void rl_session_free(RlSession *session);
 void rl_string_free(char *s);

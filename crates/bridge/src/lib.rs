@@ -224,6 +224,39 @@ pub unsafe extern "C" fn rl_job_finish(session: *mut RlSession, job: *mut RlJob)
     }
 }
 
+/// Swift's segmenter (Apple Vision): `(rgb, w, h, key, clicks [x, y, include]*, n_clicks, out_logits, side)`;
+/// returns 1 = mask written, 0 = nothing to select, negative = failure.
+type SegmentCb = unsafe extern "C" fn(*const u8, i32, i32, u64, *const f32, i32, *mut f32, i32) -> i32;
+static SEGMENT_CB: std::sync::OnceLock<SegmentCb> = std::sync::OnceLock::new();
+/// Side of the coverage grid Vision's mask is sampled to.
+const VISION_SIDE: usize = 384;
+
+fn vision_segment(rgb: &[u8], w: usize, h: usize, key: u64, clicks: &[[f32; 3]]) -> Result<Option<lightcraft_engine::segment::platform::PlatformMask>, String> {
+    let cb = SEGMENT_CB.get().ok_or("Apple Vision segmentation is not available")?;
+    if rgb.len() < w.saturating_mul(h).saturating_mul(3) || w == 0 || h == 0 {
+        return Err("the photo could not be prepared for Apple Vision".into());
+    }
+    let mut logits = vec![0f32; VISION_SIDE * VISION_SIDE];
+    // SAFETY: the buffers outlive the call and their sizes match what is passed (checked above).
+    let r = unsafe { cb(rgb.as_ptr(), w as i32, h as i32, key, clicks.as_ptr().cast(), clicks.len() as i32, logits.as_mut_ptr(), VISION_SIDE as i32) };
+    match r {
+        1 => Ok(Some(lightcraft_engine::segment::platform::PlatformMask { side: VISION_SIDE, logits })),
+        0 => Ok(None),
+        -2 => Err("Apple Vision subject selection needs iOS 17 or later".into()),
+        e => Err(format!("Apple Vision could not select anything ({e})")),
+    }
+}
+
+/// Swift registers its Vision segmenter at launch; AI masks then need no model download.
+#[unsafe(no_mangle)]
+pub extern "C" fn rl_set_segmenter(cb: Option<SegmentCb>) {
+    if let Some(cb) = cb
+        && SEGMENT_CB.set(cb).is_ok()
+    {
+        lightcraft_engine::segment::platform::set_platform_segmenter(vision_segment);
+    }
+}
+
 /// # Safety
 /// `ptr`/`len` exactly as returned by [`rl_render`], freed once.
 #[unsafe(no_mangle)]

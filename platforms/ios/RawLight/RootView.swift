@@ -13,7 +13,7 @@ struct RootView: View {
             }
         }
         .task {
-            await model.load()
+            await model.start()
             // Debug aid: RAWLIGHT_OPEN=1 opens the first photo on launch (used for screenshots).
             if ProcessInfo.processInfo.environment["RAWLIGHT_OPEN"] != nil { model.openPhoto = model.photoIDs.first }
         }
