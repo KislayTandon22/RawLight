@@ -6,8 +6,13 @@ private let groups: [(name: String, sections: [String])] = [
 ]
 
 enum EditMode: String, CaseIterable {
-    case edit = "Edit", crop = "Crop", mask = "Mask"
-    var symbol: String { switch self { case .edit: "slider.horizontal.3"; case .crop: "crop.rotate"; case .mask: "circle.lefthalf.filled.inverse" } }
+    case edit = "Edit", crop = "Crop", mask = "Mask", heal = "Heal", looks = "Looks", history = "History"
+    var symbol: String {
+        switch self {
+        case .edit: "slider.horizontal.3"; case .crop: "crop.rotate"; case .mask: "circle.lefthalf.filled.inverse"
+        case .heal: "bandage"; case .looks: "sparkles"; case .history: "clock.arrow.circlepath"
+        }
+    }
 }
 
 struct EditorView: View {
@@ -25,6 +30,12 @@ struct EditorView: View {
     @State private var curveChannel = "master"
     @State private var curvePoints: [CGPoint] = []
     @State private var mode: EditMode = .edit
+    @State private var healTool: HealTool = .spot
+    @State private var spotMode = "heal"
+    @State private var spotSize = 0.04
+    @State private var pet = false
+    @State private var showWB = false
+    @State private var copied = false
     @State private var showCurve = false
     @State private var colourTab = "Basic"
     @State private var colourBand = "red"
@@ -62,6 +73,8 @@ struct EditorView: View {
             glass("chevron.left") { model.openPhoto = nil }
             glass("arrow.uturn.backward") { Task { await command("edit.undo") } }
             glass("arrow.uturn.forward") { Task { await command("edit.redo") } }
+            glass("doc.on.doc") { Task { await command("develop.copy"); copied = true } }
+            glass("doc.on.clipboard", tint: copied ? Theme.accentSoft : nil) { Task { await command("develop.paste"); await reloadControls(); await render() } }
             VStack(spacing: 0) {
                 Text(info.name).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(info.edited ? "Edited" : "Original").font(.caption2).foregroundStyle(.secondary)
@@ -115,6 +128,7 @@ struct EditorView: View {
                             .overlay(alignment: .top) { Text(pickMessage ?? "Tap the colour you want to edit").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38).background(.ultraThinMaterial, in: Capsule()).padding(.top, 10) }
                     }
                     if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } }.transition(.opacity) }
+                    if mode == .heal { HealOverlay(engine: model.engine, imageRect: rect, tool: healTool, spotMode: spotMode, spotSize: spotSize, pet: pet) { live.run { await render(draft: true) } }.transition(.opacity) }
                     if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase) { live.run { await render(draft: true) } }.transition(.opacity) }
                 } else {
                     ProgressView()
@@ -160,7 +174,7 @@ struct EditorView: View {
     }
 
     private var modeBar: some View {
-        HStack(spacing: 4) {
+        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 4) {
             ForEach(EditMode.allCases, id: \.self) { m in
                 Button { setMode(m) } label: {
                     Label(m.rawValue, systemImage: m.symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 16).frame(height: 44)
@@ -169,7 +183,9 @@ struct EditorView: View {
                 }
             }
         }
-        .padding(4).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 6)
+        .padding(4) }
+        .scrollBounceBehavior(.basedOnSize).frame(maxWidth: 700).fixedSize(horizontal: false, vertical: true)
+        .background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 6)
     }
 
     private func setMode(_ m: EditMode) {
@@ -220,12 +236,30 @@ struct EditorView: View {
             ScrollView {
                 if mode == .crop {
                     CropPanel(engine: model.engine, photoID: photoID) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
+                } else if mode == .heal {
+                    HealPanel(engine: model.engine, photoID: photoID, tool: $healTool, spotMode: $spotMode, spotSize: $spotSize, pet: $pet) { live.run { await render(draft: true) } }
+                        .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
+                } else if mode == .looks {
+                    LooksPanel(engine: model.engine, photoID: photoID) { Task { await reloadControls(); await render() } }
+                        .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
+                } else if mode == .history {
+                    HistoryPanel(engine: model.engine, photoID: photoID) { Task { await reloadControls(); await render() } }
+                        .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else if mode == .mask {
                     MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else {
                 VStack(spacing: 8) {
                     if !histogram.isEmpty { HistogramView(bins: histogram) }
-                    QuickEditBar(engine: model.engine) { Task { await reloadControls(); await render() } }.id(photoID)
+                    QuickEditBar(engine: model.engine, showWB: $showWB) { Task { await reloadControls(); await render() } }.id(photoID)
+                    if showWB {
+                        VStack(spacing: 8) {
+                            ForEach(["wb.temp", "wb.tint"], id: \.self) { id in
+                                if let c = controls.first(where: { $0.id == id }) {
+                                    ColorSlider(control: c, onChange: { set(id, $0, commit: false) }, onEnd: { set(id, c.value, commit: true) }, reset: { set(id, c.def, commit: true) })
+                                }
+                            }
+                        }
+                    }
                     if group == "Light" {
                         Button { withAnimation(.snappy) { showCurve.toggle() } } label: {
                             HStack { Text("Tone curve").font(.subheadline.weight(.medium)); Spacer()
@@ -272,6 +306,7 @@ struct EditorView: View {
         let env = ProcessInfo.processInfo.environment
         if let m = env["RAWLIGHT_MODE"], let em = EditMode(rawValue: m.capitalized) { mode = em }
         if env["RAWLIGHT_MASK"] != nil { _ = try? await model.engine.execute("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 0.5]) }
+        if env["RAWLIGHT_SPOT"] != nil { _ = try? await model.engine.execute("spot.add", ["mode": "heal", "points": [[0.5, 0.45]], "size": 0.06]) }
         await render()
     }
 

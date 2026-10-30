@@ -3,6 +3,7 @@ import SwiftUI
 /// Auto / B&W / HDR pills, white balance and profile menus, copy/paste settings.
 struct QuickEditBar: View {
     let engine: Engine
+    @Binding var showWB: Bool
     let onChange: () -> Void
     @State private var bw = false
     @State private var profileID = "lc.color"
@@ -21,12 +22,13 @@ struct QuickEditBar: View {
                     pill("B&W", "circle.lefthalf.filled", on: bw) { await run("develop.treatment", ["bw": !bw]) }
                     if bw { pill("Auto B&W", "slider.horizontal.below.rectangle") { await run("develop.autoBwMix") } }
                     pill("HDR", "sun.max") { await run("develop.hdr") }
+                    Button { withAnimation(.snappy) { showWB.toggle() } } label: {
+                        chip("White balance", "thermometer.medium").overlay(Capsule().stroke(showWB ? Theme.accent : .clear, lineWidth: 2))
+                    }
                     Menu {
                         ForEach(wbModes, id: \.0) { m in Button { Task { await run("develop.wb", ["mode": m.0]) } } label: { if wb == m.0 { Label(m.1, systemImage: "checkmark") } else { Text(m.1) } } }
-                    } label: { chip("White balance", "thermometer.medium") }
+                    } label: { chip("WB preset", "dial.medium") }
                     Menu {
-                        Button("Copy settings") { Task { await run("develop.copy") } }
-                        Button("Paste settings") { Task { await run("develop.paste") } }
                         Button("Paste from previous") { Task { await run("develop.pastePrevious") } }
                         Button("Match exposure") { Task { await run("develop.matchExposure") } }
                     } label: { chip("More", "ellipsis") }
