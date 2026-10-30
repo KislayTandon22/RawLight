@@ -139,6 +139,12 @@ pub(super) fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                 if phone && i != selected {
                     continue;
                 }
+                let is_denoise = spec.id == "enhance.denoise";
+                let denoise_on = d.enhance.denoise_enabled();
+                if is_denoise {
+                    let applicable = !matches!(app.session.denoise_photo_state(id), lightcraft_engine::denoise::PhotoState::NotApplicable);
+                    super::denoise::detail_toggle(app, ui, id, denoise_on, applicable);
+                }
                 let value = controls::get(&d, spec.id).unwrap_or(spec.default);
                 let mut v = value as f32;
                 let response = crate::ui_kit_touch::edit_slider_row(ui, spec.label, &mut v, spec.min as f32..=spec.max as f32, spec.default as f32);
@@ -151,20 +157,37 @@ pub(super) fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
                         let _ = app.run("develop.endInteraction", json!({}));
                     }
                 }
+                if is_denoise {
+                    super::denoise::detail_status(app, ui, id, if denoise_on { d.enhance.denoise } else { 0.0 });
+                }
                 ui.add_space(4.0);
             }
-            let (curve, curve_response) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
-            crate::widgets::announce(&curve_response, "Tone curve Medium contrast");
-            ui.painter().rect_filled(curve, 22.0, Color32::from_white_alpha(31));
-            paint(ui.painter(), egui::Rect::from_center_size(pos2(curve.left() + 24.0, curve.center().y), vec2(18.0, 18.0)), Icon::Curve, t.text_dim);
-            ui.painter().text(pos2(curve.left() + 46.0, curve.center().y), egui::Align2::LEFT_CENTER, "Tone curve", t.semibold(14.0), t.text);
-            ui.painter().text(
-                pos2(curve.right() - 18.0, curve.center().y),
-                egui::Align2::RIGHT_CENTER,
-                "Medium contrast  ›",
-                t.font(14.0),
-                t.text_dim,
-            );
+            if group == 0 {
+                let curve_open = app.ui.flyout_open("curve");
+                let (curve, curve_response) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+                crate::widgets::announce(&curve_response, "Tone curve");
+                ui.painter().rect_filled(curve, 22.0, Color32::from_white_alpha(31));
+                paint(
+                    ui.painter(),
+                    egui::Rect::from_center_size(pos2(curve.left() + 24.0, curve.center().y), vec2(18.0, 18.0)),
+                    Icon::Curve,
+                    t.text_dim,
+                );
+                ui.painter().text(pos2(curve.left() + 46.0, curve.center().y), egui::Align2::LEFT_CENTER, "Tone curve", t.semibold(14.0), t.text);
+                ui.painter().text(
+                    pos2(curve.right() - 18.0, curve.center().y),
+                    egui::Align2::RIGHT_CENTER,
+                    if curve_open { "Hide  ⌄" } else { "Adjust  ›" },
+                    t.font(14.0),
+                    t.text_dim,
+                );
+                if curve_response.clicked() {
+                    app.ui.toggle_flyout("curve");
+                }
+                if curve_open {
+                    super::edit::curve_editor(app, ui, id, &d);
+                }
+            }
         });
         ui.add_space(12.0);
         ui.horizontal(|ui| {
