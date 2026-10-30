@@ -251,7 +251,7 @@ struct MaskPanel: View {
                         Button("Background") { add(["kind": "background"]) }
                     }
                 } label: {
-                    Label("Add mask", systemImage: "plus").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(height: 44)
+                    Text("Add mask").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize().padding(.horizontal, 18).frame(height: 44)
                         .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                 }
                 Spacer()
