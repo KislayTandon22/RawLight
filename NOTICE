@@ -61,3 +61,8 @@ downloads cities15000.zip, admin1CodesASCII.txt and countryInfo.txt from GeoName
 (https://download.geonames.org/export/dump/) into the settings folder. GeoNames data is licensed
 under Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/);
 attribution: "GeoNames, geonames.org". The lookup code (crates/geocode) is our own.
+
+RawLight is based on LightCraft by the ArtCraft Team / storytold
+(https://github.com/storytold/lightcraft), used under MIT OR Apache-2.0. Upstream copyright
+notices are retained. The ArtCraft name, wordmark and logos (docs/brand/) are trademarks and are
+not part of the licensed material; RawLight does not use them.
