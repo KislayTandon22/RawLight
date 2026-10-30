@@ -172,6 +172,10 @@ fn ipad_bar(app: &mut LightcraftApp, ui: &mut egui::Ui, rect: Rect, photo: &Phot
         let _ = app.run("view.photoGrid", json!({}));
     }
     x += CONTROL_H + GAP;
+    if bar_button(ui, "sidebar", Icon::Sidebar, row(x, CONTROL_H), 20.0, true, "Show/hide My Photos panel").clicked() {
+        let _ = app.run("view.leftPanel", json!({}));
+    }
+    x += CONTROL_H + GAP;
     let can_undo = !app.session.undo.is_empty();
     if bar_button(ui, "undo", Icon::Undo, row(x, CONTROL_H), 21.0, can_undo, "Undo").clicked() {
         let _ = app.run("edit.undo", json!({}));
