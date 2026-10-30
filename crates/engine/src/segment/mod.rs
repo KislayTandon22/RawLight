@@ -18,6 +18,7 @@
 #[cfg(feature = "sam")]
 mod download;
 pub mod platform;
+pub mod region;
 #[cfg(feature = "sam")]
 mod worker;
 

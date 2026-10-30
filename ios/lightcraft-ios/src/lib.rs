@@ -140,7 +140,8 @@ fn vision_segment(
         unsafe { cb(rgb.as_ptr(), w as i32, h as i32, key, clicks.as_ptr().cast(), clicks.len() as i32, logits.as_mut_ptr(), VISION_SIDE as i32) };
     match r {
         1 => Ok(Some(lightcraft_engine::segment::platform::PlatformMask { side: VISION_SIDE, logits })),
-        0 => Ok(None),
+        // no salient subject under the tap (sky, foliage, a background object): grow a region from it
+        0 => Ok(lightcraft_engine::segment::region::region_grow(rgb, w, h, clicks, VISION_SIDE)),
         -2 => Err("Apple Vision subject selection needs iPadOS 17 or later".into()),
         e => Err(format!("Apple Vision could not select anything ({e})")),
     }
