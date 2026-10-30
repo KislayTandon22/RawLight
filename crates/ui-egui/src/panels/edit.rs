@@ -76,6 +76,10 @@ fn rel_to_k(r: f64) -> f64 {
 }
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
+    if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+        super::edit_touch::show(app, ui, id);
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let d = app.session.develop_of(id).unwrap_or_default();
     // a raw shown from its embedded JPEG (preview only) gets the rendered-file white balance scale

@@ -560,6 +560,60 @@ pub fn value_slider(ui: &mut Ui, value: &mut f32, range: RangeInclusive<f32>, ne
     resp
 }
 
+/// A touch edit control with a label/value header, 44-point slider capsule and an announced
+/// reset affordance when the value differs from neutral. Returns the slider response.
+pub fn edit_slider_row(ui: &mut Ui, label: &str, value: &mut f32, range: RangeInclusive<f32>, neutral: f32) -> Response {
+    if !touch(ui.ctx()) {
+        return inert(ui);
+    }
+    let t = Tokens::get(ui.ctx());
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(crate::i18n::tr(label)).size(14.0).color(t.text));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(egui::RichText::new(format!("{value:+.2}")).size(14.0).color(t.text));
+        });
+    });
+    let neutral = clamp_value(neutral, &range);
+    let changed = (*value - neutral).abs() > 0.0001;
+    let (row, probe) = ui.allocate_exact_size(vec2(full_width(ui), CONTROL_H), Sense::hover());
+    let mut response = ui.interact(row, probe.id.with("edit-slider-capsule"), Sense::hover());
+    ui.painter().rect_filled(row, CONTROL_H / 2.0, soft(ui, TRACK_ALPHA));
+    let reset_rect = Rect::from_center_size(pos2(row.right() - 22.0, row.center().y), vec2(CONTROL_H, CONTROL_H));
+    let reset = ui.interact(reset_rect, response.id.with("reset"), if changed { Sense::click() } else { Sense::hover() });
+    crate::widgets::announce(&reset, format!("Reset {}", crate::i18n::tr(label)));
+    if changed && ui.is_rect_visible(reset_rect) {
+        ui.painter().circle_filled(reset_rect.center(), 14.0, soft(ui, SELECTED_ALPHA));
+        paint(ui.painter(), reset_rect.shrink(14.0), Icon::Undo, secondary(ui, &t));
+    }
+    if reset.clicked() {
+        *value = neutral;
+        response.mark_changed();
+    }
+    let track = row.shrink2(vec2(THUMB_R + 10.0, 0.0)).with_max_x(reset_rect.left() - 8.0);
+    if track.width() > 0.0 {
+        let track_rect = Rect::from_min_max(pos2(track.left(), row.center().y - TRACK_H / 2.0), pos2(track.right(), row.center().y + TRACK_H / 2.0));
+        let slider = ui.interact(row.with_max_x(reset_rect.left() - 4.0), response.id.with("track"), Sense::click_and_drag());
+        if let Some(pointer) = slider.interact_pointer_pos()
+            && (slider.dragged() || slider.clicked())
+        {
+            let next = slider_value_at(pointer.x, track_rect, &range);
+            if next != *value {
+                *value = next;
+                response.mark_changed();
+            }
+        }
+        let x = slider_x(*value, track_rect, &range);
+        let neutral_x = slider_x(neutral, track_rect, &range);
+        let (from, to) = fill_span(x, neutral_x);
+        if to > from {
+            ui.painter().rect_filled(Rect::from_min_max(pos2(from, track_rect.top()), pos2(to, track_rect.bottom())), TRACK_H / 2.0, t.accent);
+        }
+        ui.painter().circle_filled(pos2(x, row.center().y), THUMB_R, t.thumb);
+        crate::widgets::announce(&slider, crate::i18n::tr(label));
+    }
+    response
+}
+
 /// The state a [`photo_cell_badge`] draws over a thumbnail: the rating, the pick or reject flag,
 /// whether the photo is edited, and why its preview is missing. A plain struct, so a screen builds
 /// it from whatever it already knows and the badge draws nothing it was not told.
