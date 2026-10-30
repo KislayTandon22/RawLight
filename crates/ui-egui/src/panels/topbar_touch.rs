@@ -23,6 +23,9 @@ const CONTROL_H: f32 = 36.0;
 pub(crate) const TOUCH_BAR_H: f32 = 60.0;
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    if super::photo_bar_touch::show(app, ui) {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let touch = crate::theme::touch_ui(ui.ctx());
     let insets = crate::theme::safe_area_insets(ui.ctx());
