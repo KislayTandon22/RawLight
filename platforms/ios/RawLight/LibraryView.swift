@@ -53,7 +53,7 @@ struct LibraryView: View {
                 PhotosPicker(selection: $picked, matching: .images, photoLibrary: .shared()) {
                     Label("Import", systemImage: "plus").font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 16).frame(height: 44)
-                        .background(Color(red: 0.04, green: 0.52, blue: 1), in: Capsule())
+                        .background(Theme.accent, in: Capsule())
                         .foregroundStyle(.white)
                 }
                 .onChange(of: picked) { _, items in

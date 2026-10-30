@@ -102,9 +102,36 @@ pub unsafe extern "C" fn rl_visible_ids(session: *mut RlSession) -> *mut c_char 
 /// `session` from [`rl_session_new`]; `out_w`, `out_h`, `out_len` valid for writes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rl_render(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, out_w: *mut u32, out_h: *mut u32, out_len: *mut usize) -> *mut u8 {
+    unsafe { rl_render_hist(session, id, max_w, max_h, out_w, out_h, out_len, std::ptr::null_mut()) }
+}
+
+/// Like [`rl_render`], also writing the histogram of the result into `hist` (null to skip):
+/// 4 x 256 `u32` bins in the order red, green, blue, luma.
+///
+/// # Safety
+/// As [`rl_render`]; `hist`, when non-null, must have room for 1024 `u32`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_render_hist(
+    session: *mut RlSession,
+    id: u64,
+    max_w: u32,
+    max_h: u32,
+    out_w: *mut u32,
+    out_h: *mut u32,
+    out_len: *mut usize,
+    hist: *mut u32,
+) -> *mut u8 {
     let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
     let r = catch_unwind(AssertUnwindSafe(|| session.0.render_now(lightcraft_catalog::PhotoId(id), max_w as usize, max_h as usize)));
     let Ok(Ok(rendered)) = r else { return std::ptr::null_mut() };
+    if !hist.is_null() {
+        let h = &rendered.histogram;
+        for (c, bins) in [&h.r, &h.g, &h.b, &h.luma].into_iter().enumerate() {
+            for i in 0..256 {
+                unsafe { *hist.add(c * 256 + i) = bins.get(i).copied().unwrap_or(0) };
+            }
+        }
+    }
     let img = rendered.image;
     let mut bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
     bytes.shrink_to_fit();
@@ -115,6 +142,84 @@ pub unsafe extern "C" fn rl_render(session: *mut RlSession, id: u64, max_w: u32,
     }
     let mut bytes = std::mem::ManuallyDrop::new(bytes);
     bytes.as_mut_ptr()
+}
+
+/// A render detached from the session: build it with [`rl_job_new`] (fast, needs the session),
+/// run it with [`rl_job_run`] on any thread (slow, no session), hand it back with [`rl_job_finish`].
+pub struct RlJob {
+    job: Option<lightcraft_engine::RenderJob>,
+    result: Option<lightcraft_engine::media::RenderResult>,
+}
+
+/// `kind`: 0 full-quality fit, 1 grid/filmstrip thumbnail (disk cached), 2 draft (interactive drags).
+/// Null when the photo does not exist.
+///
+/// # Safety
+/// `session` from [`rl_session_new`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_job_new(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, kind: i32) -> *mut RlJob {
+    let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
+    let pid = lightcraft_catalog::PhotoId(id);
+    let job = catch_unwind(AssertUnwindSafe(|| match kind {
+        1 => session.0.thumb_job(pid, max_w.max(max_h) as usize),
+        2 => session.0.render_job(pid, max_w as usize, max_h as usize, false, true).map(|j| j.draft()),
+        _ => session.0.render_job(pid, max_w as usize, max_h as usize, false, true),
+    }));
+    match job {
+        Ok(Some(job)) => Box::into_raw(Box::new(RlJob { job: Some(job), result: None })),
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// Run the job; same outputs as [`rl_render_hist`]. Call once, on any thread.
+///
+/// # Safety
+/// `job` from [`rl_job_new`], not shared across threads while this runs; out pointers valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_job_run(job: *mut RlJob, out_w: *mut u32, out_h: *mut u32, out_len: *mut usize, hist: *mut u32) -> *mut u8 {
+    let Some(job) = (unsafe { job.as_mut() }) else { return std::ptr::null_mut() };
+    let Some(j) = job.job.take() else { return std::ptr::null_mut() };
+    let Ok(result) = catch_unwind(AssertUnwindSafe(|| j.run())) else { return std::ptr::null_mut() };
+    let out = match &result.rendered {
+        Ok(rendered) => {
+            if !hist.is_null() {
+                let h = &rendered.histogram;
+                for (c, bins) in [&h.r, &h.g, &h.b, &h.luma].into_iter().enumerate() {
+                    for i in 0..256 {
+                        unsafe { *hist.add(c * 256 + i) = bins.get(i).copied().unwrap_or(0) };
+                    }
+                }
+            }
+            let img = &rendered.image;
+            let mut bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
+            bytes.shrink_to_fit();
+            unsafe {
+                *out_w = img.width as u32;
+                *out_h = img.height as u32;
+                *out_len = bytes.len();
+            }
+            let mut bytes = std::mem::ManuallyDrop::new(bytes);
+            bytes.as_mut_ptr()
+        }
+        Err(_) => std::ptr::null_mut(),
+    };
+    job.result = Some(result);
+    out
+}
+
+/// Give the finished job back to the session (it keeps the decoded source and thumbnail) and free it.
+///
+/// # Safety
+/// `job` from [`rl_job_new`], freed once; `session` may be null (the job is just freed).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_job_finish(session: *mut RlSession, job: *mut RlJob) {
+    if job.is_null() {
+        return;
+    }
+    let job = unsafe { Box::from_raw(job) };
+    if let (Some(session), Some(result)) = (unsafe { session.as_mut() }, job.result.as_ref()) {
+        let _ = catch_unwind(AssertUnwindSafe(|| session.0.accept(result)));
+    }
 }
 
 /// # Safety

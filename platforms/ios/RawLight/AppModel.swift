@@ -22,7 +22,7 @@ final class AppModel {
     }
 
     func thumbnail(_ id: UInt64) async {
-        guard thumbs[id] == nil, let img = await engine.render(id, maxEdge: 360) else { return }
+        guard thumbs[id] == nil, let img = await engine.render(id, maxEdge: 360, kind: .thumb)?.image else { return }
         thumbs[id] = img
     }
 

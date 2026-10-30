@@ -17,6 +17,15 @@ char *rl_visible_ids(RlSession *session);
 /* RGBA8 sRGB, fitted in max_w x max_h; NULL on failure; free with rl_buffer_free(ptr, len). */
 unsigned char *rl_render(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h,
                          unsigned *out_w, unsigned *out_h, unsigned long *out_len);
+/* Like rl_render, plus hist[1024] = 256 bins each of red, green, blue, luma (hist may be NULL). */
+unsigned char *rl_render_hist(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h,
+                              unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
+/* Detached render: build (fast), run on any thread (slow), finish on the session.
+   kind: 0 full, 1 thumbnail (disk cached), 2 draft. */
+typedef struct RlJob RlJob;
+RlJob *rl_job_new(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind);
+unsigned char *rl_job_run(RlJob *job, unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
+void rl_job_finish(RlSession *session, RlJob *job);
 void rl_buffer_free(unsigned char *ptr, unsigned long len);
 void rl_session_free(RlSession *session);
 void rl_string_free(char *s);
