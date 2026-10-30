@@ -28,7 +28,7 @@ struct LooksPanel: View {
                 Text("Amount").font(.subheadline); Slider(value: $amount, in: 0...200, step: 1) { e in if !e, let a = applied { Task { await apply(a) } } }.tint(Theme.accent)
                 Text("\(Int(amount))").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 36)
             }
-            .padding(12).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             Button { askName = true } label: {
                 Label("Save current look", systemImage: "plus").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 44)
                     .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
@@ -43,7 +43,7 @@ struct LooksPanel: View {
                         ForEach(curves, id: \.self) { c in
                             Button { Task { _ = try? await engine.execute("curve.applyPreset", ["name": c]); currentCurve = c; onChange() } } label: {
                                 Text(c).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38)
-                                    .background(currentCurve == c ? Theme.accent : Theme.field, in: Capsule()).foregroundStyle(currentCurve == c ? .white : .primary)
+                                    .fieldBackground(currentCurve == c, in: Capsule()).foregroundStyle(currentCurve == c ? .white : .primary)
                             }
                         }
                     }
@@ -68,7 +68,7 @@ struct LooksPanel: View {
                             Text(p.name).font(.footnote.weight(.medium)).lineLimit(2).multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity).frame(height: 54).padding(.horizontal, 6)
-                        .background(applied == p.id ? Theme.accent : Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .fieldBackground(applied == p.id, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .foregroundStyle(applied == p.id ? .white : .primary)
                         .overlay(alignment: .topTrailing) { if p.favorite { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(Theme.accentSoft).padding(6) } }
                     }
@@ -125,7 +125,7 @@ struct HistoryPanel: View {
                     Label("New snapshot", systemImage: "camera").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 44).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                 }
                 Button { Task { await run("history.clear") } } label: {
-                    Text("Clear history").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).background(Theme.field, in: Capsule())
+                    Text("Clear history").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).fieldBackground(in: Capsule())
                 }.buttonStyle(.plain)
             }
             if !versions.isEmpty {
@@ -134,7 +134,7 @@ struct HistoryPanel: View {
                     HStack {
                         Button { Task { await run("version.restore", ["index": i]) } } label: { HStack { Image(systemName: "camera"); Text(v); Spacer() }.frame(height: 44) }.buttonStyle(.plain)
                         Button { Task { await run("version.delete", ["index": i]) } } label: { Image(systemName: "trash").foregroundStyle(.secondary).frame(width: 44, height: 44) }
-                    }.padding(.horizontal, 12).background(Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }.padding(.horizontal, 12).fieldBackground(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
             }
             Text("History").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
@@ -144,7 +144,7 @@ struct HistoryPanel: View {
                     HStack { Text(s); Spacer(); if i == cursor { Image(systemName: "checkmark").foregroundStyle(Theme.accent) } }.frame(height: 44)
                 }
                 .buttonStyle(.plain).padding(.horizontal, 12)
-                .background(i == cursor ? Theme.accent.opacity(0.25) : Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .fieldBackground(i == cursor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .opacity(i > cursor ? 0.5 : 1)
             }
         }

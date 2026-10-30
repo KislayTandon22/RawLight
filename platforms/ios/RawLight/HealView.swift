@@ -147,7 +147,7 @@ struct HealPanel: View {
                         ForEach([("heal", "Heal"), ("clone", "Clone"), ("remove", "Remove"), ("fill", "Fill")], id: \.0) { m in
                             Button { spotMode = m.0; if active != nil { update(["mode": m.0]) } } label: {
                                 Text(m.1).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38)
-                                    .background(spotMode == m.0 ? Theme.accent : Theme.field, in: Capsule()).foregroundStyle(spotMode == m.0 ? .white : .primary)
+                                    .fieldBackground(spotMode == m.0, in: Capsule()).foregroundStyle(spotMode == m.0 ? .white : .primary)
                             }
                         }
                     }
@@ -167,7 +167,7 @@ struct HealPanel: View {
                             pill("New source", "arrow.triangle.2.circlepath") { await run("spot.refreshSource") }
                             pill("Delete", "trash") { await run("spot.delete") }
                         }
-                    }.padding(12).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }.padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 Text("\(spots.count) spot\(spots.count == 1 ? "" : "s")").font(.footnote).foregroundStyle(.secondary)
             } else {
@@ -179,7 +179,7 @@ struct HealPanel: View {
                             Button { Task { await run("redeye.delete", ["index": e.id]) } } label: { Image(systemName: "trash").foregroundStyle(.secondary).frame(width: 44, height: 44) } }
                         slider("Pupil size", e.pupil, 0...100, "%.0f", 1) { v in eyeUpdate(e.id, v, nil) }
                         slider("Darken", e.darken, 0...100, "%.0f", 1) { v in eyeUpdate(e.id, nil, v) }
-                    }.padding(12).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }.padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
@@ -195,7 +195,7 @@ struct HealPanel: View {
     }
     private func pill(_ title: String, _ symbol: String, _ f: @escaping () async -> Void) -> some View {
         Button { Task { await f() } } label: {
-            Label(title, systemImage: symbol).font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44).background(Theme.field, in: Capsule())
+            Label(title, systemImage: symbol).font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44).fieldBackground(in: Capsule())
         }.buttonStyle(.plain)
     }
 

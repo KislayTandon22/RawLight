@@ -20,7 +20,7 @@ struct ExportSheet: View {
             HStack {
                 Text(ids.count > 1 ? "Export \(ids.count) photos" : "Export").font(.title2.weight(.semibold))
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle()) }
+                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).panelBackground(in: Circle()) }
             }
             Picker("Format", selection: $format) {
                 Text("JPEG").tag("jpeg"); Text("PNG").tag("png"); Text("TIFF").tag("tiff"); Text("WebP").tag("webp")

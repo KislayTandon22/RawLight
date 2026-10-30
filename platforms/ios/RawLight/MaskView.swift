@@ -178,14 +178,16 @@ struct MaskPanel: View {
     let photoID: UInt64
     @Binding var brushSize: Double
     @Binding var erase: Bool
+    @Binding var objectPick: Bool
+    @Binding var objectExclude: Bool
     let onChange: () -> Void
     @State private var masks: [MaskItem] = []
     @State private var active: Int?
     @State private var message: String?
     @State private var throttle = Throttle()
 
-    init(engine: Engine, photoID: UInt64, brushSize: Binding<Double>, erase: Binding<Bool>, onChange: @escaping () -> Void) {
-        self.engine = engine; self.photoID = photoID; _brushSize = brushSize; _erase = erase; self.onChange = onChange
+    init(engine: Engine, photoID: UInt64, brushSize: Binding<Double>, erase: Binding<Bool>, objectPick: Binding<Bool>, objectExclude: Binding<Bool>, onChange: @escaping () -> Void) {
+        self.engine = engine; self.photoID = photoID; _brushSize = brushSize; _erase = erase; _objectPick = objectPick; _objectExclude = objectExclude; self.onChange = onChange
     }
 
     private var current: MaskItem? { masks.first { $0.id == active } }
@@ -209,7 +211,8 @@ struct MaskPanel: View {
                         Button("Luminance range") { add(["kind": "luminanceRange"]) }
                         Button("Colour range") { add(["kind": "colorRange"]) }
                     }
-                    Section("AI (needs model)") {
+                    Section("AI (on-device)") {
+                        Button("Object (tap it)") { objectPick = true; objectExclude = false; message = "Tap the object in the photo" }
                         Button("Subject") { add(["kind": "subject"]) }
                         Button("Sky") { add(["kind": "sky"]) }
                         Button("Background") { add(["kind": "background"]) }
@@ -230,9 +233,15 @@ struct MaskPanel: View {
                                 Button("Colour range") { addComponent(op.0, ["kind": "colorRange"]) }
                             }
                         }
-                    } label: { Text("Combine").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).background(Theme.field, in: Capsule()) }
+                    } label: { Text("Combine").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 44).fieldBackground(in: Capsule()) }
                 }
                 if !masks.isEmpty { Button("Delete all", role: .destructive) { run("mask.deleteAll") }.font(.footnote) }
+            }
+            if objectPick {
+                HStack(spacing: 8) {
+                    Picker("Tap", selection: $objectExclude) { Text("Include").tag(false); Text("Exclude").tag(true) }.pickerStyle(.segmented)
+                    Button("Done") { objectPick = false; message = nil }.buttonStyle(.borderedProminent).tint(Theme.accent)
+                }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
             ForEach(masks) { m in
@@ -243,7 +252,7 @@ struct MaskPanel: View {
                     Button { run("mask.visible", ["id": m.id, "visible": !m.visible]) } label: { Image(systemName: m.visible ? "eye" : "eye.slash").frame(width: 44, height: 44) }
                 }
                 .padding(.horizontal, 12)
-                .background(m.id == active ? Theme.accent.opacity(0.28) : Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .fieldBackground(m.id == active, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             if let m = current {
                 HStack(spacing: 8) {
@@ -258,7 +267,7 @@ struct MaskPanel: View {
                         HStack { Text("Brush size").font(.subheadline); Spacer(); Text(String(format: "%.0f%%", brushSize * 100)).foregroundStyle(.secondary) }
                         Slider(value: $brushSize, in: 0.005...0.15).tint(Theme.accent)
                         Toggle("Erase", isOn: $erase).tint(Theme.accent)
-                    }.padding(12).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }.padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 ForEach(adjustments, id: \.key) { a in
                     let c = Control(id: a.key, label: a.label, section: "mask", min: a.min, max: a.max, def: 0, value: m.adjust[a.key] ?? 0,
@@ -276,7 +285,7 @@ struct MaskPanel: View {
     private func action(_ symbol: String, _ title: String, _ f: @escaping () -> Void) -> some View {
         Button(action: f) {
             VStack(spacing: 3) { Image(systemName: symbol); Text(title).font(.caption2) }.frame(maxWidth: .infinity).frame(height: 52)
-                .background(Theme.field, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .fieldBackground(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }.buttonStyle(.plain)
     }
 

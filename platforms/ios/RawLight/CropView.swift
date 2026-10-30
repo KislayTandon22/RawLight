@@ -110,7 +110,7 @@ struct CropPanel: View {
                     ForEach(aspects, id: \.0) { a in
                         Button { aspect = a.0; run("crop.aspect", ["aspect": a.0]) } label: {
                             Text(a.1).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
-                                .background(aspect == a.0 ? Theme.accent : Theme.field, in: Capsule())
+                                .fieldBackground(aspect == a.0, in: Capsule())
                                 .foregroundStyle(aspect == a.0 ? .white : .primary)
                         }
                     }
@@ -122,13 +122,13 @@ struct CropPanel: View {
                     Spacer()
                     Text(String(format: "%.1f°", angle)).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
                     Button { angle = 0; run("crop.straighten", ["angle": 0]) } label: {
-                        Image(systemName: "arrow.counterclockwise").font(.caption.weight(.semibold)).frame(width: 28, height: 28).background(Theme.field, in: Circle())
+                        Image(systemName: "arrow.counterclockwise").font(.caption.weight(.semibold)).frame(width: 28, height: 28).fieldBackground(in: Circle())
                     }.buttonStyle(.plain).opacity(angle == 0 ? 0.3 : 1)
                 }
                 Slider(value: Binding(get: { angle }, set: { v in angle = v; throttle.run { _ = try? await engine.execute("crop.straighten", ["angle": v]); onChange() } }),
                        in: -45...45).tint(Theme.accent)
             }
-            .padding(12).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             HStack(spacing: 10) {
                 tool("rotate.left", "Left") { run("photo.rotateLeft") }
                 tool("rotate.right", "Right") { run("photo.rotateRight") }
@@ -161,11 +161,11 @@ struct CropPanel: View {
     private func tool(_ symbol: String, _ title: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) { Image(systemName: symbol).font(.title3); Text(title).font(.caption2) }
-                .frame(maxWidth: .infinity).frame(height: 56).background(Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .frame(maxWidth: .infinity).frame(height: 56).fieldBackground(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }.buttonStyle(.plain)
     }
     private func pill(_ title: String, _ action: @escaping () -> Void) -> some View { Button(action: action) { pillLabel(title) }.buttonStyle(.plain) }
     private func pillLabel(_ title: String) -> some View {
-        Text(title).font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44).background(Theme.field, in: Capsule())
+        Text(title).font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44).fieldBackground(in: Capsule())
     }
 }

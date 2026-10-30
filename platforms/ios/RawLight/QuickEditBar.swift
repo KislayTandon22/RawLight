@@ -3,7 +3,6 @@ import SwiftUI
 /// Auto / B&W / HDR pills, white balance and profile menus, copy/paste settings.
 struct QuickEditBar: View {
     let engine: Engine
-    @Binding var showWB: Bool
     let onChange: () -> Void
     @State private var bw = false
     @State private var profileID = "lc.color"
@@ -22,12 +21,9 @@ struct QuickEditBar: View {
                     pill("B&W", "circle.lefthalf.filled", on: bw) { await run("develop.treatment", ["bw": !bw]) }
                     if bw { pill("Auto B&W", "slider.horizontal.below.rectangle") { await run("develop.autoBwMix") } }
                     pill("HDR", "sun.max") { await run("develop.hdr") }
-                    Button { withAnimation(.snappy) { showWB.toggle() } } label: {
-                        chip("White balance", "thermometer.medium").overlay(Capsule().stroke(showWB ? Theme.accent : .clear, lineWidth: 2))
-                    }
                     Menu {
                         ForEach(wbModes, id: \.0) { m in Button { Task { await run("develop.wb", ["mode": m.0]) } } label: { if wb == m.0 { Label(m.1, systemImage: "checkmark") } else { Text(m.1) } } }
-                    } label: { chip("WB preset", "dial.medium") }
+                    } label: { chip("White balance", "thermometer.medium") }
                     Menu {
                         Button("Paste from previous") { Task { await run("develop.pastePrevious") } }
                         Button("Match exposure") { Task { await run("develop.matchExposure") } }
@@ -49,7 +45,7 @@ struct QuickEditBar: View {
                     }
                 } label: {
                     HStack(spacing: 4) { Text(profiles.first { $0.id == profileID }?.name ?? "Color"); Image(systemName: "chevron.up.chevron.down").font(.caption) }
-                        .font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40).background(Theme.field, in: Capsule())
+                        .font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40).fieldBackground(in: Capsule())
                 }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
@@ -60,12 +56,12 @@ struct QuickEditBar: View {
     private func pill(_ title: String, _ symbol: String, on: Bool = false, _ action: @escaping () async -> Void) -> some View {
         Button { Task { await action() } } label: {
             Label(title, systemImage: symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
-                .background(on ? Theme.accent : Theme.field, in: Capsule()).foregroundStyle(on ? .white : .primary)
+                .fieldBackground(on, in: Capsule()).foregroundStyle(on ? .white : .primary)
         }
     }
     private func chip(_ title: String, _ symbol: String) -> some View {
         Label(title, systemImage: symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
-            .background(Theme.field, in: Capsule()).foregroundStyle(.primary)
+            .fieldBackground(in: Capsule()).foregroundStyle(.primary)
     }
 
     private func load() async {

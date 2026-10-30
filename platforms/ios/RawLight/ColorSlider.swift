@@ -41,7 +41,7 @@ struct ColorSlider: View {
                     .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
                 Button(action: reset) {
                     Image(systemName: "arrow.counterclockwise").font(.caption.weight(.semibold))
-                        .frame(width: 28, height: 28).background(Theme.field, in: Circle())
+                        .frame(width: 28, height: 28).fieldBackground(in: Circle())
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary).opacity(control.value == control.def ? 0.3 : 1)
             }
@@ -75,6 +75,6 @@ struct ColorSlider: View {
             .frame(height: 44)
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

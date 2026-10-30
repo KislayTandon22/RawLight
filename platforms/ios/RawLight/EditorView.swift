@@ -34,7 +34,9 @@ struct EditorView: View {
     @State private var spotMode = "heal"
     @State private var spotSize = 0.04
     @State private var pet = false
-    @State private var showWB = false
+    @State private var objectPick = false
+    @State private var objectExclude = false
+    @State private var objectMask: Int?
     @State private var copied = false
     @State private var showCurve = false
     @State private var colourTab = "Basic"
@@ -63,6 +65,7 @@ struct EditorView: View {
             }
         }
         .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
+        .onChange(of: objectPick) { _, on in if on { objectMask = nil } }
         .task(id: photoID) { await open() }
     }
 
@@ -99,7 +102,7 @@ struct EditorView: View {
             glass("square.and.arrow.up", tint: Theme.accent) { showExport = true }
         }
         .padding(.horizontal, 10).frame(height: 60)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(8)
     }
 
@@ -122,10 +125,14 @@ struct EditorView: View {
                         .simultaneousGesture(DragGesture().onChanged { if mode == .edit, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
                             .onEnded { _ in baseOffset = offset })
                         .onTapGesture(count: 2) { if mode == .edit { withAnimation(.snappy) { scale = scale > 1 ? 1 : 3; baseScale = scale; offset = .zero; baseOffset = .zero } } }
+                    if objectPick && mode == .mask {
+                        Color.clear.contentShape(Rectangle())
+                            .gesture(SpatialTapGesture().onEnded { tapObject(at: $0.location, in: rect) })
+                    }
                     if picking {
                         Color.clear.contentShape(Rectangle())
                             .gesture(SpatialTapGesture().onEnded { pickColour(at: $0.location, in: rect) })
-                            .overlay(alignment: .top) { Text(pickMessage ?? "Tap the colour you want to edit").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38).background(.ultraThinMaterial, in: Capsule()).padding(.top, 10) }
+                            .overlay(alignment: .top) { Text(pickMessage ?? "Tap the colour you want to edit").font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38).panelBackground(in: Capsule()).padding(.top, 10) }
                     }
                     if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } }.transition(.opacity) }
                     if mode == .heal { HealOverlay(engine: model.engine, imageRect: rect, tool: healTool, spotMode: spotMode, spotSize: spotSize, pet: pet) { live.run { await render(draft: true) } }.transition(.opacity) }
@@ -166,6 +173,22 @@ struct EditorView: View {
         colourTab = "Mixer"; picking = false; pickMessage = nil
     }
 
+    /// Object mask: the first tap makes an on-device Object mask, further taps add to it or cut parts out.
+    private func tapObject(at p: CGPoint, in rect: CGRect) {
+        guard rect.width > 0 else { return }
+        let x = (p.x - rect.minX) / rect.width, y = (p.y - rect.minY) / rect.height
+        guard (0...1).contains(x), (0...1).contains(y) else { return }
+        Task {
+            if let id = objectMask {
+                _ = try? await model.engine.execute("mask.objectPoint", ["x": x, "y": y, "exclude": objectExclude, "id": id])
+            } else if let r = try? await model.engine.execute("mask.add", ["kind": "object", "points": [[x, y]]]) as? [String: Any] {
+                objectMask = (r["activeMask"] as? NSNumber)?.intValue
+            }
+            NotificationCenter.default.post(name: .masksChanged, object: nil)
+            await render(draft: true)
+        }
+    }
+
     private func fitRect(_ s: CGSize, in box: CGSize) -> CGRect {
         guard s.width > 0, s.height > 0 else { return .zero }
         let k = min(box.width / s.width, box.height / s.height)
@@ -178,18 +201,19 @@ struct EditorView: View {
             ForEach(EditMode.allCases, id: \.self) { m in
                 Button { setMode(m) } label: {
                     Label(m.rawValue, systemImage: m.symbol).font(.subheadline.weight(.medium)).padding(.horizontal, 16).frame(height: 44)
-                        .background(mode == m ? Color.white.opacity(0.16) : .clear, in: Capsule())
+                        .fieldBackground(mode == m, in: Capsule())
                         .foregroundStyle(mode == m ? Theme.accentSoft : .primary)
                 }
             }
         }
         .padding(4) }
         .scrollBounceBehavior(.basedOnSize).frame(maxWidth: 700).fixedSize(horizontal: false, vertical: true)
-        .background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 6)
+        .panelBackground(in: Capsule()).padding(.bottom, 6)
     }
 
     private func setMode(_ m: EditMode) {
         withAnimation(.snappy(duration: 0.3)) { mode = m }
+        if m != .mask { objectPick = false; objectMask = nil }
         scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero
         Task { await render() }
     }
@@ -221,7 +245,9 @@ struct EditorView: View {
 
     private var visible: [Control] {
         let secs = groups.first { $0.name == group }?.sections ?? []
-        return controls.filter { secs.contains($0.section) }
+        let list = controls.filter { secs.contains($0.section) }
+        // white balance lives at the top of the Light tab
+        return group == "Light" ? controls.filter { $0.id == "wb.temp" || $0.id == "wb.tint" } + list : list
     }
 
     private var inspector: some View {
@@ -246,26 +272,17 @@ struct EditorView: View {
                     HistoryPanel(engine: model.engine, photoID: photoID) { Task { await reloadControls(); await render() } }
                         .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else if mode == .mask {
-                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
+                    MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase, objectPick: $objectPick, objectExclude: $objectExclude) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else {
                 VStack(spacing: 8) {
                     if !histogram.isEmpty { HistogramView(bins: histogram) }
-                    QuickEditBar(engine: model.engine, showWB: $showWB) { Task { await reloadControls(); await render() } }.id(photoID)
-                    if showWB {
-                        VStack(spacing: 8) {
-                            ForEach(["wb.temp", "wb.tint"], id: \.self) { id in
-                                if let c = controls.first(where: { $0.id == id }) {
-                                    ColorSlider(control: c, onChange: { set(id, $0, commit: false) }, onEnd: { set(id, c.value, commit: true) }, reset: { set(id, c.def, commit: true) })
-                                }
-                            }
-                        }
-                    }
+                    QuickEditBar(engine: model.engine) { Task { await reloadControls(); await render() } }.id(photoID)
                     if group == "Light" {
                         Button { withAnimation(.snappy) { showCurve.toggle() } } label: {
                             HStack { Text("Tone curve").font(.subheadline.weight(.medium)); Spacer()
                                 Text(curvePoints.isEmpty ? "Linear" : "Custom").font(.subheadline).foregroundStyle(.secondary)
                                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary).rotationEffect(.degrees(showCurve ? 90 : 0)) }
-                                .padding(.horizontal, 14).frame(height: 48).background(Theme.field, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .padding(.horizontal, 14).frame(height: 48).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }.buttonStyle(.plain)
                     }
                     if group == "Light" && showCurve {
@@ -286,7 +303,7 @@ struct EditorView: View {
             if mode == .edit { Picker("Group", selection: $group) { ForEach(groups, id: \.name) { Text($0.name).tag($0.name) } }
                   .pickerStyle(.segmented).padding(.horizontal, 16).padding(.bottom, 12) }
         }
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .animation(.snappy(duration: 0.3), value: mode)
         .padding(8)
     }
@@ -306,6 +323,10 @@ struct EditorView: View {
         let env = ProcessInfo.processInfo.environment
         if let m = env["RAWLIGHT_MODE"], let em = EditMode(rawValue: m.capitalized) { mode = em }
         if env["RAWLIGHT_MASK"] != nil { _ = try? await model.engine.execute("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 0.5]) }
+        if let k = env["RAWLIGHT_AIMASK"] {
+            do { let r = try await model.engine.execute("mask.add", ["kind": k]); NSLog("[RawLight] AIMASK %@ ok %@", k, "\(r)"); _ = try? await model.engine.execute("mask.adjust", ["values": ["exposure": -3.0]]); try? await Task.sleep(for: .seconds(4)) }
+            catch { NSLog("[RawLight] AIMASK %@ error %@", k, error.localizedDescription) }
+        }
         if env["RAWLIGHT_SPOT"] != nil { _ = try? await model.engine.execute("spot.add", ["mode": "heal", "points": [[0.5, 0.45]], "size": 0.06]) }
         await render()
     }

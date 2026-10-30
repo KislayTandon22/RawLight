@@ -26,7 +26,7 @@ struct LibraryView: View {
         .overlay(alignment: .bottom) { bottomBar }
         .overlay(alignment: .bottom) {
             if let msg = model.importMessage {
-                Text(msg).font(.subheadline).padding(.horizontal, 16).frame(height: 44).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 100)
+                Text(msg).font(.subheadline).padding(.horizontal, 16).frame(height: 44).panelBackground(in: Capsule()).padding(.bottom, 100)
                     .task { try? await Task.sleep(for: .seconds(4)); model.importMessage = nil }
             }
         }
@@ -68,7 +68,7 @@ struct LibraryView: View {
                     .onSubmit { Task { await model.applyFilters() } }
                 if !model.search.isEmpty { Button { Task { await model.clearFilters() } } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) } }
             }
-            .padding(.horizontal, 12).frame(height: 40).background(Theme.field, in: Capsule()).frame(minWidth: 120)
+            .padding(.horizontal, 12).frame(height: 40).fieldBackground(in: Capsule()).frame(minWidth: 120)
             Menu {
                 ForEach([("captureDate", false, "Newest first"), ("captureDate", true, "Oldest first"), ("importDate", false, "Import date"),
                          ("editDate", false, "Edit date"), ("fileName", true, "File name"), ("rating", false, "Rating"), ("fileSize", false, "File size")], id: \.2) { s in
@@ -80,11 +80,11 @@ struct LibraryView: View {
             Button { showFilters = true } label: {
                 Label("Filter", systemImage: "line.3.horizontal.decrease").labelStyle(.titleAndIcon).font(.subheadline.weight(.medium))
                     .padding(.horizontal, 12).frame(height: 40)
-                    .background(model.filtersActive ? Theme.accent : Theme.field, in: Capsule()).foregroundStyle(model.filtersActive ? .white : .primary)
+                    .fieldBackground(model.filtersActive, in: Capsule()).foregroundStyle(model.filtersActive ? .white : .primary)
             }
             Button { model.selecting.toggle(); if !model.selecting { model.selection = [] } } label: {
                 Text(model.selecting ? "Done" : "Select").font(.subheadline.weight(.medium)).padding(.horizontal, 12).frame(height: 40)
-                    .background(model.selecting ? Color.white.opacity(0.2) : Theme.field, in: Capsule())
+                    .fieldBackground(model.selecting, in: Capsule())
             }
             Menu {
                 Button { showFiles = true } label: { Label("Folder or Files…", systemImage: "folder") }
@@ -105,12 +105,12 @@ struct LibraryView: View {
             }
         }
         .padding(.horizontal, 10).frame(height: 60)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, 8).padding(.top, 4)
     }
 
     private func icon(_ s: String) -> some View {
-        Image(systemName: s).font(.body.weight(.medium)).frame(width: 40, height: 40).background(Theme.field, in: Circle())
+        Image(systemName: s).font(.body.weight(.medium)).frame(width: 40, height: 40).fieldBackground(in: Circle())
     }
 
     private func albumItems(_ items: [AlbumItem]) -> AnyView {
@@ -191,24 +191,24 @@ struct LibraryView: View {
                     } label: { icon("rectangle.stack.badge.plus") }
                     Button { if !model.selection.isEmpty { exporting = true } } label: {
                         Label("Export", systemImage: "square.and.arrow.up").font(.subheadline.weight(.semibold)).padding(.horizontal, 12).frame(height: 40)
-                            .background(model.selection.isEmpty ? Theme.field : Theme.accent, in: Capsule()).foregroundStyle(model.selection.isEmpty ? Color.secondary : .white)
+                            .fieldBackground(!model.selection.isEmpty, in: Capsule()).foregroundStyle(model.selection.isEmpty ? Color.secondary : .white)
                     }
                     if model.source == .recentlyDeleted { Button { Task { await model.batch("photo.restore", clear: true) } } label: { icon("arrow.uturn.backward") } }
                     else { Button(role: .destructive) { Task { await model.batch("photo.delete", clear: true) } } label: { icon("trash") } }
                 }
                 .padding(.horizontal, 10).frame(height: 60)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous)).padding(.horizontal, 8).padding(.bottom, 8)
+                .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous)).padding(.horizontal, 8).padding(.bottom, 8)
             } else {
                 HStack(spacing: 8) {
                     Text("\(model.photoIDs.count) photos · \(model.sortLabel)").font(.footnote.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
-                        .background(.ultraThinMaterial, in: Capsule())
+                        .panelBackground(in: Capsule())
                     Spacer()
                     HStack(spacing: 6) {
                         Image(systemName: "square.grid.3x3").font(.caption)
                         Slider(value: $m.gridSize, in: 80...260).frame(width: 130).tint(Theme.accent)
                         Image(systemName: "square.grid.2x2").font(.caption)
                     }
-                    .padding(.horizontal, 14).frame(height: 40).background(.ultraThinMaterial, in: Capsule())
+                    .padding(.horizontal, 14).frame(height: 40).panelBackground(in: Capsule())
                 }
                 .padding(.horizontal, 12).padding(.bottom, 10)
             }
@@ -227,7 +227,7 @@ struct FilterSheet: View {
         VStack(spacing: 16) {
             HStack {
                 Text("Filter").font(.title2.weight(.semibold)); Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle()) }
+                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).panelBackground(in: Circle()) }
             }
             HStack { Text("Rating"); Spacer()
                 ForEach(1...5, id: \.self) { n in
@@ -261,7 +261,7 @@ struct LibrariesSheet: View {
         VStack(spacing: 14) {
             HStack {
                 Text("Libraries").font(.title2.weight(.semibold)); Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle()) }
+                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).panelBackground(in: Circle()) }
             }
             ScrollView {
                 VStack(spacing: 8) {
@@ -273,7 +273,7 @@ struct LibrariesSheet: View {
                             }.buttonStyle(.plain)
                             if lib != model.currentLibrary { Button { toDelete = lib } label: { Image(systemName: "trash").foregroundStyle(.secondary).frame(width: 44, height: 44) } }
                         }
-                        .padding(.horizontal, 12).background(Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(.horizontal, 12).fieldBackground(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                 }
             }

@@ -37,7 +37,7 @@ struct ColourPanel: View {
                     ForEach(["Basic", "Mixer", "Grading", "More"], id: \.self) { t in
                         Button { withAnimation(.snappy) { tab = t } } label: {
                             Text(t).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 38)
-                                .background(tab == t ? Theme.accent : Theme.field, in: Capsule()).foregroundStyle(tab == t ? .white : .primary)
+                                .fieldBackground(tab == t, in: Capsule()).foregroundStyle(tab == t ? .white : .primary)
                         }
                     }
                 }
@@ -60,8 +60,8 @@ struct ColourPanel: View {
 
     private var basic: some View {
         VStack(spacing: 8) {
-            hint("Warm or cool the whole photo, then set overall colour strength.")
-            slider("wb.temp"); slider("wb.tint"); slider("color.vibrance"); slider("color.saturation")
+            hint("Set overall colour strength. White balance is in the Light tab.")
+            slider("color.vibrance"); slider("color.saturation")
         }
     }
 
@@ -71,7 +71,7 @@ struct ColourPanel: View {
             Button { picking.toggle() } label: {
                 Label(picking ? "Tap a colour in the photo…" : "Pick colour from photo", systemImage: "eyedropper")
                     .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44)
-                    .background(picking ? Theme.accent : Theme.field, in: Capsule()).foregroundStyle(picking ? .white : .primary)
+                    .fieldBackground(picking, in: Capsule()).foregroundStyle(picking ? .white : .primary)
             }
             HStack(spacing: 10) {
                 ForEach(bands, id: \.id) { b in
