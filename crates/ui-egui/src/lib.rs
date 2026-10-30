@@ -14,6 +14,7 @@ mod command_error;
 pub mod control;
 pub mod credits;
 pub mod date_picker;
+pub mod dialogs_touch;
 pub mod docking;
 mod drop_overlay;
 pub mod export_task;
