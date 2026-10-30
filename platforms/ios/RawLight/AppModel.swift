@@ -123,8 +123,8 @@ final class AppModel {
         loadSources()
         scanLibraries()
         if libraries.isEmpty { await createLibrary(name: "My Library", demo: true); return }
-        let saved = UserDefaults.standard.string(forKey: "currentLibrary")
-        await open(libraries.first { $0.id == saved } ?? libraries[0], seedDemo: false)
+        let saved = UserDefaults.standard.string(forKey: "currentLibraryName")
+        await open(libraries.first { $0.name == saved } ?? libraries[0], seedDemo: false)
     }
 
     func open(_ entry: LibraryEntry, seedDemo: Bool) async {
@@ -132,10 +132,23 @@ final class AppModel {
         libraryError = await e.openLibrary(at: entry.url, seedDemo: seedDemo)
         engine = e
         currentLibrary = entry
-        UserDefaults.standard.set(entry.id, forKey: "currentLibrary")
+        await healMissing(engine: e, entry: entry)
+        UserDefaults.standard.set(entry.name, forKey: "currentLibraryName")
         thumbs = [:]; infos = [:]; selection = []; selecting = false; openPhoto = nil
         source = .all; sourceLabel = "All Photos"; search = ""; filterRating = 0; filterFlag = nil; filterEdited = false
         await load()
+    }
+
+    /// Library files are stored by absolute path, and the app's container path can change (reinstall,
+    /// restore). Photos whose files are no longer where the library expects them are searched for in
+    /// the library's own folders and relinked, so nothing has to be imported again.
+    private func healMissing(engine e: Engine, entry: LibraryEntry) async {
+        guard let missing = try? await e.execute("library.missing") as? [[String: Any]], !missing.isEmpty else { return }
+        for folder in [entry.url.appending(path: "Originals"), documents.appending(path: "Imports"), entry.url, documents] {
+            guard FileManager.default.fileExists(atPath: folder.path) else { continue }
+            _ = try? await e.execute("library.findMissing", ["folder": folder.path])
+            if let left = try? await e.execute("library.missing") as? [[String: Any]], left.isEmpty { return }
+        }
     }
 
     func createLibrary(name: String, demo: Bool) async {
@@ -261,7 +274,8 @@ final class AppModel {
             guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
             let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             let url = dir.appending(path: "\(UUID().uuidString).\(ext)")
-            if (try? data.write(to: url)) != nil { paths.append(url.path) }
+            guard (try? data.write(to: url)) != nil else { continue }
+            if HEICConverter.isHEIC(url) { if let jpg = HEICConverter.convert(url, into: dir) { paths.append(jpg.path) } } else { paths.append(url.path) }
         }
         guard !paths.isEmpty else { importMessage = "Couldn't read the selected photos"; return }
         await runImport(paths)
@@ -276,7 +290,12 @@ final class AppModel {
         for u in urls where u.startAccessingSecurityScopedResource() { scoped.append(u); remember(u) }
         defer { scoped.forEach { $0.stopAccessingSecurityScopedResource() } }
         guard !scoped.isEmpty else { importMessage = "No access to the selected items"; return }
-        await runImport(scoped.map(\.path))
+        // HEIC has no decoder in the engine: convert those to JPEG first and import the JPEGs too
+        let stage = FileManager.default.temporaryDirectory.appending(path: "Heic-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: stage) }
+        let converted = scoped.flatMap { HEICConverter.convertAll(under: $0, into: stage) }
+        await runImport(scoped.map(\.path) + converted.map(\.path))
     }
 
     private func runImport(_ paths: [String]) async {

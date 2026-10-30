@@ -154,6 +154,7 @@ struct LibraryView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(selected ? Theme.accent : .clear, lineWidth: 3))
         }
         .buttonStyle(.plain)
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in if !model.selecting { model.selecting = true; model.selection = [id] } })
         .task { await model.thumbnail(id); await model.loadInfo(id) }
     }
 
@@ -188,7 +189,10 @@ struct LibraryView: View {
                             Button(a.name) { Task { await model.batch("album.addPhotos", ["id": a.id]) } }
                         }
                     } label: { icon("rectangle.stack.badge.plus") }
-                    Button { if !model.selection.isEmpty { exporting = true } } label: { icon("square.and.arrow.up") }
+                    Button { if !model.selection.isEmpty { exporting = true } } label: {
+                        Label("Export", systemImage: "square.and.arrow.up").font(.subheadline.weight(.semibold)).padding(.horizontal, 12).frame(height: 40)
+                            .background(model.selection.isEmpty ? Theme.field : Theme.accent, in: Capsule()).foregroundStyle(model.selection.isEmpty ? Color.secondary : .white)
+                    }
                     if model.source == .recentlyDeleted { Button { Task { await model.batch("photo.restore", clear: true) } } label: { icon("arrow.uturn.backward") } }
                     else { Button(role: .destructive) { Task { await model.batch("photo.delete", clear: true) } } label: { icon("trash") } }
                 }
