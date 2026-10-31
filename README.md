@@ -3,13 +3,13 @@
 A native raw photo editor for iPhone, iPad, Mac, Windows, Linux and Android, built on a pure-Rust
 engine (raw decode, develop pipeline, catalog, masks) with a SwiftUI interface on Apple platforms.
 
-> Status: early. iOS/iPadOS is the first target; other platforms follow.
+> Status: v1.0.0 beta for iPad and iPhone ([release notes](docs/RELEASE-v1.0.0.md), [build and test guide](platforms/ios/README.md)). Other platforms follow.
 
 ## Platforms
 
 | Platform | Status | Folder |
 |---|---|---|
-| iOS / iPadOS | builds for simulator | `platforms/ios` |
+| iOS / iPadOS | v1.0.0 beta (simulator and device) | `platforms/ios` |
 | macOS | planned | `platforms/macos` |
 | Windows (x86_64, arm64) | planned | `platforms/windows` |
 | Linux (x86_64, arm64) | planned | `platforms/linux` |

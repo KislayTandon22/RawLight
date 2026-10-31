@@ -364,8 +364,8 @@ struct MaskPanel: View {
     private var typeTabs: some View {
         let types: [(symbol: String, title: String, full: String, run: () -> Void)] = [
             ("person.crop.square", "Subject", "Subject", { add(["kind": "subject"]) }),
-            ("cloud.sun", "Sky", "Sky", { add(["kind": "sky"]) }),
-            ("rectangle.dashed", "Background", "Background", { add(["kind": "background"]) }),
+            ("cloud.sun", "Sky", "Sky", { customOrBuiltIn(.sky, ["kind": "sky"]) }),
+            ("rectangle.dashed", "Background", "Background", { customOrBuiltIn(.background, ["kind": "background"]) }),
             ("lasso", "Lasso", "Lasso", { ObjectPicker.shared.reset(); ObjectPicker.shared.lasso = true; objectPick = true; objectExclude = false; message = nil; showMask = true; onChange() }),
             ("hand.tap", "Object", "Object", { ObjectPicker.shared.reset(); ObjectPicker.shared.lasso = false; objectPick = true; objectExclude = false; message = nil; showMask = true; onChange() }),
             ("square.split.1x2", "Linear", "Linear gradient", { add(["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }),
@@ -422,12 +422,19 @@ struct MaskPanel: View {
         }
     }
     private func select(_ id: Int) { showMask = true; Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
+    /// Sky and Background use the user's own model when one is installed (an Object mask whose point is a marker the
+    /// segmenter recognises), and the built-in method otherwise.
+    private func customOrBuiltIn(_ role: CustomSegmenter.Role, _ builtIn: [String: Any]) {
+        guard CustomSegmenter.shared.isInstalled(role) else { return add(builtIn) }
+        add(["kind": "object", "points": [[0.0, Double(role.marker)]], "label": role.title])
+    }
+
     private func add(_ p: [String: Any]) {
         let picker = ObjectPicker.shared
         NSLog("[RawLight] add tapped kind=%@ busy=%d", String(describing: p["kind"]), picker.busy ? 1 : 0)
         guard !picker.busy else { return }
         let kind = p["kind"] as? String ?? "mask"
-        picker.status = ["subject", "sky", "background", "object"].contains(kind) ? "Finding the \(kind)…" : "Adding mask…"
+        picker.status = ["subject", "sky", "background", "object"].contains(kind) ? "Finding the \((p["label"] as? String)?.lowercased() ?? kind)…" : "Adding mask…"
         picker.busy = true; showMask = true; onChange()
         Task {
             defer { picker.busy = false }

@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("segmenter") private var segmenter = "sam"
     @State private var denoiseModels: [[String: Any]] = []
     @State private var terms: (title: String, terms: String, sizeBytes: Int)?
+    @State private var pickingRole: CustomSegmenter.Role?
     @State private var photos = 0
     @State private var albums = 0
     @State private var cacheBytes = 0
@@ -81,9 +82,11 @@ struct SettingsView: View {
                         Text("MobileSAM (recommended)").tag("sam")
                         Text("Apple Vision only").tag("vision")
                     }
-                    LabeledContent("Subject, Sky, Background", value: "Apple Vision")
+                    LabeledContent("Subject", value: "Apple Vision")
+                    ForEach(CustomSegmenter.Role.allCases, id: \.self) { role in customRow(role) }
+                    if let e = CustomSegmenter.shared.error { Text(e).font(.footnote).foregroundStyle(Theme.accentSoft) }
                 } header: { Text("Selection model") } footer: {
-                    Text(MobileSAM.shared.available ? "MobileSAM (Apache-2.0, about 23 MB) is included in the app and follows edges best. Apple Vision is faster to start but picks whole people and groups." : "MobileSAM is not in this build, so Apple Vision is used.")
+                    Text((MobileSAM.shared.available ? "MobileSAM (Apache-2.0, about 23 MB) is included in the app and follows edges best. Apple Vision is faster to start but picks whole people and groups. " : "MobileSAM is not in this build, so Apple Vision is used. ") + "For Sky or Background you can add your own Core ML model: one image input and a mask output (an image or an array) covering the whole photo, where higher means the region. Turn on Invert if your model marks the opposite area.")
                 }
                 Section {
                     if denoiseModels.isEmpty { Text("No denoise model yet.").foregroundStyle(.secondary) }
@@ -123,6 +126,10 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { Task { await saveImport() }; dismiss() } } }
+            .fileImporter(isPresented: Binding(get: { pickingRole != nil }, set: { if !$0 { pickingRole = nil } }), allowedContentTypes: [.item], allowsMultipleSelection: false) { r in
+                if case .success(let urls) = r, let url = urls.first, let role = pickingRole { Task { await CustomSegmenter.shared.install(url, as: role) } }
+                pickingRole = nil
+            }
             .task { await load(); await loadModels() }
             .onChange(of: model.denoiseDownload == nil) { _, _ in Task { await loadModels() } }
             .alert(terms?.title ?? "", isPresented: Binding(get: { terms != nil }, set: { if !$0 { terms = nil } })) {
@@ -144,6 +151,24 @@ struct SettingsView: View {
             creator = imp?["creator"] as? String ?? ""; copyright = imp?["copyright"] as? String ?? ""
         }
         if let x = try? await model.engine.execute("library.xmpPreferences") as? [String: Any] { autoWrite = x["autoWrite"] as? Bool ?? false }
+    }
+
+    @ViewBuilder private func customRow(_ role: CustomSegmenter.Role) -> some View {
+        let seg = CustomSegmenter.shared
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(role.title)
+                    Text(seg.names[role].map { "Your model: \($0)" } ?? (role == .sky ? "Built-in sky detection" : "Apple Vision")).font(.footnote).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(seg.isInstalled(role) ? "Change…" : "Add model…") { pickingRole = role }.buttonStyle(.bordered).tint(Theme.accent)
+            }
+            if seg.isInstalled(role) {
+                Toggle("Invert (the model marks the other area)", isOn: Binding(get: { seg.invert(role) }, set: { seg.setInvert(role, $0) })).tint(Theme.accent).font(.footnote)
+                Button("Use built-in again", role: .destructive) { seg.remove(role) }.font(.footnote)
+            }
+        }
     }
 
     private func askModelDownload() async { terms = await model.denoiseTerms() }

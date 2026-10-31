@@ -10,6 +10,7 @@
 		02C29839F2ECC7641EBFC5F6 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29C664979A0E27C1CBD431C /* ExportSheet.swift */; };
 		12DFC765C4FB29BF9D12D5D0 /* InfoPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B25D05C46397F9EC8DFA415 /* InfoPanel.swift */; };
 		17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188A661C8121EDA12A429069 /* EditorView.swift */; };
+		1B9D62DBAB2A7F77BA3F1B5C /* CustomSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 920F6F245BCB82FDCCB54E3D /* CustomSegmenter.swift */; };
 		28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */; };
 		2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D206DF744DE049ABECA7CEDA /* LibraryView.swift */; };
 		31706586C5570C3DD9D03174 /* RegionGrow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6819299CDC16F1CDE6499E5E /* RegionGrow.swift */; };
@@ -77,6 +78,7 @@
 		7B25D05C46397F9EC8DFA415 /* InfoPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoPanel.swift; sourceTree = "<group>"; };
 		81475D8E59BEEC8167FBB4F0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8560E8AC4BC45B87ADF19267 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		920F6F245BCB82FDCCB54E3D /* CustomSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSegmenter.swift; sourceTree = "<group>"; };
 		95D54056A2B475E5BC232199 /* MergeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeView.swift; sourceTree = "<group>"; };
 		9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawLightApp.swift; sourceTree = "<group>"; };
 		A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RawLight-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 				BECC7399FD2375C6CDB41443 /* ColourPanel.swift */,
 				48C0A5D018031985E8DCD890 /* CropView.swift */,
 				A475B1E68A117F49D9DE92CD /* CurveEditor.swift */,
+				920F6F245BCB82FDCCB54E3D /* CustomSegmenter.swift */,
 				B338610ED569669C9221C258 /* DetailPanel.swift */,
 				188A661C8121EDA12A429069 /* EditorView.swift */,
 				773D225FB743BF09F0786159 /* Engine.swift */,
@@ -319,6 +322,7 @@
 				36664514EEF83F8D61D1B199 /* ColourPanel.swift in Sources */,
 				8B8622516CB2417190BC36AD /* CropView.swift in Sources */,
 				326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */,
+				1B9D62DBAB2A7F77BA3F1B5C /* CustomSegmenter.swift in Sources */,
 				7AF2CA2A6C9AA67A01162E3A /* DetailPanel.swift in Sources */,
 				17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */,
 				7C236BFC68456C18831CD622 /* Engine.swift in Sources */,

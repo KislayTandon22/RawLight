@@ -16,8 +16,10 @@ private final class VisionSegmenter {
 
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Int32 {
-        NSLog("[RawLight] segmenter start clicks=%d", clicks.count)
-        defer { NSLog("[RawLight] segmenter end") }
+        // Sky or Background with the user's own model: the tile sends a marker point instead of a real tap
+        if let marker = clicks.first(where: { $0.0 < 0.0001 }), let role = CustomSegmenter.Role.allCases.first(where: { abs($0.marker - marker.1) < 0.000004 }) {
+            return CustomSegmenter.shared.run(role, rgb: rgb, w: w, h: h, out: out, side: side) ? 1 : -6
+        }
         // taps (Object tool): MobileSAM follows the tapped thing, so a bird held by a person is just the bird
         if clicks.contains(where: { $0.2 }), UserDefaults.standard.string(forKey: "segmenter") != "vision", MobileSAM.shared.segment(rgb: rgb, w: w, h: h, key: key, clicks: clicks, out: out, side: side) { return 1 }
         lock.lock(); defer { lock.unlock() }
