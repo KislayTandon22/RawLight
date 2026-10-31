@@ -18,6 +18,7 @@ struct RootView: View {
         }
         .task {
             await model.start()
+            if onboarded || debugLaunch { await model.ensureDenoiseModel() }
             // Debug aid: RAWLIGHT_OPEN=1 opens the first photo on launch (used for screenshots).
             // Debug aid: RAWLIGHT_IMPORT=/path/photo.jpg imports that file and opens it.
             if let path = ProcessInfo.processInfo.environment["RAWLIGHT_IMPORT"] {

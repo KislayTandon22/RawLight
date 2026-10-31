@@ -43,9 +43,8 @@ struct OnboardingView: View {
     private func accept() async {
         working = true
         _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        if let url = Bundle.main.url(forResource: "rawdenoise-nind", withExtension: "dtmodel") {
-            do { _ = try await model.engine.execute("denoise.models.install", ["path": url.path, "acknowledged": true, "activate": true]) }
-            catch { note = "Denoise model couldn't be set up now; you can add it later in Edit › Detail." }
+        if Bundle.main.url(forResource: "rawdenoise-nind", withExtension: "dtmodel") != nil, !(await model.ensureDenoiseModel()) {
+            note = "Denoise model couldn't be set up now; you can add it later in Edit › Detail."
         }
         working = false
         finish()

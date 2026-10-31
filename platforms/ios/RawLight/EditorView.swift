@@ -264,7 +264,14 @@ struct EditorView: View {
                     if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase, pencilOnly: UserDefaults.standard.bool(forKey: "pencilOnly"),
                         onUndo: { Task { await command("edit.undo") } }, onRedo: { Task { await command("edit.redo") } }, onPencilTap: { erase.toggle() }) { live.run { await render(draft: true) } }.transition(.opacity) }
                 } else {
-                    ProgressView()
+                    // Opening a large raw takes a moment: show its thumbnail under a progress badge instead of a black screen.
+                    ZStack {
+                        if let t = model.thumbs[photoID] {
+                            Image(uiImage: t).resizable().scaledToFit().blur(radius: 6).opacity(0.7)
+                        }
+                        HStack(spacing: 10) { ProgressView().controlSize(.regular); Text("Developing photo…").font(.subheadline.weight(.medium)) }
+                            .padding(.horizontal, 18).frame(height: 48).panelBackground(in: Capsule())
+                    }
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)

@@ -310,4 +310,13 @@ final class AppModel {
             importMessage = error.localizedDescription
         }
     }
+
+    /// Installs the bundled AI denoise model the first time, so nobody has to find a button for it.
+    @discardableResult
+    func ensureDenoiseModel() async -> Bool {
+        guard let url = Bundle.main.url(forResource: "rawdenoise-nind", withExtension: "dtmodel") else { return false }
+        if let s = try? await engine.execute("denoise.status", [:]) as? [String: Any], s["model"] is [String: Any] { return true }
+        do { _ = try await engine.execute("denoise.models.install", ["path": url.path, "acknowledged": true, "activate": true]); return true }
+        catch { return false }
+    }
 }
