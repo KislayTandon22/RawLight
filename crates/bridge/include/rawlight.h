@@ -25,6 +25,7 @@ unsigned char *rl_render_hist(RlSession *session, unsigned long long id, unsigne
 typedef struct RlJob RlJob;
 RlJob *rl_job_new(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind);
 RlJob *rl_job_new_mask_overlay(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind, unsigned mask_id);
+RlJob *rl_job_new_mask_overlay_rgb(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, int kind, unsigned mask_id, unsigned char r, unsigned char g, unsigned char b);
 RlJob *rl_job_new_preset(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h, const char *preset_id, unsigned amount);
 unsigned char *rl_job_run(RlJob *job, unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
 void rl_job_finish(RlSession *session, RlJob *job);

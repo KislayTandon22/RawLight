@@ -97,6 +97,7 @@ struct LibraryView: View {
                     }
                 }
             } label: { icon("arrow.up.arrow.down") }
+            Button { showSettings = true } label: { icon("gearshape") }.accessibilityLabel("Settings").accessibilityIdentifier("settings.button")
             Button { showFilters = true } label: {
                 AdaptiveLabel("Filter", "line.3.horizontal.decrease", compact: hsize == .compact).font(.subheadline.weight(.medium))
                     .padding(.horizontal, hsize == .compact ? 0 : 12).frame(width: hsize == .compact ? 40 : nil, height: 40)

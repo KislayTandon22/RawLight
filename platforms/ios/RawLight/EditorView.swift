@@ -210,7 +210,7 @@ struct EditorView: View {
                         .simultaneousGesture(DragGesture().onChanged { if mode == .edit, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
                             .onEnded { _ in baseOffset = offset })
                         .simultaneousGesture(DragGesture(minimumDistance: 40).onEnded { v in
-                            guard mode == .edit, scale <= 1, compare == "off", !picking else { return }
+                            guard mode == .edit, scale <= 1, compare == "off", !picking, UserDefaults.standard.object(forKey: "swipeGestures") as? Bool ?? true else { return }
                             let dx = v.translation.width, dy = v.translation.height
                             if abs(dx) > abs(dy) * 1.5 { step(dx < 0 ? 1 : -1) }
                             else if abs(dy) > abs(dx) * 1.5 { swipeVertical(up: dy < 0, flagSide: v.startLocation.x > rect.midX) }
@@ -642,7 +642,7 @@ struct EditorView: View {
     private func step(_ d: Int) {
         guard let i = model.photoIDs.firstIndex(of: photoID), model.photoIDs.indices.contains(i + d) else { return }
         withAnimation(.snappy) { photoID = model.photoIDs[i + d] }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if UserDefaults.standard.object(forKey: "haptics") as? Bool ?? true { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
     }
 
     private func swipeVertical(up: Bool, flagSide: Bool) {
@@ -668,7 +668,7 @@ struct EditorView: View {
     }
 
     private func show(_ text: String) {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if UserDefaults.standard.object(forKey: "haptics") as? Bool ?? true { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         withAnimation(.snappy) { hud = text }
         Task { try? await Task.sleep(for: .seconds(1)); withAnimation { if hud == text { hud = nil } } }
     }

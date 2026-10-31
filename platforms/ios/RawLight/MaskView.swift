@@ -283,7 +283,7 @@ struct MaskPanel: View {
             ForEach(masks) { m in
                 HStack {
                     Button { select(m.id) } label: {
-                        HStack { Image(systemName: icon(m.kind)); Text(m.name).lineLimit(1); Spacer() }.frame(height: 44)
+                        HStack { Circle().fill(MaskPalette.color(for: m.id)).frame(width: 14, height: 14).overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1.5)); Image(systemName: icon(m.kind)); Text(m.name).lineLimit(1); Spacer() }.frame(height: 44)
                     }.buttonStyle(.plain)
                     Button { run("mask.visible", ["id": m.id, "visible": !m.visible]) } label: { Image(systemName: m.visible ? "eye" : "eye.slash").frame(width: 44, height: 44) }
                 }
@@ -338,13 +338,17 @@ struct MaskPanel: View {
                     }.buttonStyle(.plain)
                 }
             }
-            HStack(spacing: 8) {
-                Button { picker.undo?() } label: { Label(picker.lasso ? "Undo" : "Undo tap", systemImage: "arrow.uturn.backward").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
-                    .buttonStyle(.plain).disabled(picker.taps.isEmpty).opacity(picker.taps.isEmpty ? 0.4 : 1)
-                Button { picker.clear?() } label: { Label("Start over", systemImage: "xmark").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
-                    .buttonStyle(.plain).disabled(picker.taps.isEmpty).opacity(picker.taps.isEmpty ? 0.4 : 1)
+            HStack(spacing: 10) {
+                let empty = picker.taps.isEmpty
+                Button { picker.undo?() } label: {
+                    Image(systemName: "arrow.uturn.backward").font(.body.weight(.semibold)).frame(width: 44, height: 44).fieldBackground(in: Circle())
+                }.buttonStyle(.plain).disabled(empty).opacity(empty ? 0.35 : 1).accessibilityLabel("Undo")
+                Button { picker.clear?() } label: {
+                    Text("Start over").font(.subheadline.weight(.medium)).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(height: 44).fieldBackground(in: Capsule())
+                }.buttonStyle(.plain).disabled(empty).opacity(empty ? 0.35 : 1)
+                Spacer(minLength: 0)
                 Button { objectPick = false; message = nil; picker.reset() } label: {
-                    Text("Done").font(.footnote.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 38).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
+                    Text("Done").font(.subheadline.weight(.semibold)).padding(.horizontal, 26).frame(height: 44).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                 }.buttonStyle(.plain)
             }
             if let e = picker.error { Text(e).font(.footnote).foregroundStyle(Theme.accentSoft) }

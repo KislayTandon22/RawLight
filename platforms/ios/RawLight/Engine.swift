@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SwiftUI
 
 /// How the engine wants a slider track drawn (`track` in `develop.controls`).
 enum Track: Hashable {
@@ -107,7 +108,8 @@ final class Engine: @unchecked Sendable {
         let job: OpaquePointer? = await withCheckedContinuation { cont in
             queue.async {
                 if let m = maskOverlay, kind != .thumb {
-                    cont.resume(returning: rl_job_new_mask_overlay(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue, UInt32(m)))
+                    let c = MaskPalette.rgb(for: m)
+                    cont.resume(returning: rl_job_new_mask_overlay_rgb(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue, UInt32(m), c.0, c.1, c.2))
                 } else {
                     cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind.rawValue))
                 }
@@ -262,4 +264,21 @@ extension Engine {
             busy = false
         }
     }
+}
+
+
+/// Overlay colours for masks. The default palette is the Okabe-Ito set, chosen to stay distinguishable with the common
+/// kinds of colour blindness, and gives each mask its own colour; Settings can pin every mask to one colour instead.
+enum MaskPalette {
+    static let colors: [(name: String, rgb: (UInt8, UInt8, UInt8))] = [
+        ("Orange", (230, 159, 0)), ("Sky blue", (86, 180, 233)), ("Yellow", (240, 228, 66)),
+        ("Vermilion", (213, 94, 0)), ("Blue", (0, 114, 178)), ("Pink", (204, 121, 167)), ("Teal", (0, 158, 115)),
+    ]
+    /// "auto" (a colour per mask) or the name of one colour.
+    static var choice: String { UserDefaults.standard.string(forKey: "maskColor") ?? "auto" }
+    static func rgb(for maskID: Int) -> (UInt8, UInt8, UInt8) {
+        if let fixed = colors.first(where: { $0.name == choice }) { return fixed.rgb }
+        return colors[abs(max(maskID, 1) - 1) % colors.count].rgb
+    }
+    static func color(for maskID: Int) -> Color { let c = rgb(for: maskID); return Color(red: Double(c.0) / 255, green: Double(c.1) / 255, blue: Double(c.2) / 255) }
 }

@@ -152,10 +152,13 @@ final class MobileSAM {
             return n
         }
         let floor = max(0.7, iou[best].floatValue - 0.06)
-        var pickIdx = best, bigArea = area(best)
+        let valid = Float(max(1, (scaledW / 4) * (scaledH / 4)))
+        let bestArea = area(best)
+        var pickIdx = best, bigArea = bestArea
         for k in 0..<count where k != best && iou[k].floatValue >= floor {
             let a = area(k)
-            if a > bigArea { bigArea = a; pickIdx = k }
+            // a guess that swallows the background is not "the whole object": cap it relative to the best one and to the photo
+            if a > bigArea, a <= bestArea * 3, Float(a) <= valid * 0.6 { bigArea = a; pickIdx = k }
         }
         return pickIdx
     }

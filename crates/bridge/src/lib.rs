@@ -209,9 +209,20 @@ pub unsafe extern "C" fn rl_job_new(session: *mut RlSession, id: u64, max_w: u32
 /// `session` from [`rl_session_new`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rl_job_new_mask_overlay(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, kind: i32, mask_id: u32) -> *mut RlJob {
+    unsafe { rl_job_new_mask_overlay_rgb(session, id, max_w, max_h, kind, mask_id, 242, 58, 92) }
+}
+
+/// [`rl_job_new_mask_overlay`] with the tint colour chosen by the caller (so masks can be told apart and
+/// the colour can be picked for colour-blind users).
+///
+/// # Safety
+/// `session` from [`rl_session_new`].
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn rl_job_new_mask_overlay_rgb(session: *mut RlSession, id: u64, max_w: u32, max_h: u32, kind: i32, mask_id: u32, r: u8, g: u8, b: u8) -> *mut RlJob {
     let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
     let pid = lightcraft_catalog::PhotoId(id);
-    let color = [242, 58, 92];
+    let color = [r, g, b];
     let overlay = if mask_id == 0 {
         lightcraft_engine::pipeline::Overlay::AllMasks { view: lightcraft_engine::pipeline::MaskView::Color, color, opacity: 55 }
     } else {
