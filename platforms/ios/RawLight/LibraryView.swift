@@ -34,8 +34,11 @@ struct LibraryView: View {
             }
         }
         .overlay(alignment: .bottom) { bottomBar }
-        .overlay { if model.importing { ImportingOverlay().transition(.opacity) } }
-        .animation(.easeInOut(duration: 0.25), value: model.importing)
+        .overlay {
+            if model.openingLibrary { ImportingOverlay(title: "Opening your library", quiet: "Loading your photos and edits…", slow: "Still opening. Big libraries take a little longer.").transition(.opacity) }
+            else if model.importing { ImportingOverlay().transition(.opacity) }
+        }
+        .animation(.easeInOut(duration: 0.25), value: model.importing || model.openingLibrary)
         .overlay(alignment: .bottom) {
             if let msg = model.importMessage {
                 Text(msg).font(.subheadline).padding(.horizontal, 16).frame(height: 44).panelBackground(in: Capsule()).padding(.bottom, 100)
@@ -345,17 +348,20 @@ struct AdaptiveLabel: View {
 
 /// Shown while photos are copied into the library, so a big import never looks like a frozen app.
 struct ImportingOverlay: View {
+    var title = "Bringing your photos in"
+    var quiet = "Reading your files…"
+    var slow: String? = nil
     @State private var started = Date()
     var body: some View {
         ZStack {
             Color.black.opacity(0.78).ignoresSafeArea()
             VStack(spacing: 18) {
                 Image("Logo").resizable().scaledToFit().frame(width: 84).clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                Text("Bringing your photos in").font(.title3.weight(.semibold))
+                Text(title).font(.title3.weight(.semibold))
                 ProgressView().controlSize(.large).tint(Theme.accent)
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     let s = Int(ctx.date.timeIntervalSince(started))
-                    Text(s < 8 ? "Reading your files…" : "Still working: \(s / 60):\(String(format: "%02d", s % 60)). Large libraries can take a few minutes, and your originals are never changed.")
+                    Text(s < 8 ? quiet : slow != nil ? slow! : "Still working: \(s / 60):\(String(format: "%02d", s % 60)). Large libraries can take a few minutes, and your originals are never changed.")
                         .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 320)
                 }
             }

@@ -54,6 +54,8 @@ final class AppModel {
     var gridSize = 130.0
 
     var importing = false
+    /// True while a saved library is being opened (a big one takes a few seconds).
+    var openingLibrary = true
     var importMessage: String?
     var started = false
     var sources: [ImportSource] = []
@@ -120,6 +122,7 @@ final class AppModel {
     func start() async {
         guard !started else { return }
         started = true
+        defer { openingLibrary = false }
         loadSources()
         scanLibraries()
         // UI tests start from a fresh demo library every run
@@ -130,6 +133,8 @@ final class AppModel {
     }
 
     func open(_ entry: LibraryEntry, seedDemo: Bool) async {
+        openingLibrary = true
+        defer { openingLibrary = false }
         let e = Engine(demo: false)
         libraryError = await e.openLibrary(at: entry.url, seedDemo: seedDemo)
         engine = e

@@ -8,6 +8,8 @@ struct SettingsView: View {
     @AppStorage("swipeGestures") private var swipeGestures = true
     @AppStorage("haptics") private var haptics = true
     @AppStorage("maskColor") private var maskColor = "auto"
+    @AppStorage("segmenter") private var segmenter = "sam"
+    @State private var denoiseModels: [[String: Any]] = []
     @State private var photos = 0
     @State private var albums = 0
     @State private var cacheBytes = 0
@@ -58,8 +60,40 @@ struct SettingsView: View {
                     Text("Brush and Lasso: double-tap or squeeze switches erase, or include and exclude. Two-finger tap undoes, three-finger tap redoes. A resting palm is ignored.").font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
-                    Text("Everything runs on this device and nothing is uploaded. AI Denoise (RawNIND, GPL-3.0) and the Object and Lasso masks (MobileSAM, Apache-2.0) are included in the app. Subject, Sky and Background use Apple Vision.").font(.footnote).foregroundStyle(.secondary)
-                } header: { Text("On-device AI") }
+                    Picker("Object and Lasso", selection: $segmenter) {
+                        Text("MobileSAM (recommended)").tag("sam")
+                        Text("Apple Vision only").tag("vision")
+                    }
+                    LabeledContent("Subject, Sky, Background", value: "Apple Vision")
+                } header: { Text("Selection model") } footer: {
+                    Text(MobileSAM.shared.available ? "MobileSAM (Apache-2.0, about 23 MB) is included in the app and follows edges best. Apple Vision is faster to start but picks whole people and groups." : "MobileSAM is not in this build, so Apple Vision is used.")
+                }
+                Section {
+                    if denoiseModels.isEmpty { Text("No denoise model yet.").foregroundStyle(.secondary) }
+                    ForEach(denoiseModels.indices, id: \.self) { i in
+                        let m = denoiseModels[i]
+                        let installed = m["installed"] as? Bool ?? false, selected = m["selected"] as? Bool ?? false
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(m["name"] as? String ?? "Model").font(.body)
+                                Text(modelSubtitle(m)).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if installed {
+                                if selected { Label("In use", systemImage: "checkmark.circle.fill").font(.footnote.weight(.semibold)).foregroundStyle(Theme.accent) }
+                                else { Button("Use") { Task { await selectModel(m["id"] as? String) } }.buttonStyle(.bordered).tint(Theme.accent) }
+                            } else if (m["known"] as? Bool) == true {
+                                Button("Install") { Task { _ = await model.ensureDenoiseModel(); await loadModels() } }.buttonStyle(.borderedProminent).tint(Theme.accent)
+                            }
+                        }
+                        .swipeActions { if installed { Button("Remove", role: .destructive) { Task { await removeModel(m["id"] as? String) } } } }
+                    }
+                    if denoiseModels.contains(where: { ($0["selected"] as? Bool) == true }) {
+                        Button("Switch AI denoise off") { Task { await selectModel(nil) } }
+                    }
+                } header: { Text("AI denoise model") } footer: {
+                    Text("RawNIND (GPL-3.0) is included and installs itself. Swipe a model to remove it. To add another .onnx model, use Edit › Detail › Add a denoise model. Everything runs on this device and nothing is uploaded.")
+                }
                 Section("About") {
                     LabeledContent("RawLight", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
                     Text("The raw engine is LightCraft by storytold, used under the MIT and Apache-2.0 licences. The interface is original. Interface font: Inter (SIL OFL). Subject selection by Apple Vision.").font(.footnote).foregroundStyle(.secondary)
@@ -69,7 +103,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { Task { await saveImport() }; dismiss() } } }
-            .task { await load() }
+            .task { await load(); await loadModels() }
         }
         .presentationBackground(.ultraThinMaterial).presentationCornerRadius(28)
     }
@@ -85,6 +119,27 @@ struct SettingsView: View {
             creator = imp?["creator"] as? String ?? ""; copyright = imp?["copyright"] as? String ?? ""
         }
         if let x = try? await model.engine.execute("library.xmpPreferences") as? [String: Any] { autoWrite = x["autoWrite"] as? Bool ?? false }
+    }
+
+    private func loadModels() async {
+        let r = try? await model.engine.execute("denoise.models.list", [:]) as? [String: Any]
+        denoiseModels = (r?["models"] as? [[String: Any]] ?? []).filter { ($0["installed"] as? Bool) == true || ($0["known"] as? Bool) == true }
+    }
+    private func selectModel(_ id: String?) async {
+        _ = try? await model.engine.execute("denoise.models.select", ["id": id as Any? ?? NSNull()])
+        await loadModels()
+    }
+    private func removeModel(_ id: String?) async {
+        guard let id else { return }
+        _ = try? await model.engine.execute("denoise.models.remove", ["id": id])
+        await loadModels()
+    }
+    private func modelSubtitle(_ m: [String: Any]) -> String {
+        var parts: [String] = []
+        if let b = m["sizeBytes"] as? Int, b > 0 { parts.append(ByteCountFormatter.string(fromByteCount: Int64(b), countStyle: .file)) }
+        if let l = (m["licence"] as? [String: Any])?["name"] as? String { parts.append(l) }
+        parts.append((m["installed"] as? Bool) == true ? "Installed" : "Not installed")
+        return parts.joined(separator: " · ")
     }
 
     private func saveImport() async {
