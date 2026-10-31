@@ -214,14 +214,27 @@ struct EditorView: View {
                         objectMarkers(in: rect)
                     }
                     if objectPick && mode == .mask && ObjectPicker.shared.lasso {
-                        Color.clear.contentShape(Rectangle())
-                            .gesture(DragGesture(minimumDistance: 4).onChanged { lassoStroke.append($0.location) }
-                                .onEnded { _ in let s = lassoStroke; lassoStroke = []; finishLasso(s, in: rect) })
+                        PencilCanvas(pencilOnly: UserDefaults.standard.bool(forKey: "pencilOnly"),
+                                     onBegan: { lassoStroke = [$0.point] },
+                                     onMoved: { lassoStroke.append(contentsOf: $0.map(\.point)) },
+                                     onEnded: { let s = lassoStroke; lassoStroke = []; finishLasso(s, in: rect) },
+                                     onCancelled: { lassoStroke = [] },
+                                     onUndo: { undoObjectTap() }, onRedo: {},
+                                     onPencilTap: { objectExclude.toggle() })
+                        // Trail: the loop so far as a faint dashed line, with a bright comet tail behind the pen tip.
                         Canvas { ctx, _ in
-                            guard let f = lassoStroke.first else { return }
-                            var p = Path(); p.move(to: f); for q in lassoStroke.dropFirst() { p.addLine(to: q) }; p.closeSubpath()
-                            ctx.stroke(p, with: .color(.black.opacity(0.5)), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-                            ctx.stroke(p, with: .color(.white), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [8, 6]))
+                            guard let f = lassoStroke.first, lassoStroke.count > 1 else { return }
+                            let tint: Color = objectExclude ? .red : Theme.accent
+                            var loop = Path(); loop.move(to: f); for q in lassoStroke.dropFirst() { loop.addLine(to: q) }; loop.closeSubpath()
+                            ctx.stroke(loop, with: .color(.white.opacity(0.45)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round, dash: [6, 6]))
+                            let tail = Array(lassoStroke.suffix(40))
+                            for i in 1..<max(tail.count, 1) {
+                                let t = Double(i) / Double(tail.count)
+                                var seg = Path(); seg.move(to: tail[i - 1]); seg.addLine(to: tail[i])
+                                ctx.stroke(seg, with: .color(tint.opacity(0.25 * t)), style: StrokeStyle(lineWidth: 4 + 12 * t, lineCap: .round))
+                                ctx.stroke(seg, with: .color(.white.opacity(t)), style: StrokeStyle(lineWidth: 1 + 3 * t, lineCap: .round))
+                            }
+                            if let tip = tail.last { ctx.fill(Path(ellipseIn: CGRect(x: tip.x - 6, y: tip.y - 6, width: 12, height: 12)), with: .color(.white)) }
                         }.allowsHitTesting(false)
                     }
                     if picking {
