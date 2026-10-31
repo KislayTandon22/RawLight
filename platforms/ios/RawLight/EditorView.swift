@@ -79,7 +79,7 @@ struct EditorView: View {
         }
         .background(keyShortcuts)
         .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
-        .onReceive(NotificationCenter.default.publisher(for: .masksChanged)) { n in activeMask = n.object as? Int }
+        .onReceive(NotificationCenter.default.publisher(for: .masksChanged)) { n in if let id = n.object as? Int { activeMask = id }; if mode == .mask { live.run { await render(draft: true) } } }
         .onReceive(NotificationCenter.default.publisher(for: .curvePreset)) { n in
             guard let name = n.object as? String else { return }
             Task { _ = try? await model.engine.execute("curve.applyPreset", ["name": name]); curvePoints = await model.engine.curve(curveChannel); await render() }

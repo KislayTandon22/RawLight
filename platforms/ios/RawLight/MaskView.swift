@@ -395,9 +395,14 @@ struct MaskPanel: View {
     }
 
     private func reload() async {
-        let r = await engine.masks()
+        var r = await engine.masks()
+        // Reopening a photo leaves no mask selected, so nothing could be edited: pick the last one.
+        if r.active == nil, let last = r.items.last {
+            _ = try? await engine.execute("mask.select", ["id": last.id])
+            r = await engine.masks()
+        }
         masks = r.items; active = r.active
-        NotificationCenter.default.post(name: .masksChanged, object: nil)
+        NotificationCenter.default.post(name: .masksChanged, object: r.active)
     }
     private func addComponent(_ op: String, _ shape: [String: Any]) {
         guard let id = active else { return }
