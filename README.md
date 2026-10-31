@@ -41,6 +41,10 @@ pipeline, catalog and masking crates are theirs. Thank you. The original README 
 Also thanks to the open-source projects LightCraft builds on (see `NOTICE`), including wgpu, egui,
 and the Inter typeface (SIL OFL). GeoNames data is used under CC BY 4.0.
 
+The iOS app bundles the **RawNIND** denoise weights (GPL-3.0, from the RawNIND authors, packaged by
+[darktable-ai](https://github.com/darktable-org/darktable-ai)); the user sees the terms and accepts them before
+they are installed. Fetched by `platforms/ios/scripts/fetch-models.sh`, never committed.
+
 The ArtCraft name, wordmark and logos are trademarks of their owners and are not used here.
 RawLight contains no Adobe assets. See `assets/ATTRIBUTION.md`.
 

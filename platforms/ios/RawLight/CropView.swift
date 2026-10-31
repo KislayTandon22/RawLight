@@ -105,11 +105,11 @@ struct CropPanel: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+            do {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 8)], spacing: 8) {
                     ForEach(aspects, id: \.0) { a in
                         Button { aspect = a.0; run("crop.aspect", ["aspect": a.0]) } label: {
-                            Text(a.1).font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
+                            Text(a.1).font(.subheadline.weight(.medium)).lineLimit(1).frame(maxWidth: .infinity).frame(height: 40)
                                 .fieldBackground(aspect == a.0, in: Capsule())
                                 .foregroundStyle(aspect == a.0 ? .white : .primary)
                         }

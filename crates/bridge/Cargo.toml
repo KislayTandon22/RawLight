@@ -10,6 +10,6 @@ description = "C ABI over the engine command contract, for native UIs (SwiftUI, 
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-lightcraft-engine = { workspace = true, features = ["sam", "denoise"] }
+lightcraft-engine = { workspace = true, features = ["sam", "denoise", "rawnind-model"] }
 serde_json = { workspace = true }
 lightcraft-catalog = { workspace = true }

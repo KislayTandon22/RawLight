@@ -16,6 +16,7 @@
 		326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A475B1E68A117F49D9DE92CD /* CurveEditor.swift */; };
 		36664514EEF83F8D61D1B199 /* ColourPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BECC7399FD2375C6CDB41443 /* ColourPanel.swift */; };
 		3CF358D6A978E2BA7AA5D496 /* HealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFD216B06873D6E60DE5790 /* HealView.swift */; };
+		3D3E71D0229243D48031A359 /* rawdenoise-nind.dtmodel in Resources */ = {isa = PBXBuildFile; fileRef = DA333C96A712EDFB037103E4 /* rawdenoise-nind.dtmodel */; };
 		3E4BA2F8EFFB2BCEED3CA64B /* HEICConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */; };
 		58364B204B7E1675E9171D4E /* PeopleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7D902551F3651E28059614 /* PeopleView.swift */; };
 		6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152DED07BD4B22C089F27083 /* AppModel.swift */; };
@@ -83,6 +84,7 @@
 		D206DF744DE049ABECA7CEDA /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionSegmenter.swift; sourceTree = "<group>"; };
 		D934F9B15D5972DDA61E86D6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DA333C96A712EDFB037103E4 /* rawdenoise-nind.dtmodel */ = {isa = PBXFileReference; path = "rawdenoise-nind.dtmodel"; sourceTree = "<group>"; };
 		E01EA1FF9FF1F0A27F722E35 /* RawLightUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawLightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -138,8 +140,17 @@
 				277B51930533BFDC91FF340B /* SliderTouch.swift */,
 				8560E8AC4BC45B87ADF19267 /* Theme.swift */,
 				D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */,
+				A1D6E0AA7252760CFEC43212 /* Models */,
 			);
 			path = RawLight;
+			sourceTree = "<group>";
+		};
+		A1D6E0AA7252760CFEC43212 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				DA333C96A712EDFB037103E4 /* rawdenoise-nind.dtmodel */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		CDFAB3EA57F414C0DF2CCFDF = {
@@ -236,6 +247,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */,
+				3D3E71D0229243D48031A359 /* rawdenoise-nind.dtmodel in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

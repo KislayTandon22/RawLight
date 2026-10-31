@@ -240,25 +240,8 @@ struct MaskPanel: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            typeTabs
             HStack {
-                Menu {
-                    Section("Local") {
-                        Button("Linear gradient") { add(["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }
-                        Button("Radial gradient") { add(["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }
-                        Button("Brush") { add(["kind": "brush"]) }
-                        Button("Luminance range") { add(["kind": "luminanceRange"]) }
-                        Button("Colour range") { add(["kind": "colorRange"]) }
-                    }
-                    Section("AI (on-device)") {
-                        Button("Object (tap it)") { objectPick = true; objectExclude = false; message = "Tap the object in the photo" }
-                        Button("Subject") { add(["kind": "subject"]) }
-                        Button("Sky") { add(["kind": "sky"]) }
-                        Button("Background") { add(["kind": "background"]) }
-                    }
-                } label: {
-                    Text("Add mask").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize().padding(.horizontal, 18).frame(height: 44)
-                        .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
-                }
                 Spacer()
                 if current != nil {
                     Menu {
@@ -323,6 +306,37 @@ struct MaskPanel: View {
             }
         }
         .task(id: photoID) { await reload() }
+    }
+
+    /// One-tap mask types, AI first. Replaces the "Add mask" menu so nothing is hidden.
+    private var typeTabs: some View {
+        let types: [(symbol: String, title: String, full: String, run: () -> Void)] = [
+            ("person.crop.square", "Subject", "Subject", { add(["kind": "subject"]) }),
+            ("cloud.sun", "Sky", "Sky", { add(["kind": "sky"]) }),
+            ("rectangle.dashed", "Background", "Background", { add(["kind": "background"]) }),
+            ("hand.tap", "Object", "Object", { objectPick = true; objectExclude = false; message = "Tap the object in the photo" }),
+            ("square.split.1x2", "Linear", "Linear gradient", { add(["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }),
+            ("circle.dashed", "Radial", "Radial gradient", { add(["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }),
+            ("paintbrush", "Brush", "Brush", { add(["kind": "brush"]) }),
+            ("circle.lefthalf.filled", "Luminance", "Luminance range", { add(["kind": "luminanceRange"]) }),
+            ("eyedropper", "Colour", "Colour range", { add(["kind": "colorRange"]) }),
+        ]
+        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 8) {
+                ForEach(types, id: \.full) { t in
+                    Button(action: t.run) {
+                        VStack(spacing: 5) {
+                            Image(systemName: t.symbol).font(.system(size: 20, weight: .medium)).frame(height: 24)
+                            Text(t.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 58)
+                        .foregroundStyle(.white)
+                        .fieldBackground(objectPick && t.title == "Object", in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(t.full)
+                }
+        }
     }
 
     private func icon(_ kind: String) -> String {

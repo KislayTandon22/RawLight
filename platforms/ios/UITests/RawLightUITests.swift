@@ -93,7 +93,6 @@ final class RawLightUITests: XCTestCase {
     func testAddRadialMask() {
         openFirstPhoto()
         app.buttons["Mask"].firstMatch.tap()
-        app.buttons["Add mask"].firstMatch.tap()
         app.buttons["Radial gradient"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Mask 1"].firstMatch.waitForExistence(timeout: 10), "mask appears in the list")
     }
