@@ -127,8 +127,7 @@ final class RawLightUITests: XCTestCase {
         openFirstPhoto()
         let menu = app.buttons["compare.menu"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap()
-        app.buttons["Split"].firstMatch.tap()
+        menu.tap()  // a plain tap turns the split slider on
         XCTAssertTrue(app.images["arrow.left.and.right"].firstMatch.waitForExistence(timeout: 15), "split handle shows")
     }
 

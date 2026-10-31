@@ -12,6 +12,7 @@
 		17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188A661C8121EDA12A429069 /* EditorView.swift */; };
 		28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */; };
 		2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D206DF744DE049ABECA7CEDA /* LibraryView.swift */; };
+		31706586C5570C3DD9D03174 /* RegionGrow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6819299CDC16F1CDE6499E5E /* RegionGrow.swift */; };
 		326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A475B1E68A117F49D9DE92CD /* CurveEditor.swift */; };
 		36664514EEF83F8D61D1B199 /* ColourPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BECC7399FD2375C6CDB41443 /* ColourPanel.swift */; };
 		3CF358D6A978E2BA7AA5D496 /* HealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFD216B06873D6E60DE5790 /* HealView.swift */; };
@@ -58,6 +59,7 @@
 		59AD332855C4111D6E843DC0 /* ColorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorSlider.swift; sourceTree = "<group>"; };
 		5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawLightUITests.swift; sourceTree = "<group>"; };
 		5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HEICConverter.swift; sourceTree = "<group>"; };
+		6819299CDC16F1CDE6499E5E /* RegionGrow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionGrow.swift; sourceTree = "<group>"; };
 		6C7D902551F3651E28059614 /* PeopleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleView.swift; sourceTree = "<group>"; };
 		746AE174CA016CAF647AD43E /* MaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskView.swift; sourceTree = "<group>"; };
 		773D225FB743BF09F0786159 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 				B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */,
 				A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */,
 				9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */,
+				6819299CDC16F1CDE6499E5E /* RegionGrow.swift */,
 				AE62BE11F6376A150B4F7F7A /* RootView.swift */,
 				81475D8E59BEEC8167FBB4F0 /* SettingsView.swift */,
 				277B51930533BFDC91FF340B /* SliderTouch.swift */,
@@ -292,6 +295,7 @@
 				58364B204B7E1675E9171D4E /* PeopleView.swift in Sources */,
 				8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */,
 				D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */,
+				31706586C5570C3DD9D03174 /* RegionGrow.swift in Sources */,
 				90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */,
 				8308FE803AD3708534078813 /* SettingsView.swift in Sources */,
 				B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */,

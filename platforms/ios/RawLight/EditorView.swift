@@ -107,7 +107,7 @@ struct EditorView: View {
             } label: {
                 Image(systemName: "rectangle.split.2x1").font(.body.weight(.medium)).foregroundStyle(compare == "off" ? Color.primary : Theme.accentSoft)
                     .frame(width: 40, height: 44).contentShape(Circle())
-            }
+            } primaryAction: { setCompare(compare == "off" ? "split" : "off") }
             .accessibilityIdentifier("compare.menu")
             Menu {
                 Button { Task { await command("develop.copy"); copied = true } } label: { Label("Copy settings", systemImage: "doc.on.doc") }
@@ -160,11 +160,11 @@ struct EditorView: View {
                 Button { setCompare("off") } label: { Label("Off", systemImage: compare == "off" ? "checkmark" : "eye.slash") }
                 Button { setCompare("before") } label: { Label("Before only", systemImage: compare == "before" ? "checkmark" : "photo") }
                 Button { setCompare("split") } label: { Label("Split", systemImage: compare == "split" ? "checkmark" : "rectangle.split.2x1") }
-                Text("Or touch and hold the photo to peek at the original")
+                Text("Tap toggles the split slider. Touch and hold the photo to peek at the original.")
             } label: {
                 Image(systemName: "rectangle.split.2x1").font(.body.weight(.medium)).foregroundStyle(compare == "off" ? Color.primary : Theme.accentSoft)
                     .frame(width: 44, height: 44).contentShape(Circle())
-            }
+            } primaryAction: { setCompare(compare == "off" ? "split" : "off") }
             .accessibilityIdentifier("compare.menu")
             glass("square.and.arrow.up", tint: Theme.accent) { showExport = true }
         }
@@ -468,6 +468,13 @@ struct EditorView: View {
         if let c = env["RAWLIGHT_COMPARE"] { setCompare(c) }
         if let t = env["RAWLIGHT_COLOURTAB"] { colourTab = t }
         if env["RAWLIGHT_CURVE"] != nil { showCurve = true; _ = try? await model.engine.execute("develop.curve", ["channel": "master", "points": [[0, 0], [0.3, 0.2], [1, 1]]]); curvePoints = await model.engine.curve("master") }
+        if let pt = env["RAWLIGHT_OBJECT"] {
+            let v = pt.split(separator: ",").compactMap { Double($0) }
+            if v.count == 2 {
+                do { let r = try await model.engine.execute("mask.add", ["kind": "object", "points": [[v[0], v[1]]]]); NSLog("[RawLight] OBJECT ok %@", "\(r)"); _ = try? await model.engine.execute("mask.adjust", ["values": ["exposure": -3.0]]); try? await Task.sleep(for: .seconds(4)) }
+                catch { NSLog("[RawLight] OBJECT error %@", error.localizedDescription) }
+            }
+        }
         if let k = env["RAWLIGHT_AIMASK"] {
             do { let r = try await model.engine.execute("mask.add", ["kind": k]); NSLog("[RawLight] AIMASK %@ ok %@", k, "\(r)"); _ = try? await model.engine.execute("mask.adjust", ["values": ["exposure": -3.0]]); try? await Task.sleep(for: .seconds(4)) }
             catch { NSLog("[RawLight] AIMASK %@ error %@", k, error.localizedDescription) }

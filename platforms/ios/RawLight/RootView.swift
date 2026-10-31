@@ -15,7 +15,13 @@ struct RootView: View {
         .task {
             await model.start()
             // Debug aid: RAWLIGHT_OPEN=1 opens the first photo on launch (used for screenshots).
-            if ProcessInfo.processInfo.environment["RAWLIGHT_OPEN"] != nil { model.openPhoto = model.photoIDs.first }
+            // Debug aid: RAWLIGHT_IMPORT=/path/photo.jpg imports that file and opens it.
+            if let path = ProcessInfo.processInfo.environment["RAWLIGHT_IMPORT"] {
+                let before = Set(model.photoIDs)
+                await model.importURLs([URL(fileURLWithPath: path)])
+                await model.load()
+                model.openPhoto = model.photoIDs.first { !before.contains($0) } ?? model.photoIDs.first
+            } else if ProcessInfo.processInfo.environment["RAWLIGHT_OPEN"] != nil { model.openPhoto = model.photoIDs.first }
         }
     }
 }

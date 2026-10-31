@@ -15,27 +15,53 @@ private final class VisionSegmenter {
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Int32 {
         lock.lock(); defer { lock.unlock() }
+        var visionFailed = false
         if key != self.key || handler == nil {
             guard let cg = Self.image(rgb: rgb, w: w, h: h) else { return -3 }
             let request = VNGenerateForegroundInstanceMaskRequest()
             let newHandler = VNImageRequestHandler(cgImage: cg, options: [:])
-            do { try newHandler.perform([request]) } catch { return -4 }
+            do { try newHandler.perform([request]) } catch { visionFailed = true }
             self.key = key
-            handler = newHandler
-            observation = request.results?.first
+            handler = visionFailed ? nil : newHandler
+            observation = visionFailed ? nil : request.results?.first
+        }
+        // Vision unavailable (older chips, the simulator): taps still work by colour region growing
+        if visionFailed || observation == nil || handler == nil {
+            let include = clicks.filter { $0.2 }, exclude = clicks.filter { !$0.2 }
+            if include.isEmpty { return visionFailed ? -4 : 0 }
+            for i in 0..<(side * side) { out[i] = -8 }
+            for c in include { let m = RegionGrow.select(rgb: rgb, w: w, h: h, side: side, x: c.0, y: c.1); for i in 0..<m.count where m[i] > 0.5 { out[i] = 8 } }
+            for c in exclude { let m = RegionGrow.select(rgb: rgb, w: w, h: h, side: side, x: c.0, y: c.1); for i in 0..<m.count where m[i] > 0.5 { out[i] = -8 } }
+            return 1
         }
         guard let observation, let handler else { return 0 }
         var instances = IndexSet()
-        let include = clicks.filter { $0.2 }
-        if include.isEmpty {
+        var growIn: [(Float, Float)] = [], growOut: [(Float, Float)] = []
+        if clicks.isEmpty {
             instances = observation.allInstances
         } else {
-            for c in include { if let i = instance(at: c, in: observation), i > 0 { instances.insert(i) } }
-            for c in clicks where !c.2 { if let i = instance(at: c, in: observation) { instances.remove(i) } }
+            // a tap on something Vision did not call a subject falls back to colour region growing
+            for c in clicks {
+                let i = instance(at: c, in: observation)
+                if c.2 { if let i, i > 0 { instances.insert(i) } else { growIn.append((c.0, c.1)) } }
+                else if let i { instances.remove(i) } else { growOut.append((c.0, c.1)) }
+            }
         }
-        if instances.isEmpty { return 0 }
-        guard let mask = try? observation.generateScaledMaskForImage(forInstances: instances, from: handler) else { return -5 }
-        Self.sample(mask, into: out, side: side)
+        if instances.isEmpty, growIn.isEmpty { return 0 }
+        if !instances.isEmpty {
+            guard let mask = try? observation.generateScaledMaskForImage(forInstances: instances, from: handler) else { return -5 }
+            Self.sample(mask, into: out, side: side)
+        } else {
+            for i in 0..<(side * side) { out[i] = -8 }
+        }
+        for g in growIn {
+            let cover = RegionGrow.select(rgb: rgb, w: w, h: h, side: side, x: g.0, y: g.1)
+            for i in 0..<cover.count where cover[i] > 0.5 { out[i] = 8 }
+        }
+        for g in growOut {
+            let cover = RegionGrow.select(rgb: rgb, w: w, h: h, side: side, x: g.0, y: g.1)
+            for i in 0..<cover.count where cover[i] > 0.5 { out[i] = -8 }
+        }
         return 1
     }
 
