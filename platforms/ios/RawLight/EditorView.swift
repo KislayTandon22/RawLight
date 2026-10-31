@@ -51,6 +51,8 @@ struct EditorView: View {
     @State private var erase = false
     @State private var live = Throttle()
     @State private var compare = "off"
+    @State private var hdrOn = false
+    @State private var rendition = "HDR"
     @State private var beforeImage: UIImage?
     @State private var peek = false
     @State private var split: CGFloat = 0.5
@@ -336,8 +338,11 @@ struct EditorView: View {
     private var visible: [Control] {
         let secs = groups.first { $0.name == group }?.sections ?? []
         let list = controls.filter { secs.contains($0.section) }
+        guard group == "Light" else { return list }
+        // HDR editing keeps two renditions: the main sliders shape the HDR picture, the SDR ones what SDR displays show
+        if hdrOn && rendition == "SDR" { return list.filter { $0.id.hasPrefix("hdr.sdr") } }
         // white balance lives at the top of the Light tab
-        return group == "Light" ? controls.filter { $0.id == "wb.temp" || $0.id == "wb.tint" } + list : list
+        return controls.filter { $0.id == "wb.temp" || $0.id == "wb.tint" } + list.filter { !$0.id.hasPrefix("hdr.sdr") && ($0.id != "hdr.maxEv" || hdrOn) }
     }
 
     private var inspector: some View {
@@ -369,7 +374,13 @@ struct EditorView: View {
                 VStack(spacing: 8) {
                     if !histogram.isEmpty { HistogramView(height: hsize == .compact ? 44 : 70, bins: histogram) }
                     QuickEditBar(engine: model.engine) { Task { await reloadControls(); await render() } }.id(photoID)
-                    if group == "Light" {
+                    if group == "Light" && hdrOn {
+                        Picker("Rendition", selection: $rendition) { Text("HDR").tag("HDR"); Text("SDR").tag("SDR") }.pickerStyle(.segmented)
+                            .accessibilityIdentifier("rendition.picker")
+                        Text(rendition == "HDR" ? "Shapes the picture on HDR displays and in HDR exports." : "Shapes what ordinary SDR displays show.")
+                            .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if group == "Light" && !(hdrOn && rendition == "SDR") {
                         Button { withAnimation(.snappy) { showCurve.toggle() } } label: {
                             HStack { Text("Tone curve").font(.subheadline.weight(.medium)); Spacer()
                                 Text(curvePoints.count <= 2 && curvePoints.allSatisfy { abs($0.x - $0.y) < 0.001 } ? "Linear" : "Custom").accessibilityIdentifier("curve.state").font(.subheadline).foregroundStyle(.secondary)
@@ -377,7 +388,7 @@ struct EditorView: View {
                                 .padding(.horizontal, 14).frame(height: 48).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }.buttonStyle(.plain)
                     }
-                    if group == "Light" {
+                    if group == "Light" && !(hdrOn && rendition == "SDR") {
                         HStack {
                             Text("White balance").font(.subheadline.weight(.semibold))
                             Spacer()
@@ -395,7 +406,7 @@ struct EditorView: View {
                         }
                         .padding(.horizontal, 4)
                     }
-                    if group == "Light" && showCurve {
+                    if group == "Light" && showCurve && !(hdrOn && rendition == "SDR") {
                         CurveEditor(channel: $curveChannel, points: $curvePoints, histogram: histogram, controls: controls,
                                     setControl: { id, v, commit in set(id, v, commit: commit) },
                                     onChange: { pts in curvePoints = pts; setCurve(pts, commit: false) },
@@ -437,7 +448,9 @@ struct EditorView: View {
         async let i = model.engine.info()
         async let p = model.engine.curve(curveChannel)
         controls = await c
-        wbMode = (((await model.engine.developState())["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"
+        let dev = await model.engine.developState()
+        wbMode = ((dev["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"
+        hdrOn = ((dev["hdr"] as? [String: Any])?["enabled"] as? Bool) ?? false
         info = await i ?? info
         curvePoints = await p
         // Debug aids for screenshots: RAWLIGHT_MODE=crop|mask, RAWLIGHT_MASK=1 adds a radial mask.
@@ -451,6 +464,7 @@ struct EditorView: View {
             catch { NSLog("[RawLight] EXPORT error %@", error.localizedDescription) }
         }
         if let g = env["RAWLIGHT_GROUP"] { group = g }
+        if env["RAWLIGHT_HDR"] != nil { _ = try? await model.engine.execute("develop.hdr", ["enabled": true]); hdrOn = true; await reloadControls(); if env["RAWLIGHT_HDR"] == "sdr" { rendition = "SDR" } }
         if let c = env["RAWLIGHT_COMPARE"] { setCompare(c) }
         if let t = env["RAWLIGHT_COLOURTAB"] { colourTab = t }
         if env["RAWLIGHT_CURVE"] != nil { showCurve = true; _ = try? await model.engine.execute("develop.curve", ["channel": "master", "points": [[0, 0], [0.3, 0.2], [1, 1]]]); curvePoints = await model.engine.curve("master") }
@@ -462,7 +476,7 @@ struct EditorView: View {
         await render()
     }
 
-    private func reloadControls() async { controls = await model.engine.controls(); wbMode = (((await model.engine.developState())["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"; curvePoints = await model.engine.curve(curveChannel); await refreshInfo() }
+    private func reloadControls() async { controls = await model.engine.controls(); let d = await model.engine.developState(); wbMode = ((d["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"; hdrOn = ((d["hdr"] as? [String: Any])?["enabled"] as? Bool) ?? false; if !hdrOn { rendition = "HDR" }; curvePoints = await model.engine.curve(curveChannel); await refreshInfo() }
     private func refreshInfo() async { if let i = await model.engine.info() { info = i } }
     private func command(_ id: String, _ p: [String: Any] = [:]) async {
         _ = try? await model.engine.execute(id, p)

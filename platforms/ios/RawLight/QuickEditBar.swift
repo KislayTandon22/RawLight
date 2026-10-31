@@ -5,6 +5,7 @@ struct QuickEditBar: View {
     let engine: Engine
     let onChange: () -> Void
     @State private var bw = false
+    @State private var hdr = false
     @State private var profileID = "lc.color"
     @State private var profiles: [(id: String, name: String, group: String)] = []
     @State private var wb = "asShot"
@@ -18,7 +19,7 @@ struct QuickEditBar: View {
             HStack(spacing: 6) {
                 pill("Auto", "wand.and.stars") { await run("develop.auto") }
                 pill("B&W", "circle.lefthalf.filled", on: bw) { await run("develop.treatment", ["bw": !bw]) }
-                pill("HDR", "sun.max") { await run("develop.hdr") }
+                pill("HDR", "sun.max", on: hdr) { await run("develop.hdr") }
                 Menu {
                     if bw { Button("Auto B&W mix") { Task { await run("develop.autoBwMix") } } }
                     Menu("Profile: \(profiles.first { $0.id == profileID }?.name ?? "Color")") {
@@ -58,6 +59,7 @@ struct QuickEditBar: View {
     private func load() async {
         let d = await engine.developState()
         bw = (d["treatment"] as? String) == "bw"
+        hdr = ((d["hdr"] as? [String: Any])?["enabled"] as? Bool) ?? false
         profileID = ((d["profile"] as? [String: Any])?["id"] as? String) ?? "lc.color"
         wb = ((d["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"
         if profiles.isEmpty, let arr = try? await engine.execute("profiles.list") as? [[String: Any]] {
