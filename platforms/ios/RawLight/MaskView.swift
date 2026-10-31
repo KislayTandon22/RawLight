@@ -217,6 +217,7 @@ extension Notification.Name { static let masksChanged = Notification.Name("rawli
     var group = 0
     var taps: [Tap] = []
     var busy = false
+    var status = "Finding edges…"
     var error: String?
     var undo: (() -> Void)?
     var clear: (() -> Void)?
@@ -408,14 +409,20 @@ struct MaskPanel: View {
     }
     private func select(_ id: Int) { Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
     private func add(_ p: [String: Any]) {
+        let picker = ObjectPicker.shared
+        guard !picker.busy else { return }
+        let kind = p["kind"] as? String ?? "mask"
+        picker.status = ["subject", "sky", "background", "object"].contains(kind) ? "Finding the \(kind)…" : "Adding mask…"
+        picker.busy = true; showMask = true; onChange()
         Task {
+            defer { picker.busy = false }
             var failed = false
             do { _ = try await engine.execute("mask.add", p); message = nil; showMask = true } catch { message = error.localizedDescription; failed = true }
             await reload(); onChange()
             // AI masks are found in the background; refresh until the region shows up
             if !failed, ["subject", "sky", "background", "object"].contains(p["kind"] as? String ?? "") {
                 message = "Finding the \(p["kind"] as? String ?? "") on this device…"
-                for _ in 0..<10 { try? await Task.sleep(for: .milliseconds(700)); onChange() }
+                for _ in 0..<28 { try? await Task.sleep(for: .milliseconds(250)); onChange() }
                 message = nil
             }
         }

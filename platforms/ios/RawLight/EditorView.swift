@@ -225,8 +225,8 @@ struct EditorView: View {
                         Text(hud).font(.title3.weight(.semibold)).padding(.horizontal, 18).frame(height: 46).panelBackground(in: Capsule())
                             .foregroundStyle(Theme.accentSoft).transition(.scale.combined(with: .opacity)).allowsHitTesting(false)
                     }
-                    if objectPick && mode == .mask && ObjectPicker.shared.busy {
-                        HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Finding edges…").font(.subheadline.weight(.medium)) }
+                    if mode == .mask && ObjectPicker.shared.busy {
+                        HStack(spacing: 8) { ProgressView().controlSize(.small); Text(ObjectPicker.shared.status).font(.subheadline.weight(.medium)) }
                             .padding(.horizontal, 14).frame(height: 38).panelBackground(in: Capsule())
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 10).allowsHitTesting(false)
                     }
@@ -352,7 +352,7 @@ struct EditorView: View {
     private func applyObject(points: [(Double, Double)], lasso: Bool) {
         let picker = ObjectPicker.shared
         guard !picker.busy else { return }
-        picker.busy = true; picker.error = nil
+        picker.busy = true; picker.error = nil; picker.status = "Finding edges…"
         showMask = true
         picker.group += 1
         let group = picker.group
