@@ -24,3 +24,5 @@ platforms/ios/target/
 .build.log
 # iOS: bundled RawNIND weights (GPL-3.0) are fetched by platforms/ios/scripts/fetch-models.sh, never committed
 platforms/ios/RawLight/Models/*.dtmodel
+# iOS: MobileSAM weights are fetched by platforms/ios/scripts/fetch-models.sh
+platforms/ios/RawLight/Models/MobileSAM/

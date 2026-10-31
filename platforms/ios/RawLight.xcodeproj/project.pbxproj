@@ -15,6 +15,7 @@
 		31706586C5570C3DD9D03174 /* RegionGrow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6819299CDC16F1CDE6499E5E /* RegionGrow.swift */; };
 		326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A475B1E68A117F49D9DE92CD /* CurveEditor.swift */; };
 		36664514EEF83F8D61D1B199 /* ColourPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BECC7399FD2375C6CDB41443 /* ColourPanel.swift */; };
+		3BB14D222F14AB07090A16BC /* MobileSAM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18421792E5E532A0A9F48969 /* MobileSAM.swift */; };
 		3CF358D6A978E2BA7AA5D496 /* HealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFD216B06873D6E60DE5790 /* HealView.swift */; };
 		3D3E71D0229243D48031A359 /* rawdenoise-nind.dtmodel in Resources */ = {isa = PBXBuildFile; fileRef = DA333C96A712EDFB037103E4 /* rawdenoise-nind.dtmodel */; };
 		3E4BA2F8EFFB2BCEED3CA64B /* HEICConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */; };
@@ -22,6 +23,7 @@
 		6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152DED07BD4B22C089F27083 /* AppModel.swift */; };
 		719E99E7BC32BEFA09BD09FA /* ColorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AD332855C4111D6E843DC0 /* ColorSlider.swift */; };
 		7AF2CA2A6C9AA67A01162E3A /* DetailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B338610ED569669C9221C258 /* DetailPanel.swift */; };
+		7BE7E3F1EFD2E55AE3C08AA9 /* mobile_sam_encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = D3B77BAF42055C39AE246659 /* mobile_sam_encoder.mlpackage */; };
 		7C236BFC68456C18831CD622 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773D225FB743BF09F0786159 /* Engine.swift */; };
 		8308FE803AD3708534078813 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81475D8E59BEEC8167FBB4F0 /* SettingsView.swift */; };
 		8B2927AE423EEFADDD9F3FE2 /* RawLightUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */; };
@@ -30,6 +32,7 @@
 		90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62BE11F6376A150B4F7F7A /* RootView.swift */; };
 		9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 793784F1303D4D3381740077 /* Assets.xcassets */; };
 		B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277B51930533BFDC91FF340B /* SliderTouch.swift */; };
+		BB338ADF5B39F607E7EF3F27 /* mobile_sam_prompt_encoder_weights.json in Resources */ = {isa = PBXBuildFile; fileRef = EF4B46A240031B4D3BF5DBAB /* mobile_sam_prompt_encoder_weights.json */; };
 		C5735DAD209D36E1619418F5 /* PencilCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */; };
 		D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */; };
 		D4581C7958B4D35C41DF5B59 /* AppleDenoise.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9F4DB53F553D83A0202BEAC /* AppleDenoise.swift */; };
@@ -37,6 +40,7 @@
 		DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 746AE174CA016CAF647AD43E /* MaskView.swift */; };
 		E19781E0B876437FEE642F69 /* HistogramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6546856C997D6BFE63CC7F /* HistogramView.swift */; };
 		EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0017D18B656BA9A6950B0FC0 /* LooksView.swift */; };
+		EC5DCD41490301922E236920 /* mobile_sam_decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 438329D6F328A0BBB5ED54BA /* mobile_sam_decoder.mlpackage */; };
 		F020CEDDF4B2D4BBFB784C1F /* MergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D54056A2B475E5BC232199 /* MergeView.swift */; };
 		FDBF6196F5C90E3A62BFDB94 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1886B7C94CDA6FA0B22EA2B0 /* OnboardingView.swift */; };
 /* End PBXBuildFile section */
@@ -54,11 +58,13 @@
 /* Begin PBXFileReference section */
 		0017D18B656BA9A6950B0FC0 /* LooksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LooksView.swift; sourceTree = "<group>"; };
 		152DED07BD4B22C089F27083 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		18421792E5E532A0A9F48969 /* MobileSAM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileSAM.swift; sourceTree = "<group>"; };
 		1886B7C94CDA6FA0B22EA2B0 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		188A661C8121EDA12A429069 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		1C6546856C997D6BFE63CC7F /* HistogramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistogramView.swift; sourceTree = "<group>"; };
 		1CFD216B06873D6E60DE5790 /* HealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealView.swift; sourceTree = "<group>"; };
 		277B51930533BFDC91FF340B /* SliderTouch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SliderTouch.swift; sourceTree = "<group>"; };
+		438329D6F328A0BBB5ED54BA /* mobile_sam_decoder.mlpackage */ = {isa = PBXFileReference; path = mobile_sam_decoder.mlpackage; sourceTree = "<group>"; };
 		48C0A5D018031985E8DCD890 /* CropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropView.swift; sourceTree = "<group>"; };
 		59AD332855C4111D6E843DC0 /* ColorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorSlider.swift; sourceTree = "<group>"; };
 		5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawLightUITests.swift; sourceTree = "<group>"; };
@@ -84,13 +90,25 @@
 		C9F4DB53F553D83A0202BEAC /* AppleDenoise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDenoise.swift; sourceTree = "<group>"; };
 		CB1E46860D465391ACFBEF6F /* RawLight.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RawLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D206DF744DE049ABECA7CEDA /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		D3B77BAF42055C39AE246659 /* mobile_sam_encoder.mlpackage */ = {isa = PBXFileReference; path = mobile_sam_encoder.mlpackage; sourceTree = "<group>"; };
 		D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionSegmenter.swift; sourceTree = "<group>"; };
 		D934F9B15D5972DDA61E86D6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DA333C96A712EDFB037103E4 /* rawdenoise-nind.dtmodel */ = {isa = PBXFileReference; path = "rawdenoise-nind.dtmodel"; sourceTree = "<group>"; };
 		E01EA1FF9FF1F0A27F722E35 /* RawLightUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawLightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF4B46A240031B4D3BF5DBAB /* mobile_sam_prompt_encoder_weights.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = mobile_sam_prompt_encoder_weights.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		5B6371FCDA3C1DA2A4BEDE62 /* MobileSAM */ = {
+			isa = PBXGroup;
+			children = (
+				438329D6F328A0BBB5ED54BA /* mobile_sam_decoder.mlpackage */,
+				D3B77BAF42055C39AE246659 /* mobile_sam_encoder.mlpackage */,
+				EF4B46A240031B4D3BF5DBAB /* mobile_sam_prompt_encoder_weights.json */,
+			);
+			path = MobileSAM;
+			sourceTree = "<group>";
+		};
 		5BB5B15BA41707CD142F483C /* UITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -131,6 +149,7 @@
 				0017D18B656BA9A6950B0FC0 /* LooksView.swift */,
 				746AE174CA016CAF647AD43E /* MaskView.swift */,
 				95D54056A2B475E5BC232199 /* MergeView.swift */,
+				18421792E5E532A0A9F48969 /* MobileSAM.swift */,
 				1886B7C94CDA6FA0B22EA2B0 /* OnboardingView.swift */,
 				C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */,
 				6C7D902551F3651E28059614 /* PeopleView.swift */,
@@ -152,6 +171,7 @@
 			isa = PBXGroup;
 			children = (
 				DA333C96A712EDFB037103E4 /* rawdenoise-nind.dtmodel */,
+				5B6371FCDA3C1DA2A4BEDE62 /* MobileSAM */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -250,6 +270,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */,
+				BB338ADF5B39F607E7EF3F27 /* mobile_sam_prompt_encoder_weights.json in Resources */,
 				3D3E71D0229243D48031A359 /* rawdenoise-nind.dtmodel in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -310,6 +331,7 @@
 				EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */,
 				DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */,
 				F020CEDDF4B2D4BBFB784C1F /* MergeView.swift in Sources */,
+				3BB14D222F14AB07090A16BC /* MobileSAM.swift in Sources */,
 				FDBF6196F5C90E3A62BFDB94 /* OnboardingView.swift in Sources */,
 				C5735DAD209D36E1619418F5 /* PencilCanvas.swift in Sources */,
 				58364B204B7E1675E9171D4E /* PeopleView.swift in Sources */,
@@ -321,6 +343,8 @@
 				B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */,
 				DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */,
 				28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */,
+				EC5DCD41490301922E236920 /* mobile_sam_decoder.mlpackage in Sources */,
+				7BE7E3F1EFD2E55AE3C08AA9 /* mobile_sam_encoder.mlpackage in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

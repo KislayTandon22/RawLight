@@ -43,7 +43,7 @@ and the Inter typeface (SIL OFL). GeoNames data is used under CC BY 4.0.
 
 The iOS app bundles the **RawNIND** denoise weights (GPL-3.0, from the RawNIND authors, packaged by
 [darktable-ai](https://github.com/darktable-org/darktable-ai)); the user sees the terms and accepts them before
-they are installed. Fetched by `platforms/ios/scripts/fetch-models.sh`, never committed.
+they are installed. Object masks use **MobileSAM** (Apache-2.0, Core ML conversion by mlboydaisuke, prompt encoding after SamKit). Both are fetched by `platforms/ios/scripts/fetch-models.sh`, never committed.
 
 The ArtCraft name, wordmark and logos are trademarks of their owners and are not used here.
 RawLight contains no Adobe assets. See `assets/ATTRIBUTION.md`.
