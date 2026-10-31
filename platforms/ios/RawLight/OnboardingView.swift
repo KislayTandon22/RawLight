@@ -37,7 +37,7 @@ struct OnboardingView: View {
             Text("RawLight never uploads your photos.").font(.caption).foregroundStyle(.secondary)
             Spacer(minLength: 20)
         }
-        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.black.ignoresSafeArea())
+        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(uiColor: .systemBackground).ignoresSafeArea())
     }
 
     private func accept() async {

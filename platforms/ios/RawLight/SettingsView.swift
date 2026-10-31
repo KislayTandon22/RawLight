@@ -43,6 +43,22 @@ struct SettingsView: View {
                     TextField("Copyright notice", text: $copyright).onSubmit { Task { await saveImport() } }
                 }
                 Section {
+                    Picker("Appearance", selection: Binding(get: { ThemeStore.shared.appearance }, set: { ThemeStore.shared.appearance = $0 })) {
+                        Text("Dark").tag("dark"); Text("Light").tag("light"); Text("System").tag("system")
+                    }.pickerStyle(.segmented)
+                    HStack(spacing: 14) {
+                        Text("Accent")
+                        Spacer()
+                        ForEach(ThemeStore.accents, id: \.name) { a in
+                            Button { ThemeStore.shared.accentName = a.name } label: {
+                                Circle().fill(a.base).frame(width: 30, height: 30)
+                                    .overlay(Circle().stroke(.white, lineWidth: ThemeStore.shared.accentName == a.name ? 3 : 0))
+                                    .overlay(Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(.white).opacity(ThemeStore.shared.accentName == a.name ? 1 : 0))
+                            }.buttonStyle(.plain).accessibilityLabel(a.label)
+                        }
+                    }
+                } header: { Text("Theme") } footer: { Text("Dark suits editing best. The photo area stays dark in every theme.") }
+                Section {
                     Picker("Overlay colour", selection: $maskColor) {
                         Text("Automatic (one per mask)").tag("auto")
                         ForEach(MaskPalette.colors, id: \.name) { c in

@@ -10,7 +10,7 @@ struct RawLightApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(ThemeStore.shared.scheme)
                 .tint(Theme.accent)
         }
     }

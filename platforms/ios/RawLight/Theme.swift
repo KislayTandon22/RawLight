@@ -1,9 +1,26 @@
 import SwiftUI
 
+/// The user's look choices, kept in UserDefaults. Observable so every view that reads `Theme.accent` redraws when it changes.
+@Observable final class ThemeStore {
+    static let shared = ThemeStore()
+    static let accents: [(name: String, label: String, base: Color, soft: Color)] = [
+        ("rose", "Rose", Color(red: 0.95, green: 0.23, blue: 0.36), Color(red: 1.0, green: 0.47, blue: 0.59)),
+        ("blue", "Blue", Color(red: 0.0, green: 0.45, blue: 0.9), Color(red: 0.4, green: 0.7, blue: 1.0)),
+        ("amber", "Amber", Color(red: 0.9, green: 0.6, blue: 0.0), Color(red: 1.0, green: 0.78, blue: 0.35)),
+        ("teal", "Teal", Color(red: 0.0, green: 0.62, blue: 0.55), Color(red: 0.4, green: 0.85, blue: 0.78)),
+        ("violet", "Violet", Color(red: 0.55, green: 0.35, blue: 0.9), Color(red: 0.74, green: 0.62, blue: 1.0)),
+    ]
+    var accentName = UserDefaults.standard.string(forKey: "accent") ?? "rose" { didSet { UserDefaults.standard.set(accentName, forKey: "accent") } }
+    /// "dark" (default), "light" or "system".
+    var appearance = UserDefaults.standard.string(forKey: "appearance") ?? "dark" { didSet { UserDefaults.standard.set(appearance, forKey: "appearance") } }
+    var scheme: ColorScheme? { appearance == "light" ? .light : appearance == "system" ? nil : .dark }
+    var current: (name: String, label: String, base: Color, soft: Color) { Self.accents.first { $0.name == accentName } ?? Self.accents[0] }
+}
+
 enum Theme {
-    /// RawLight rose: red with a slight pink lean.
-    static let accent = Color(red: 0.95, green: 0.23, blue: 0.36)
-    static let accentSoft = Color(red: 1.0, green: 0.47, blue: 0.59)
+    /// The accent colour (RawLight rose unless the user picked another in Settings).
+    static var accent: Color { ThemeStore.shared.current.base }
+    static var accentSoft: Color { ThemeStore.shared.current.soft }
     static let panel = Color(white: 0.11)
     static let field = Color.white.opacity(0.07)
 }

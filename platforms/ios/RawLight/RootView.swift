@@ -7,7 +7,7 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(uiColor: .systemBackground).ignoresSafeArea()
             if !onboarded && !debugLaunch {
                 OnboardingView { onboarded = true }
             } else if let id = model.openPhoto {
