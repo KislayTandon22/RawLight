@@ -380,6 +380,7 @@ struct EditorView: View {
                 picker.error = lasso ? "Couldn't find an object in that loop. Draw closer around it." : "Couldn't pick an object there. Try the middle of it, or tap again."
             }
             NotificationCenter.default.post(name: .masksChanged, object: nil)
+            NotificationCenter.default.post(name: .photoOpened, object: nil)   // the mask list reloads too
             await render(draft: true)
         }
     }
@@ -393,6 +394,7 @@ struct EditorView: View {
             picker.taps.removeAll { $0.group == g }
             if picker.taps.isEmpty { objectMask = nil }
             NotificationCenter.default.post(name: .masksChanged, object: nil)
+            NotificationCenter.default.post(name: .photoOpened, object: nil)   // the mask list reloads too
             await render(draft: true)
         }
     }
@@ -404,6 +406,7 @@ struct EditorView: View {
             _ = try? await model.engine.execute("mask.delete", ["id": id])
             objectMask = nil; picker.reset()
             NotificationCenter.default.post(name: .masksChanged, object: nil)
+            NotificationCenter.default.post(name: .photoOpened, object: nil)   // the mask list reloads too
             await render(draft: true)
         }
     }
@@ -597,6 +600,8 @@ struct EditorView: View {
         appleLevel = AppleDenoise.level(photoID)
         if compare != "off" { await loadBefore() }
         try? await model.engine.execute("library.select", ["ids": [photoID], "active": photoID])
+        // Panels that read per-photo state (the mask list) must load after this photo is the engine's active one.
+        NotificationCenter.default.post(name: .photoOpened, object: photoID)
         async let c = model.engine.controls()
         async let i = model.engine.info()
         async let p = model.engine.curve(curveChannel)

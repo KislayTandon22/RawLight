@@ -206,7 +206,10 @@ struct MaskOverlay: View {
     }
 }
 
-extension Notification.Name { static let masksChanged = Notification.Name("rawlight.masksChanged") }
+extension Notification.Name {
+    static let masksChanged = Notification.Name("rawlight.masksChanged")
+    static let photoOpened = Notification.Name("rawlight.photoOpened")
+}
 
 /// Inspector content for masks: list, add menu, per-mask adjustments, brush controls.
 /// State of the "Object" tool: every tap, whether it is still working, and why the last one failed.
@@ -316,6 +319,7 @@ struct MaskPanel: View {
             }
         }
         .task(id: photoID) { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .photoOpened)) { _ in Task { await reload() } }
     }
 
     private var objectCard: some View {
@@ -406,6 +410,7 @@ struct MaskPanel: View {
             r = await engine.masks()
         }
         masks = r.items; active = r.active
+        NSLog("[RawLight] masks reload items=%d active=%@ photo=%llu", r.items.count, String(describing: r.active), photoID)
         NotificationCenter.default.post(name: .masksChanged, object: r.active)
     }
     private func addComponent(_ op: String, _ shape: [String: Any]) {
@@ -419,6 +424,7 @@ struct MaskPanel: View {
     private func select(_ id: Int) { showMask = true; Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
     private func add(_ p: [String: Any]) {
         let picker = ObjectPicker.shared
+        NSLog("[RawLight] add tapped kind=%@ busy=%d", String(describing: p["kind"]), picker.busy ? 1 : 0)
         guard !picker.busy else { return }
         let kind = p["kind"] as? String ?? "mask"
         picker.status = ["subject", "sky", "background", "object"].contains(kind) ? "Finding the \(kind)…" : "Adding mask…"
@@ -426,7 +432,7 @@ struct MaskPanel: View {
         Task {
             defer { picker.busy = false }
             var failed = false
-            do { _ = try await engine.execute("mask.add", p); message = nil; showMask = true } catch { message = error.localizedDescription; failed = true }
+            do { let r = try await engine.execute("mask.add", p); NSLog("[RawLight] mask.add ok %@", "\(r)".prefix(300) as CVarArg); message = nil; showMask = true } catch { NSLog("[RawLight] mask.add error %@", error.localizedDescription); message = error.localizedDescription; failed = true }
             await reload(); onChange()
             // AI masks are found in the background; refresh until the region shows up
             if !failed, ["subject", "sky", "background", "object"].contains(p["kind"] as? String ?? "") {

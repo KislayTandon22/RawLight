@@ -16,6 +16,8 @@ private final class VisionSegmenter {
 
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Int32 {
+        NSLog("[RawLight] segmenter start clicks=%d", clicks.count)
+        defer { NSLog("[RawLight] segmenter end") }
         // taps (Object tool): MobileSAM follows the tapped thing, so a bird held by a person is just the bird
         if clicks.contains(where: { $0.2 }), UserDefaults.standard.string(forKey: "segmenter") != "vision", MobileSAM.shared.segment(rgb: rgb, w: w, h: h, key: key, clicks: clicks, out: out, side: side) { return 1 }
         lock.lock(); defer { lock.unlock() }
