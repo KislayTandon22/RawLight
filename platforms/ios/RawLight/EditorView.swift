@@ -38,6 +38,7 @@ struct EditorView: View {
     @State private var objectPick = false
     @State private var objectExclude = false
     @State private var lassoStroke: [CGPoint] = []
+    @State private var hud: String?
     @State private var objectMask: Int?
     @State private var showMask = true
     @State private var activeMask: Int?
@@ -76,6 +77,7 @@ struct EditorView: View {
                 inspector.frame(width: wide ? 360 : nil, height: wide ? nil : min(geo.size.height * (hsize == .compact ? 0.5 : 0.45), 420))
             }
         }
+        .background(keyShortcuts)
         .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
         .onReceive(NotificationCenter.default.publisher(for: .masksChanged)) { n in activeMask = n.object as? Int }
         .onReceive(NotificationCenter.default.publisher(for: .curvePreset)) { n in
@@ -207,11 +209,21 @@ struct EditorView: View {
                             .onEnded { _ in baseScale = scale; if scale == 1 { offset = .zero } })
                         .simultaneousGesture(DragGesture().onChanged { if mode == .edit, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
                             .onEnded { _ in baseOffset = offset })
+                        .simultaneousGesture(DragGesture(minimumDistance: 40).onEnded { v in
+                            guard mode == .edit, scale <= 1, compare == "off", !picking else { return }
+                            let dx = v.translation.width, dy = v.translation.height
+                            if abs(dx) > abs(dy) * 1.5 { step(dx < 0 ? 1 : -1) }
+                            else if abs(dy) > abs(dx) * 1.5 { swipeVertical(up: dy < 0, flagSide: v.startLocation.x > rect.midX) }
+                        })
                         .onTapGesture(count: 2) { if mode == .edit { withAnimation(.snappy) { scale = scale > 1 ? 1 : 3; baseScale = scale; offset = .zero; baseOffset = .zero } } }
                     if objectPick && mode == .mask {
                         Color.clear.contentShape(Rectangle())
                             .gesture(SpatialTapGesture().onEnded { tapObject(at: $0.location, in: rect) })
                         objectMarkers(in: rect)
+                    }
+                    if let hud {
+                        Text(hud).font(.title3.weight(.semibold)).padding(.horizontal, 18).frame(height: 46).panelBackground(in: Capsule())
+                            .foregroundStyle(Theme.accentSoft).transition(.scale.combined(with: .opacity)).allowsHitTesting(false)
                     }
                     if objectPick && mode == .mask && ObjectPicker.shared.busy {
                         HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Finding edges…").font(.subheadline.weight(.medium)) }
@@ -618,6 +630,54 @@ struct EditorView: View {
     }
 
     private func reloadControls() async { controls = await model.engine.controls(); let d = await model.engine.developState(); wbMode = ((d["wb"] as? [String: Any])?["mode"] as? String) ?? "asShot"; hdrOn = ((d["hdr"] as? [String: Any])?["enabled"] as? Bool) ?? false; if !hdrOn { rendition = "HDR" }; curvePoints = await model.engine.curve(curveChannel); await refreshInfo() }
+    // MARK: gestures and keys: swipe left/right = next/previous; swipe up/down on the left half = rating, right half = pick/reject
+
+    private func step(_ d: Int) {
+        guard let i = model.photoIDs.firstIndex(of: photoID), model.photoIDs.indices.contains(i + d) else { return }
+        withAnimation(.snappy) { photoID = model.photoIDs[i + d] }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func swipeVertical(up: Bool, flagSide: Bool) {
+        if flagSide { setFlag(up ? "pick" : "reject") } else { setRating(info.rating + (up ? 1 : -1)) }
+    }
+
+    private func setRating(_ n: Int) {
+        let r = min(5, max(0, n))
+        Task {
+            await command("photo.rate", ["rating": r]); await refreshInfo()
+            model.infos[photoID] = nil; await model.loadInfo(photoID)
+            show(r == 0 ? "No rating" : String(repeating: "★", count: r))
+        }
+    }
+
+    private func setFlag(_ f: String) {
+        Task {
+            let already = info.flag == f
+            await command(already || f == "none" ? "photo.unflag" : f == "pick" ? "photo.pick" : "photo.reject"); await refreshInfo()
+            model.infos[photoID] = nil; await model.loadInfo(photoID)
+            show(already || f == "none" ? "Unflagged" : f == "pick" ? "Picked" : "Rejected")
+        }
+    }
+
+    private func show(_ text: String) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.snappy) { hud = text }
+        Task { try? await Task.sleep(for: .seconds(1)); withAnimation { if hud == text { hud = nil } } }
+    }
+
+    /// Hardware-keyboard shortcuts: 0–5 rate, P pick, X reject, U unflag, arrows move between photos.
+    private var keyShortcuts: some View {
+        Group {
+            ForEach(0...5, id: \.self) { n in Button("") { setRating(n) }.keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: []) }
+            Button("") { setFlag("pick") }.keyboardShortcut("p", modifiers: [])
+            Button("") { setFlag("reject") }.keyboardShortcut("x", modifiers: [])
+            Button("") { setFlag("none") }.keyboardShortcut("u", modifiers: [])
+            Button("") { step(1) }.keyboardShortcut(.rightArrow, modifiers: [])
+            Button("") { step(-1) }.keyboardShortcut(.leftArrow, modifiers: [])
+        }.opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
+    }
+
     private func refreshInfo() async { if let i = await model.engine.info() { info = i } }
     private func command(_ id: String, _ p: [String: Any] = [:]) async {
         _ = try? await model.engine.execute(id, p)
