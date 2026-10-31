@@ -37,6 +37,7 @@ struct EditorView: View {
     @State private var pet = false
     @State private var objectPick = false
     @State private var objectExclude = false
+    @State private var lassoStroke: [CGPoint] = []
     @State private var objectMask: Int?
     @State private var showMask = true
     @State private var activeMask: Int?
@@ -212,6 +213,17 @@ struct EditorView: View {
                             .gesture(SpatialTapGesture().onEnded { tapObject(at: $0.location, in: rect) })
                         objectMarkers(in: rect)
                     }
+                    if objectPick && mode == .mask && ObjectPicker.shared.lasso {
+                        Color.clear.contentShape(Rectangle())
+                            .gesture(DragGesture(minimumDistance: 4).onChanged { lassoStroke.append($0.location) }
+                                .onEnded { _ in let s = lassoStroke; lassoStroke = []; finishLasso(s, in: rect) })
+                        Canvas { ctx, _ in
+                            guard let f = lassoStroke.first else { return }
+                            var p = Path(); p.move(to: f); for q in lassoStroke.dropFirst() { p.addLine(to: q) }; p.closeSubpath()
+                            ctx.stroke(p, with: .color(.black.opacity(0.5)), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                            ctx.stroke(p, with: .color(.white), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [8, 6]))
+                        }.allowsHitTesting(false)
+                    }
                     if picking {
                         Color.clear.contentShape(Rectangle())
                             .gesture(SpatialTapGesture().onEnded { pickColour(at: $0.location, in: rect) })
@@ -262,21 +274,65 @@ struct EditorView: View {
         guard rect.width > 0 else { return }
         let x = (p.x - rect.minX) / rect.width, y = (p.y - rect.minY) / rect.height
         guard (0...1).contains(x), (0...1).contains(y) else { return }
+        applyObject(points: [(x, y)], lasso: false)
+    }
+
+    /// Lasso: the user draws around something; a few points spread through the loop go to the segmenter, which follows the
+    /// nearest real edges instead of the hand-drawn line.
+    private func finishLasso(_ stroke: [CGPoint], in rect: CGRect) {
+        guard rect.width > 0, stroke.count > 8 else { return }
+        let poly = stroke.map { CGPoint(x: min(max(($0.x - rect.minX) / rect.width, 0), 1), y: min(max(($0.y - rect.minY) / rect.height, 0), 1)) }
+        let xs = poly.map(\.x), ys = poly.map(\.y)
+        guard let x0 = xs.min(), let x1 = xs.max(), let y0 = ys.min(), let y1 = ys.max(), x1 - x0 > 0.02, y1 - y0 > 0.02 else { return }
+        func inside(_ p: CGPoint) -> Bool {
+            var c = false, j = poly.count - 1
+            for i in 0..<poly.count {
+                if (poly[i].y > p.y) != (poly[j].y > p.y), p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x { c.toggle() }
+                j = i
+            }
+            return c
+        }
+        var cand: [CGPoint] = []
+        let n = 28
+        for i in 0..<n { for k in 0..<n {
+            let q = CGPoint(x: x0 + (x1 - x0) * (Double(i) + 0.5) / Double(n), y: y0 + (y1 - y0) * (Double(k) + 0.5) / Double(n))
+            if inside(q) { cand.append(q) }
+        } }
+        guard !cand.isEmpty else { return }
+        // Farthest-point sampling from the middle, so the points cover the whole shape (head, body, tail…).
+        let mid = CGPoint(x: cand.map(\.x).reduce(0, +) / Double(cand.count), y: cand.map(\.y).reduce(0, +) / Double(cand.count))
+        var chosen = [cand.min { hypot($0.x - mid.x, $0.y - mid.y) < hypot($1.x - mid.x, $1.y - mid.y) }!]
+        while chosen.count < 6 {
+            guard let next = cand.max(by: { a, b in
+                chosen.map { hypot(a.x - $0.x, a.y - $0.y) }.min()! < chosen.map { hypot(b.x - $0.x, b.y - $0.y) }.min()!
+            }), chosen.map({ hypot(next.x - $0.x, next.y - $0.y) }).min()! > 0.06 else { break }
+            chosen.append(next)
+        }
+        applyObject(points: chosen.map { ($0.x, $0.y) }, lasso: true)
+    }
+
+    private func applyObject(points: [(Double, Double)], lasso: Bool) {
         let picker = ObjectPicker.shared
         guard !picker.busy else { return }
         picker.busy = true; picker.error = nil
         showMask = true
+        picker.group += 1
+        let group = picker.group
         Task {
             defer { picker.busy = false }
             do {
-                if let id = objectMask {
-                    _ = try await model.engine.execute("mask.objectPoint", ["x": x, "y": y, "exclude": objectExclude, "id": id])
-                } else if let r = try await model.engine.execute("mask.add", ["kind": "object", "points": [[x, y]]]) as? [String: Any] {
+                var cmds = 0
+                var rest = points[...]
+                if objectMask == nil, !objectExclude, let r = try await model.engine.execute("mask.add", ["kind": "object", "points": points.map { [$0.0, $0.1] }]) as? [String: Any] {
                     objectMask = (r["activeMask"] as? NSNumber)?.intValue
+                    rest = []; cmds = 1
                 }
-                picker.taps.append(.init(x: x, y: y, exclude: objectExclude))
+                if let id = objectMask {
+                    for p in rest { _ = try await model.engine.execute("mask.objectPoint", ["x": p.0, "y": p.1, "exclude": objectExclude, "id": id]); cmds += 1 }
+                }
+                for (i, p) in points.enumerated() { picker.taps.append(.init(x: p.0, y: p.1, exclude: objectExclude, group: group, cmds: i == 0 ? cmds : 0, lasso: lasso)) }
             } catch {
-                picker.error = "Couldn't pick an object there. Try the middle of it, or tap again."
+                picker.error = lasso ? "Couldn't find an object in that loop. Draw closer around it." : "Couldn't pick an object there. Try the middle of it, or tap again."
             }
             NotificationCenter.default.post(name: .masksChanged, object: nil)
             await render(draft: true)
@@ -285,10 +341,11 @@ struct EditorView: View {
 
     private func undoObjectTap() {
         let picker = ObjectPicker.shared
-        guard !picker.taps.isEmpty else { return }
+        guard let g = picker.taps.last?.group else { return }
+        let n = picker.taps.filter { $0.group == g }.reduce(0) { $0 + $1.cmds }
         Task {
-            await command("edit.undo")
-            picker.taps.removeLast()
+            for _ in 0..<max(1, n) { await command("edit.undo") }
+            picker.taps.removeAll { $0.group == g }
             if picker.taps.isEmpty { objectMask = nil }
             NotificationCenter.default.post(name: .masksChanged, object: nil)
             await render(draft: true)
@@ -309,7 +366,7 @@ struct EditorView: View {
     /// Green + / red − where the user tapped, so it is clear what was added and what was cut away.
     private func objectMarkers(in rect: CGRect) -> some View {
         ZStack {
-            ForEach(ObjectPicker.shared.taps) { t in
+            ForEach(ObjectPicker.shared.taps.filter { !$0.lasso }) { t in
                 Image(systemName: t.exclude ? "minus.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 26)).symbolRenderingMode(.palette)
                     .foregroundStyle(.white, t.exclude ? Color.red : Color.green)

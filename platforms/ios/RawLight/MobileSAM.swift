@@ -66,9 +66,7 @@ final class MobileSAM {
                 "image_embeddings": embeddings, "sparse_embeddings": sparse, "dense_embeddings": dense]))
             guard let masks = result.featureValue(for: "masks")?.multiArrayValue,
                   let iou = result.featureValue(for: "iou_predictions")?.multiArrayValue else { return false }
-            var best = 0
-            for k in 1..<min(3, iou.count) where iou[k].floatValue > iou[best].floatValue { best = k }
-            sample(masks, index: best, w: w, h: h, into: out, side: side)
+            sample(masks, index: pick(masks, iou, single: pts.count == 1), w: w, h: h, into: out, side: side)
             return true
         } catch { return false }
     }
@@ -136,6 +134,31 @@ final class MobileSAM {
     }
 
     // MARK: output
+
+    /// SAM returns nested guesses (part, larger part, whole object). One tap is ambiguous, and the highest-scoring guess is
+    /// often just a part (a head, a wing), so with a single tap take the largest guess that is still confident.
+    /// With several taps the user has said what they mean, so the best score wins.
+    private func pick(_ masks: MLMultiArray, _ iou: MLMultiArray, single: Bool) -> Int {
+        let count = min(masks.shape.count > 1 ? masks.shape[1].intValue : 1, iou.count)
+        guard count > 1 else { return 0 }
+        var best = 0
+        for k in 1..<count where iou[k].floatValue > iou[best].floatValue { best = k }
+        guard single else { return best }
+        let strides = masks.strides.map { $0.intValue }
+        let base = masks.dataPointer.bindMemory(to: Float32.self, capacity: masks.count)
+        func area(_ k: Int) -> Int {
+            var n = 0
+            for y in 0..<256 { for x in 0..<256 where base[k * strides[1] + y * strides[2] + x * strides[3]] > 0 { n += 1 } }
+            return n
+        }
+        let floor = max(0.7, iou[best].floatValue - 0.06)
+        var pickIdx = best, bigArea = area(best)
+        for k in 0..<count where k != best && iou[k].floatValue >= floor {
+            let a = area(k)
+            if a > bigArea { bigArea = a; pickIdx = k }
+        }
+        return pickIdx
+    }
 
     /// 256×256 logits of the padded model frame → `side × side` logits of the photo (bilinear, clamped to ±8).
     private func sample(_ masks: MLMultiArray, index: Int, w: Int, h: Int, into out: UnsafeMutablePointer<Float>, side: Int) {

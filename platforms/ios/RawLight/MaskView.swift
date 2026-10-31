@@ -212,13 +212,15 @@ extension Notification.Name { static let masksChanged = Notification.Name("rawli
 /// State of the "Object" tool: every tap, whether it is still working, and why the last one failed.
 @Observable final class ObjectPicker {
     static let shared = ObjectPicker()
-    struct Tap: Identifiable { let id = UUID(); let x: Double; let y: Double; let exclude: Bool }
+    struct Tap: Identifiable { let id = UUID(); let x: Double; let y: Double; let exclude: Bool; var group = 0; var cmds = 1; var lasso = false }
+    var lasso = false
+    var group = 0
     var taps: [Tap] = []
     var busy = false
     var error: String?
     var undo: (() -> Void)?
     var clear: (() -> Void)?
-    func reset() { taps = []; busy = false; error = nil }
+    func reset() { taps = []; busy = false; error = nil; group = 0 }
 }
 
 struct MaskPanel: View {
@@ -319,8 +321,9 @@ struct MaskPanel: View {
         let picker = ObjectPicker.shared
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "hand.tap").foregroundStyle(Theme.accent)
-                Text(picker.taps.isEmpty ? "Tap the object you want to edit" : "Tap more to add or cut away parts").font(.subheadline.weight(.semibold))
+                Image(systemName: picker.lasso ? "lasso" : "hand.tap").foregroundStyle(Theme.accent)
+                Text(picker.lasso ? (picker.taps.isEmpty ? "Draw a loop around what you want to edit" : "Draw again to add or cut away parts")
+                                  : (picker.taps.isEmpty ? "Tap the object you want to edit" : "Tap more to add or cut away parts")).font(.subheadline.weight(.semibold))
                 Spacer()
                 if picker.busy { ProgressView().controlSize(.small) }
             }
@@ -335,7 +338,7 @@ struct MaskPanel: View {
                 }
             }
             HStack(spacing: 8) {
-                Button { picker.undo?() } label: { Label("Undo tap", systemImage: "arrow.uturn.backward").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
+                Button { picker.undo?() } label: { Label(picker.lasso ? "Undo" : "Undo tap", systemImage: "arrow.uturn.backward").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
                     .buttonStyle(.plain).disabled(picker.taps.isEmpty).opacity(picker.taps.isEmpty ? 0.4 : 1)
                 Button { picker.clear?() } label: { Label("Start over", systemImage: "xmark").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
                     .buttonStyle(.plain).disabled(picker.taps.isEmpty).opacity(picker.taps.isEmpty ? 0.4 : 1)
@@ -354,7 +357,8 @@ struct MaskPanel: View {
             ("person.crop.square", "Subject", "Subject", { add(["kind": "subject"]) }),
             ("cloud.sun", "Sky", "Sky", { add(["kind": "sky"]) }),
             ("rectangle.dashed", "Background", "Background", { add(["kind": "background"]) }),
-            ("hand.tap", "Object", "Object", { ObjectPicker.shared.reset(); objectPick = true; objectExclude = false; message = nil; showMask = true; onChange() }),
+            ("lasso", "Lasso", "Lasso", { ObjectPicker.shared.reset(); ObjectPicker.shared.lasso = true; objectPick = true; objectExclude = false; message = nil; showMask = true; onChange() }),
+            ("hand.tap", "Object", "Object", { ObjectPicker.shared.reset(); ObjectPicker.shared.lasso = false; objectPick = true; objectExclude = false; message = nil; showMask = true; onChange() }),
             ("square.split.1x2", "Linear", "Linear gradient", { add(["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }),
             ("circle.dashed", "Radial", "Radial gradient", { add(["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }),
             ("paintbrush", "Brush", "Brush", { add(["kind": "brush"]) }),
@@ -370,7 +374,7 @@ struct MaskPanel: View {
                         }
                         .frame(maxWidth: .infinity).frame(height: 58)
                         .foregroundStyle(.white)
-                        .fieldBackground(objectPick && t.title == "Object", in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .fieldBackground(objectPick && t.title == (ObjectPicker.shared.lasso ? "Lasso" : "Object"), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(.plain)
