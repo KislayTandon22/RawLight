@@ -89,7 +89,7 @@ final class Engine: @unchecked Sendable {
         }
     }
 
-    enum Kind: Int32 { case full = 0, thumb = 1, draft = 2, uncropped = 3 }
+    enum Kind: Int32 { case full = 0, thumb = 1, draft = 2, uncropped = 3, before = 4 }
 
     /// Render a photo with its current edits, fitted in `maxEdge` x `maxEdge`.
     func render(_ id: UInt64, maxEdge: Int, kind: Kind = .full, maskOverlay: Int? = nil) async -> Rendered? {

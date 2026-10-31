@@ -4,10 +4,13 @@ import UniformTypeIdentifiers
 
 struct LibraryView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var hsize
+    @State private var showSearch = false
     @State private var picked: [PhotosPickerItem] = []
     @State private var showFiles = false
     @State private var showFilters = false
     @State private var showLibraries = false
+    @State private var showSettings = false
     @State private var newAlbum = ""
     @State private var askAlbum = false
     @State private var exporting = false
@@ -22,7 +25,12 @@ struct LibraryView: View {
                 .padding(8).padding(.bottom, 90)
             }
         }
-        .safeAreaInset(edge: .top) { topBar }
+        .safeAreaInset(edge: .top) {
+            VStack(spacing: 6) {
+                topBar
+                if hsize == .compact, showSearch { searchField.padding(.horizontal, 12) }
+            }
+        }
         .overlay(alignment: .bottom) { bottomBar }
         .overlay(alignment: .bottom) {
             if let msg = model.importMessage {
@@ -36,6 +44,7 @@ struct LibraryView: View {
         .sheet(isPresented: $exporting) { ExportSheet(ids: Array(model.selection)) }
         .sheet(isPresented: $showFilters) { FilterSheet().presentationDetents([.medium]) }
         .sheet(isPresented: $showLibraries) { LibrariesSheet() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
         .alert("New album", isPresented: $askAlbum) {
             TextField("Name", text: $newAlbum)
             Button("Create") { let n = newAlbum; newAlbum = ""; Task { await model.createAlbum(n) } }
@@ -58,17 +67,13 @@ struct LibraryView: View {
                 if !model.albums.isEmpty { Menu("Albums") { albumItems(model.albums) } }
                 Divider()
                 Button { showLibraries = true } label: { Label("Libraries…", systemImage: "externaldrive") }
+                Button { showSettings = true } label: { Label("Settings…", systemImage: "gearshape") }
             } label: {
-                HStack(spacing: 4) { Text(model.sourceLabel).font(.headline).lineLimit(1); Image(systemName: "chevron.down").font(.caption.weight(.bold)) }
+                HStack(spacing: 4) { Text(model.sourceLabel).font(.headline).lineLimit(1).frame(maxWidth: hsize == .compact ? 110 : nil, alignment: .leading); Image(systemName: "chevron.down").font(.caption.weight(.bold)) }
                     .padding(.horizontal, 12).frame(height: 44)
             }
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search", text: $m.search).submitLabel(.search).autocorrectionDisabled()
-                    .onSubmit { Task { await model.applyFilters() } }
-                if !model.search.isEmpty { Button { Task { await model.clearFilters() } } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) } }
-            }
-            .padding(.horizontal, 12).frame(height: 40).fieldBackground(in: Capsule()).frame(minWidth: 120)
+            if hsize != .compact { searchField }
+            else { Spacer(minLength: 0); Button { withAnimation(.snappy) { showSearch.toggle() } } label: { icon("magnifyingglass") } }
             Menu {
                 ForEach([("captureDate", false, "Newest first"), ("captureDate", true, "Oldest first"), ("importDate", false, "Import date"),
                          ("editDate", false, "Edit date"), ("fileName", true, "File name"), ("rating", false, "Rating"), ("fileSize", false, "File size")], id: \.2) { s in
@@ -78,13 +83,16 @@ struct LibraryView: View {
                 }
             } label: { icon("arrow.up.arrow.down") }
             Button { showFilters = true } label: {
-                Label("Filter", systemImage: "line.3.horizontal.decrease").labelStyle(.titleAndIcon).font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 12).frame(height: 40)
+                AdaptiveLabel("Filter", "line.3.horizontal.decrease", compact: hsize == .compact).font(.subheadline.weight(.medium))
+                    .padding(.horizontal, hsize == .compact ? 0 : 12).frame(width: hsize == .compact ? 40 : nil, height: 40)
                     .fieldBackground(model.filtersActive, in: Capsule()).foregroundStyle(model.filtersActive ? .white : .primary)
             }
             Button { model.selecting.toggle(); if !model.selecting { model.selection = [] } } label: {
-                Text(model.selecting ? "Done" : "Select").font(.subheadline.weight(.medium)).padding(.horizontal, 12).frame(height: 40)
-                    .fieldBackground(model.selecting, in: Capsule())
+                Group {
+                    if hsize == .compact { Image(systemName: model.selecting ? "checkmark.circle.fill" : "checkmark.circle").frame(width: 40, height: 40) }
+                    else { Text(model.selecting ? "Done" : "Select").padding(.horizontal, 12).frame(height: 40) }
+                }
+                .font(.subheadline.weight(.medium)).fieldBackground(model.selecting, in: Capsule())
             }
             Menu {
                 Button { showFiles = true } label: { Label("Folder or Files…", systemImage: "folder") }
@@ -96,7 +104,8 @@ struct LibraryView: View {
                     }
                 }
             } label: {
-                Label("Import", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40)
+                AdaptiveLabel("Import", "plus", compact: hsize == .compact).font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, hsize == .compact ? 0 : 14).frame(width: hsize == .compact ? 40 : nil, height: 40)
                     .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
             }
             .onChange(of: picked) { _, items in
@@ -107,6 +116,17 @@ struct LibraryView: View {
         .padding(.horizontal, 10).frame(height: 60)
         .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, 8).padding(.top, 4)
+    }
+
+    private var searchField: some View {
+        @Bindable var m = model
+        return HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search", text: $m.search).submitLabel(.search).autocorrectionDisabled()
+                    .onSubmit { Task { await model.applyFilters() } }
+                if !model.search.isEmpty { Button { Task { await model.clearFilters() } } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) } }
+            }
+            .padding(.horizontal, 12).frame(height: 40).fieldBackground(in: Capsule()).frame(minWidth: 120)
     }
 
     private func icon(_ s: String) -> some View {
@@ -178,9 +198,11 @@ struct LibraryView: View {
         return Group {
             if model.selecting {
                 HStack(spacing: 6) {
-                    Text("\(model.selection.count) selected").font(.subheadline.weight(.medium)).padding(.horizontal, 8)
-                    Button("All") { model.selectAll() }.buttonStyle(.bordered).tint(.gray)
-                    Spacer()
+                    Menu {
+                        Button("Select all") { model.selectAll() }
+                        Button("Select none") { model.selection = [] }
+                    } label: { Text(hsize == .compact ? "\(model.selection.count)" : "\(model.selection.count) selected").font(.subheadline.weight(.medium)).padding(.horizontal, 10).frame(height: 40).fieldBackground(in: Capsule()) }
+                    Spacer(minLength: 0)
                     Menu { ForEach(0...5, id: \.self) { r in Button(r == 0 ? "No rating" : String(repeating: "★", count: r)) { Task { await model.batch("photo.rate", ["rating": r]) } } } } label: { icon("star") }
                     Button { Task { await model.batch("photo.pick") } } label: { icon("flag") }
                     Button { Task { await model.batch("photo.reject") } } label: { icon("xmark.circle") }
@@ -191,7 +213,7 @@ struct LibraryView: View {
                         }
                     } label: { icon("rectangle.stack.badge.plus") }
                     Button { if !model.selection.isEmpty { exporting = true } } label: {
-                        Label("Export", systemImage: "square.and.arrow.up").font(.subheadline.weight(.semibold)).padding(.horizontal, 12).frame(height: 40)
+                        AdaptiveLabel("Export", "square.and.arrow.up", compact: hsize == .compact).font(.subheadline.weight(.semibold)).padding(.horizontal, hsize == .compact ? 0 : 12).frame(width: hsize == .compact ? 40 : nil, height: 40)
                             .fieldBackground(!model.selection.isEmpty, in: Capsule()).foregroundStyle(model.selection.isEmpty ? Color.secondary : .white)
                     }
                     if model.source == .recentlyDeleted { Button { Task { await model.batch("photo.restore", clear: true) } } label: { icon("arrow.uturn.backward") } }
@@ -201,15 +223,15 @@ struct LibraryView: View {
                 .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous)).padding(.horizontal, 8).padding(.bottom, 8)
             } else {
                 HStack(spacing: 8) {
-                    Text("\(model.photoIDs.count) photos · \(model.sortLabel)").font(.footnote.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
+                    Text(hsize == .compact ? "\(model.photoIDs.count) photos" : "\(model.photoIDs.count) photos · \(model.sortLabel)").font(.footnote.weight(.medium)).padding(.horizontal, 14).frame(height: 40)
                         .panelBackground(in: Capsule())
                     Spacer()
-                    HStack(spacing: 6) {
+                    if hsize != .compact { HStack(spacing: 6) {
                         Image(systemName: "square.grid.3x3").font(.caption)
                         Slider(value: $m.gridSize, in: 80...260).frame(width: 130).tint(Theme.accent)
                         Image(systemName: "square.grid.2x2").font(.caption)
                     }
-                    .padding(.horizontal, 14).frame(height: 40).panelBackground(in: Capsule())
+                    .padding(.horizontal, 14).frame(height: 40).panelBackground(in: Capsule()) }
                 }
                 .padding(.horizontal, 12).padding(.bottom, 10)
             }
@@ -290,5 +312,14 @@ struct LibrariesSheet: View {
         .confirmationDialog("Delete this library and its photos?", isPresented: Binding(get: { toDelete != nil }, set: { if !$0 { toDelete = nil } }), titleVisibility: .visible) {
             Button("Delete library", role: .destructive) { if let l = toDelete { model.deleteLibrary(l) }; toDelete = nil }
         } message: { Text("Photos copied into it are removed from this device. This can't be undone.") }
+    }
+}
+
+/// A label that shows only its icon when space is tight.
+struct AdaptiveLabel: View {
+    let title: String, symbol: String, compact: Bool
+    init(_ title: String, _ symbol: String, compact: Bool) { self.title = title; self.symbol = symbol; self.compact = compact }
+    var body: some View {
+        if compact { Image(systemName: symbol).accessibilityLabel(title) } else { Label(title, systemImage: symbol) }
     }
 }

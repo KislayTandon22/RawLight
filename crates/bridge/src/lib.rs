@@ -179,7 +179,8 @@ pub struct RlJob {
 }
 
 /// `kind`: 0 full-quality fit, 1 grid/filmstrip thumbnail (disk cached), 2 draft (interactive drags),
-/// 3 full uncropped frame (shown while the crop tool is active).
+/// 3 full uncropped frame (shown while the crop tool is active), 4 the photo as imported (the "before" of
+/// Before/After).
 /// Null when the photo does not exist.
 ///
 /// # Safety
@@ -192,6 +193,7 @@ pub unsafe extern "C" fn rl_job_new(session: *mut RlSession, id: u64, max_w: u32
         1 => session.0.thumb_job(pid, max_w.max(max_h) as usize),
         2 => session.0.render_job(pid, max_w as usize, max_h as usize, false, true).map(|j| j.draft()),
         3 => session.0.render_job(pid, max_w as usize, max_h as usize, false, false),
+        4 => session.0.render_job(pid, max_w as usize, max_h as usize, true, true),
         _ => session.0.render_job(pid, max_w as usize, max_h as usize, false, true),
     }));
     match job {

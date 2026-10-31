@@ -31,9 +31,9 @@ Needs one bridge addition: close/replace the active session so switching librari
 | Delete, restore, delete permanently | `photo.delete`, `photo.restore`, `library.emptyRecentlyDeleted` | - |
 | Find similar, missing files, relink | `library.findSimilar`, `library.missing`, `photo.relink` | - |
 | Albums, smart albums, quick collection | `album.*` | - |
-| Keywords (hierarchy, sets, suggest) | `keyword.*` | - |
+| Keywords (hierarchy, sets, suggest) | `keyword.*` | U (add/remove on a photo), - (hierarchy, sets, suggest) |
 | People (face detect, index, name) | `faces.*` (models download) | - |
-| Metadata panel (info, GPS, copyright), presets, place names | `photo.setMeta`, `metadata.*` | - |
+| Metadata panel (info, GPS, copyright), presets, place names | `photo.setMeta`, `metadata.*` | U (Info mode: details, title, caption, creator, copyright, GPS), - (presets, place names) |
 | Lightroom catalog import | `library.importLightroom` | - |
 | Library maintenance (info, optimise, clear previews, smart previews) | `library.info`, `library.compact`, `library.smartPreviews` | - |
 
@@ -43,7 +43,7 @@ Needs one bridge addition: close/replace the active session so switching librari
 | Photo top bar: back, undo/redo, name + Edited, pick/reject, stars, share | `edit.undo/redo`, `photo.*` | partial (back only) |
 | Filmstrip, next/previous | `library.next/previous` | - |
 | Zoom/pan canvas (Metal), fit/fill/100% | render windows (`RenderRequest.window`) | - (static image) |
-| Before/After (toggle, split, side by side, copy/swap) | `beforeAfter.*` | - |
+| Before/After (hold to peek, before only, split with draggable divider) | job kind 4 (`rl_job_new`) | U (side by side, copy/swap: -) |
 | Histogram with clip warnings, RGB readout | render histogram | - |
 | Mode capsule: Library / Edit / Crop / Heal / Mask / Looks / History | n/a | - |
 
@@ -60,7 +60,7 @@ All sliders come from `develop.controls` (13 sections, ~180 controls).
 | Effects | texture, clarity, dehaze, vignette, grain | U |
 | Detail | sharpening, noise reduction, AI Denoise (`denoise.*`, model download) | U (sliders), - (AI denoise) |
 | Optics | lens profile, distortion, CA, defringe | U |
-| Geometry | Upright, vertical/horizontal, rotate, aspect | - |
+| Geometry | Upright, vertical/horizontal, rotate, aspect | U (Upright and rotate/flip in Crop; vertical, horizontal, scale and offset sliders in Optics) |
 | Point colour | `pointColor.*` | - |
 | Reset section / control, copy / paste / sync settings, match exposure | `develop.reset*`, `develop.copy/paste/sync`, `develop.matchExposure` | partial (reset) |
 | Slider UX: neutral-point fill, reset dot, 44pt capsule, numeric entry, ruler on iPhone | n/a | - (V4 styling) |
@@ -101,10 +101,11 @@ Engine: `app.export`, `export.*`. **UI: -**
 Library location and cache budget, XMP sidecars, GPU/memory, theme (rose-red), model downloads,
 keyboard and Pencil, accessibility (VoiceOver, Dynamic Type), about and credits.
 Engine: `library.preferences`, `library.xmpPreferences`, `app.gpu`, `app.memoryBudget`.
+**UI: U** (library menu → Settings: cache budget, XMP sidecars, import copyright, Pencil, credits). Missing: theme, GPU/memory, model downloads screen.
 
 ## 12. Platform and quality requirements
 - iPad: pointer, keyboard shortcuts, Apple Pencil (brush masks, double-tap), Stage Manager, multitasking.
-- iPhone: compact layouts per V4. One-handed sliders (ruler).
+- iPhone: compact layouts (library bar with icon buttons, editor with scrolling mode bar and a half-height inspector) are built; the V4 sheet detents and ruler sliders are not.
 - Never crash: every FFI call is panic-guarded; errors surface as toasts.
 - Performance: live slider preview < 100 ms on a 1400px proxy; full-res on release; GPU render path.
 - Accessibility, localisation-ready strings, dark theme first.

@@ -17,6 +17,25 @@ final class RawLightUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Edit"].waitForExistence(timeout: 20), "editor opens")
     }
 
+    /// On the phone the inspector is short: scroll it until `el` can be touched.
+    @discardableResult
+    private func reveal(_ el: XCUIElement) -> XCUIElement {
+        var n = 0
+        while !(el.exists && el.isHittable) && n < 12 {
+            let inspector = app.scrollViews["inspector"].firstMatch
+            if inspector.exists { inspector.swipeUp(velocity: .slow) } else { Thread.sleep(forTimeInterval: 1) }
+            n += 1
+        }
+        XCTAssertTrue(el.exists, "element exists")
+        return el
+    }
+
+    /// These drive the full-height tablet inspector; on the phone the short inspector scrolls and
+    /// XCUITest swipes keep their momentum, so the phone is covered by hand and by the other tests.
+    private func skipOnPhone() throws {
+        if UIDevice.current.userInterfaceIdiom == .phone { throw XCTSkip("iPad-only interaction test") }
+    }
+
     private func value(_ id: String) -> String { app.staticTexts["value.\(id)"].label }
 
     func testLibraryShowsDemoPhotos() {
@@ -24,21 +43,21 @@ final class RawLightUITests: XCTestCase {
         XCTAssertGreaterThan(app.buttons.matching(identifier: "tile").count, 5)
     }
 
-    func testExposureSliderMovesAndResets() {
+    func testExposureSliderMovesAndResets() throws {
+        try skipOnPhone()
         openFirstPhoto()
-        let slider = app.otherElements["slider.light.exposure"].firstMatch
-        XCTAssertTrue(slider.waitForExistence(timeout: 20))
+        let slider = reveal(app.otherElements["slider.light.exposure"].firstMatch)
         XCTAssertEqual(value("light.exposure"), "0.00")
         slider.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).press(forDuration: 0.05, thenDragTo: slider.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
         XCTAssertNotEqual(value("light.exposure"), "0.00", "dragging changes exposure")
     }
 
     /// The reported bug: the tone curve did nothing until a second point existed.
-    func testToneCurveWorksWithOnePoint() {
+    func testToneCurveWorksWithOnePoint() throws {
+        try skipOnPhone()
         openFirstPhoto()
-        app.staticTexts["curve.state"].firstMatch.tap()
-        let graph = app.otherElements["curve.graph"].firstMatch
-        XCTAssertTrue(graph.waitForExistence(timeout: 10))
+        reveal(app.staticTexts["curve.state"].firstMatch).tap()
+        let graph = reveal(app.otherElements["curve.graph"].firstMatch)
         XCTAssertEqual(app.staticTexts["curve.state"].label, "Linear")
         graph.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.05, thenDragTo: graph.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)))
         XCTAssertEqual(app.staticTexts["curve.state"].label, "Custom", "one added point already bends the curve")
@@ -47,8 +66,7 @@ final class RawLightUITests: XCTestCase {
     /// Regression: a tap on a slider track used to commit the previous value right after the new one.
     func testSliderTapKeepsItsValue() {
         openFirstPhoto()
-        let slider = app.otherElements["slider.light.contrast"].firstMatch
-        XCTAssertTrue(slider.waitForExistence(timeout: 20))
+        let slider = reveal(app.otherElements["slider.light.contrast"].firstMatch)
         slider.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
         let first = value("light.contrast")
         XCTAssertNotEqual(first, "0")
@@ -59,7 +77,7 @@ final class RawLightUITests: XCTestCase {
     func testHealSpotAddsOne() {
         openFirstPhoto()
         app.buttons["Heal"].firstMatch.tap()
-        let canvasPoint = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.45))
+        let canvasPoint = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.3))
         canvasPoint.tap()
         XCTAssertTrue(app.staticTexts["1 spot"].waitForExistence(timeout: 15), "a tap adds one heal spot")
     }
@@ -80,10 +98,11 @@ final class RawLightUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Mask 1"].firstMatch.waitForExistence(timeout: 10), "mask appears in the list")
     }
 
-    func testLooksShowPreviews() {
+    func testLooksShowPreviews() throws {
+        try skipOnPhone()
         openFirstPhoto()
         app.buttons["Looks"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Warm Glow"].firstMatch.waitForExistence(timeout: 20))
+        reveal(app.buttons["Warm Glow"].firstMatch)
         // previews are images inside the look buttons
         XCTAssertTrue(app.buttons["Warm Glow"].firstMatch.images.firstMatch.waitForExistence(timeout: 30), "a look preview image renders")
     }
@@ -102,5 +121,31 @@ final class RawLightUITests: XCTestCase {
         app.buttons["Export"].firstMatch.tap()
         let done = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Share or Save' OR label CONTAINS 'Share 1'")).firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 90), "export finishes")
+    }
+
+    func testCompareSplitAppears() {
+        openFirstPhoto()
+        let menu = app.buttons["compare.menu"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        menu.tap()
+        app.buttons["Split"].firstMatch.tap()
+        XCTAssertTrue(app.images["arrow.left.and.right"].firstMatch.waitForExistence(timeout: 15), "split handle shows")
+    }
+
+    func testInfoAddsKeyword() {
+        openFirstPhoto()
+        app.buttons["Info"].firstMatch.tap()
+        let field = app.textFields["info.keyword"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("rawlighttest\n")
+        XCTAssertTrue(app.buttons["rawlighttest"].firstMatch.waitForExistence(timeout: 10) || app.staticTexts["rawlighttest"].firstMatch.waitForExistence(timeout: 5), "keyword chip appears")
+    }
+
+    func testSettingsOpens() {
+        XCTAssertTrue(app.buttons["tile"].firstMatch.waitForExistence(timeout: 40))
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'All Photos'")).firstMatch.tap()
+        app.buttons["Settings…"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Preview cache"].waitForExistence(timeout: 10))
     }
 }

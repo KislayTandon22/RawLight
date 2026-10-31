@@ -2,21 +2,22 @@ import SwiftUI
 
 private let groups: [(name: String, sections: [String])] = [
     ("Light", ["light"]), ("Colour", ["color", "mixer", "grading", "bwMix", "calibration"]),
-    ("Effects", ["effects", "vignette", "grain"]), ("Detail", ["detail"]), ("Optics", ["optics"]),
+    ("Effects", ["effects", "vignette", "grain"]), ("Detail", ["detail"]), ("Optics", ["optics", "geometry"]),
 ]
 
 enum EditMode: String, CaseIterable {
-    case edit = "Edit", crop = "Crop", mask = "Mask", heal = "Heal", looks = "Looks", history = "History"
+    case edit = "Edit", crop = "Crop", mask = "Mask", heal = "Heal", looks = "Looks", history = "History", info = "Info"
     var symbol: String {
         switch self {
         case .edit: "slider.horizontal.3"; case .crop: "crop.rotate"; case .mask: "circle.lefthalf.filled.inverse"
-        case .heal: "bandage"; case .looks: "sparkles"; case .history: "clock.arrow.circlepath"
+        case .heal: "bandage"; case .looks: "sparkles"; case .history: "clock.arrow.circlepath"; case .info: "info.circle"
         }
     }
 }
 
 struct EditorView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var hsize
     @State private var photoID: UInt64
     @State private var image: UIImage?
     @State private var histogram: [UInt32] = []
@@ -49,6 +50,10 @@ struct EditorView: View {
     @State private var brushSize = 0.03
     @State private var erase = false
     @State private var live = Throttle()
+    @State private var compare = "off"
+    @State private var beforeImage: UIImage?
+    @State private var peek = false
+    @State private var split: CGFloat = 0.5
 
     init(photoID: UInt64) { _photoID = State(initialValue: photoID) }
 
@@ -61,10 +66,10 @@ struct EditorView: View {
                     topBar
                     canvas
                     modeBar
-                    filmstrip
+                    if hsize != .compact { filmstrip }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                inspector.frame(width: wide ? 360 : nil, height: wide ? nil : min(geo.size.height * 0.45, 420))
+                inspector.frame(width: wide ? 360 : nil, height: wide ? nil : min(geo.size.height * (hsize == .compact ? 0.5 : 0.45), 420))
             }
         }
         .sheet(isPresented: $showExport) { ExportSheet(ids: [photoID]) }
@@ -80,6 +85,48 @@ struct EditorView: View {
     // MARK: top bar, canvas, filmstrip
 
     private var topBar: some View {
+        Group { if hsize == .compact { compactTopBar } else { regularTopBar } }
+    }
+
+    private var compactTopBar: some View {
+        HStack(spacing: 2) {
+            glass("chevron.left") { model.openPhoto = nil }
+            glass("arrow.uturn.backward") { Task { await command("edit.undo") } }
+            glass("arrow.uturn.forward") { Task { await command("edit.redo") } }
+            VStack(spacing: 0) {
+                Text(info.name).font(.footnote.weight(.semibold)).lineLimit(1)
+                Text(info.edited ? "Edited" : "Original").font(.caption2).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            Menu {
+                Button { setCompare("off") } label: { Label("Compare off", systemImage: compare == "off" ? "checkmark" : "eye.slash") }
+                Button { setCompare("before") } label: { Label("Before only", systemImage: compare == "before" ? "checkmark" : "photo") }
+                Button { setCompare("split") } label: { Label("Split", systemImage: compare == "split" ? "checkmark" : "rectangle.split.2x1") }
+            } label: {
+                Image(systemName: "rectangle.split.2x1").font(.body.weight(.medium)).foregroundStyle(compare == "off" ? Color.primary : Theme.accentSoft)
+                    .frame(width: 40, height: 44).contentShape(Circle())
+            }
+            .accessibilityIdentifier("compare.menu")
+            Menu {
+                Button { Task { await command("develop.copy"); copied = true } } label: { Label("Copy settings", systemImage: "doc.on.doc") }
+                Button { Task { await command("develop.paste"); await reloadControls(); await render() } } label: { Label("Paste settings", systemImage: "doc.on.clipboard") }
+                Divider()
+                Button { Task { await command(info.flag == "pick" ? "photo.unflag" : "photo.pick"); await refreshInfo() } } label: { Label(info.flag == "pick" ? "Remove pick" : "Pick", systemImage: "flag") }
+                Button { Task { await command(info.flag == "reject" ? "photo.unflag" : "photo.reject"); await refreshInfo() } } label: { Label(info.flag == "reject" ? "Remove reject" : "Reject", systemImage: "xmark.circle") }
+                Menu("Rating") {
+                    ForEach(0...5, id: \.self) { n in
+                        Button(n == 0 ? "No rating" : String(repeating: "★", count: n)) { Task { await command("photo.rate", ["rating": n]); await refreshInfo() } }
+                    }
+                }
+            } label: { Image(systemName: "ellipsis.circle").font(.body.weight(.medium)).frame(width: 40, height: 44).contentShape(Circle()) }
+            glass("square.and.arrow.up", tint: Theme.accent) { showExport = true }
+        }
+        .padding(.horizontal, 6).frame(height: 56)
+        .panelBackground(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .padding(.horizontal, 8).padding(.top, 4)
+    }
+
+    private var regularTopBar: some View {
         HStack(spacing: 6) {
             glass("chevron.left") { model.openPhoto = nil }
             glass("arrow.uturn.backward") { Task { await command("edit.undo") } }
@@ -107,6 +154,16 @@ struct EditorView: View {
                     }
                 }
             }
+            Menu {
+                Button { setCompare("off") } label: { Label("Off", systemImage: compare == "off" ? "checkmark" : "eye.slash") }
+                Button { setCompare("before") } label: { Label("Before only", systemImage: compare == "before" ? "checkmark" : "photo") }
+                Button { setCompare("split") } label: { Label("Split", systemImage: compare == "split" ? "checkmark" : "rectangle.split.2x1") }
+                Text("Or touch and hold the photo to peek at the original")
+            } label: {
+                Image(systemName: "rectangle.split.2x1").font(.body.weight(.medium)).foregroundStyle(compare == "off" ? Color.primary : Theme.accentSoft)
+                    .frame(width: 44, height: 44).contentShape(Circle())
+            }
+            .accessibilityIdentifier("compare.menu")
             glass("square.and.arrow.up", tint: Theme.accent) { showExport = true }
         }
         .padding(.horizontal, 10).frame(height: 60)
@@ -126,8 +183,20 @@ struct EditorView: View {
             let rect = fitRect(image?.size ?? .zero, in: geo.size)
             ZStack {
                 if let image {
-                    Image(uiImage: image).resizable().scaledToFit()
-                        .scaleEffect(scale).offset(offset)
+                    ZStack {
+                        Image(uiImage: (compare == "before" || peek) ? (beforeImage ?? image) : image).resizable().scaledToFit()
+                        if compare == "split", !peek, let beforeImage, mode == .edit {
+                            Image(uiImage: beforeImage).resizable().scaledToFit()
+                                .mask(alignment: .leading) { Rectangle().frame(width: rect.minX + rect.width * split) }
+                            Rectangle().fill(.white).frame(width: 2, height: rect.height).position(x: rect.minX + rect.width * split, y: geo.size.height / 2)
+                            Circle().fill(.ultraThinMaterial).overlay(Image(systemName: "arrow.left.and.right").font(.caption.weight(.bold)))
+                                .frame(width: 40, height: 40).position(x: rect.minX + rect.width * split, y: geo.size.height / 2)
+                                .gesture(DragGesture().onChanged { split = min(max(($0.location.x - rect.minX) / max(rect.width, 1), 0.02), 0.98) })
+                        }
+                    }
+                    .scaleEffect(scale).offset(offset)
+                    .onLongPressGesture(minimumDuration: 0.3, maximumDistance: 20, perform: { if mode == .edit { Task { await loadBefore(); peek = true } } },
+                                        onPressingChanged: { if !$0 { peek = false } })
                         .gesture(MagnifyGesture().onChanged { if mode == .edit { scale = min(max($0.magnification * baseScale, 1), 8) } }
                             .onEnded { _ in baseScale = scale; if scale == 1 { offset = .zero } })
                         .simultaneousGesture(DragGesture().onChanged { if mode == .edit, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) } }
@@ -206,6 +275,14 @@ struct EditorView: View {
     }
 
     private var modeBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) { modeItems }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxWidth: hsize == .compact ? .infinity : 560)
+            .panelBackground(in: Capsule())
+            .padding(.bottom, 6).padding(.horizontal, hsize == .compact ? 8 : 12)
+    }
+
+    private var modeItems: some View {
         HStack(spacing: 0) {
             ForEach(EditMode.allCases, id: \.self) { m in
                 Button { setMode(m) } label: {
@@ -213,7 +290,7 @@ struct EditorView: View {
                         Image(systemName: m.symbol).font(.system(size: 19, weight: .medium)).frame(height: 24)
                         Text(m.rawValue).font(.system(size: 11, weight: .semibold)).tracking(0.2)
                     }
-                    .frame(maxWidth: .infinity).frame(height: 54)
+                    .frame(minWidth: 52, maxWidth: .infinity).frame(height: 54)
                     .foregroundStyle(mode == m ? Color.white : Color.white.opacity(0.55))
                     .overlay(alignment: .bottom) { Capsule().fill(Theme.accent).frame(width: mode == m ? 16 : 0, height: 3).offset(y: -2) }
                     .contentShape(Rectangle())
@@ -221,10 +298,7 @@ struct EditorView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 6)
-        .frame(maxWidth: 560)
-        .panelBackground(in: Capsule())
-        .padding(.bottom, 6).padding(.horizontal, 12)
+        .padding(.horizontal, 6).frame(minWidth: hsize == .compact ? 0 : 560)
     }
 
     private func setMode(_ m: EditMode) {
@@ -284,6 +358,8 @@ struct EditorView: View {
                 } else if mode == .looks {
                     LooksPanel(engine: model.engine, photoID: photoID) { Task { await reloadControls(); await render() } }
                         .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
+                } else if mode == .info {
+                    InfoPanel(engine: model.engine, photoID: photoID).padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else if mode == .history {
                     HistoryPanel(engine: model.engine, photoID: photoID) { Task { await reloadControls(); await render() } }
                         .padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -291,7 +367,7 @@ struct EditorView: View {
                     MaskPanel(engine: model.engine, photoID: photoID, brushSize: $brushSize, erase: $erase, objectPick: $objectPick, objectExclude: $objectExclude, showMask: $showMask) { live.run { await render(draft: true) } }.padding(.horizontal, 16).transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else {
                 VStack(spacing: 8) {
-                    if !histogram.isEmpty { HistogramView(bins: histogram) }
+                    if !histogram.isEmpty { HistogramView(height: hsize == .compact ? 44 : 70, bins: histogram) }
                     QuickEditBar(engine: model.engine) { Task { await reloadControls(); await render() } }.id(photoID)
                     if group == "Light" {
                         Button { withAnimation(.snappy) { showCurve.toggle() } } label: {
@@ -339,6 +415,7 @@ struct EditorView: View {
                 }.padding(.horizontal, 16)
                 }
             }
+            .accessibilityIdentifier("inspector")
             .contentMargins(.top, 8, for: .scrollContent)
             .contentMargins(.bottom, 36, for: .scrollContent)
             .scrollIndicators(.hidden)
@@ -353,7 +430,8 @@ struct EditorView: View {
     // MARK: engine glue
 
     private func open() async {
-        scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero
+        scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero; beforeImage = nil; peek = false
+        if compare != "off" { await loadBefore() }
         try? await model.engine.execute("library.select", ["ids": [photoID], "active": photoID])
         async let c = model.engine.controls()
         async let i = model.engine.info()
@@ -373,6 +451,7 @@ struct EditorView: View {
             catch { NSLog("[RawLight] EXPORT error %@", error.localizedDescription) }
         }
         if let g = env["RAWLIGHT_GROUP"] { group = g }
+        if let c = env["RAWLIGHT_COMPARE"] { setCompare(c) }
         if let t = env["RAWLIGHT_COLOURTAB"] { colourTab = t }
         if env["RAWLIGHT_CURVE"] != nil { showCurve = true; _ = try? await model.engine.execute("develop.curve", ["channel": "master", "points": [[0, 0], [0.3, 0.2], [1, 1]]]); curvePoints = await model.engine.curve("master") }
         if let k = env["RAWLIGHT_AIMASK"] {
@@ -408,6 +487,15 @@ struct EditorView: View {
     }
 
     /// Fast draft while dragging; full quality when the finger lifts.
+    private func setCompare(_ c: String) {
+        compare = c
+        if c != "off" { Task { await loadBefore() } }
+    }
+
+    private func loadBefore() async {
+        if beforeImage == nil, let r = await model.engine.render(photoID, maxEdge: 1600, kind: .before) { beforeImage = r.image }
+    }
+
     private func render(draft: Bool = false) async {
         let id = photoID
         if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: (mode == .crop || mode == .mask || mode == .heal) ? .uncropped : (draft ? .draft : .full),

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// RGB + luma histogram with clipping markers.
 struct HistogramView: View {
+    var height: CGFloat = 70
     let bins: [UInt32]   // 4 x 256: r, g, b, luma
 
     var body: some View {
@@ -24,7 +25,7 @@ struct HistogramView: View {
             ctx.fill(path(1), with: .color(.green.opacity(0.7)))
             ctx.fill(path(2), with: .color(.blue.opacity(0.8)))
         }
-        .frame(height: 70)
+        .frame(height: height)
         .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(alignment: .topLeading) { clip(shadows: true) }
         .overlay(alignment: .topTrailing) { clip(shadows: false) }

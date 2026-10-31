@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02C29839F2ECC7641EBFC5F6 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29C664979A0E27C1CBD431C /* ExportSheet.swift */; };
+		12DFC765C4FB29BF9D12D5D0 /* InfoPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B25D05C46397F9EC8DFA415 /* InfoPanel.swift */; };
 		17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188A661C8121EDA12A429069 /* EditorView.swift */; };
 		28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */; };
 		2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D206DF744DE049ABECA7CEDA /* LibraryView.swift */; };
@@ -19,6 +20,7 @@
 		719E99E7BC32BEFA09BD09FA /* ColorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AD332855C4111D6E843DC0 /* ColorSlider.swift */; };
 		7AF2CA2A6C9AA67A01162E3A /* DetailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B338610ED569669C9221C258 /* DetailPanel.swift */; };
 		7C236BFC68456C18831CD622 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773D225FB743BF09F0786159 /* Engine.swift */; };
+		8308FE803AD3708534078813 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81475D8E59BEEC8167FBB4F0 /* SettingsView.swift */; };
 		8B2927AE423EEFADDD9F3FE2 /* RawLightUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB49DE0795AF17F6568F459 /* RawLightUITests.swift */; };
 		8B8622516CB2417190BC36AD /* CropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C0A5D018031985E8DCD890 /* CropView.swift */; };
 		8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */; };
@@ -57,6 +59,8 @@
 		746AE174CA016CAF647AD43E /* MaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskView.swift; sourceTree = "<group>"; };
 		773D225FB743BF09F0786159 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
 		793784F1303D4D3381740077 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7B25D05C46397F9EC8DFA415 /* InfoPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoPanel.swift; sourceTree = "<group>"; };
+		81475D8E59BEEC8167FBB4F0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8560E8AC4BC45B87ADF19267 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawLightApp.swift; sourceTree = "<group>"; };
 		A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RawLight-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -109,6 +113,7 @@
 				5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */,
 				1C6546856C997D6BFE63CC7F /* HistogramView.swift */,
 				D934F9B15D5972DDA61E86D6 /* Info.plist */,
+				7B25D05C46397F9EC8DFA415 /* InfoPanel.swift */,
 				D206DF744DE049ABECA7CEDA /* LibraryView.swift */,
 				0017D18B656BA9A6950B0FC0 /* LooksView.swift */,
 				746AE174CA016CAF647AD43E /* MaskView.swift */,
@@ -117,6 +122,7 @@
 				A075A64973F12004B1176998 /* RawLight-Bridging-Header.h */,
 				9F6B8A4D8BF834BA65D2CFC3 /* RawLightApp.swift */,
 				AE62BE11F6376A150B4F7F7A /* RootView.swift */,
+				81475D8E59BEEC8167FBB4F0 /* SettingsView.swift */,
 				277B51930533BFDC91FF340B /* SliderTouch.swift */,
 				8560E8AC4BC45B87ADF19267 /* Theme.swift */,
 				D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */,
@@ -271,6 +277,7 @@
 				3E4BA2F8EFFB2BCEED3CA64B /* HEICConverter.swift in Sources */,
 				3CF358D6A978E2BA7AA5D496 /* HealView.swift in Sources */,
 				E19781E0B876437FEE642F69 /* HistogramView.swift in Sources */,
+				12DFC765C4FB29BF9D12D5D0 /* InfoPanel.swift in Sources */,
 				2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */,
 				EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */,
 				DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */,
@@ -278,6 +285,7 @@
 				8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */,
 				D06829E9FACCEF0A522E7D96 /* RawLightApp.swift in Sources */,
 				90C9D7B9F29256A8798A7D72 /* RootView.swift in Sources */,
+				8308FE803AD3708534078813 /* SettingsView.swift in Sources */,
 				B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */,
 				DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */,
 				28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */,
