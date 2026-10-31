@@ -2015,10 +2015,10 @@ mod tests {
         let plain = DevelopSettings::default();
         assert_eq!(green(&s, &info, 2), green(&plain, &info, 2), "no sky at the top");
         assert!(green(&s, &info, 13) + 40 < green(&plain, &info, 13), "the sky at the bottom is darkened");
-        // without the matte the heuristic looks at the top of the frame instead
+        // without the matte the sky is grown from the top of the frame (this uniform frame is all
+        // connected, so it is all sky: what matters is that it no longer follows the matte)
         let heuristic = SourceInfo { mattes: None, ..info.clone() };
         assert!(green(&s, &heuristic, 2) < green(&plain, &heuristic, 2));
-        assert_eq!(green(&s, &heuristic, 13), green(&plain, &heuristic, 13));
     }
 
     /// A DNG's white balance is re-evaluated through its own colour model: the decoder hands the

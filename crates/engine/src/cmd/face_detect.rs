@@ -17,7 +17,7 @@ use lightcraft_faces::yunet::{Detector, Face, Options};
 use lightcraft_meta::{Region, RegionKind};
 use serde_json::{Value, json};
 
-use super::{CommandSpec, bad, cmd, has_selection};
+use super::{CommandSpec, always, bad, cmd, has_selection};
 use crate::{AiModel, EngineError, Result, Session};
 
 const C: &str = "faces.detect";
@@ -172,8 +172,23 @@ fn detect(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"detector": LABEL, "applied": applied, "photos": results, "ms": started.elapsed().as_secs_f64() * 1000.0}))
 }
 
+/// `faces.people`: the people named on faces in the library, most photos first.
+fn people(s: &mut Session, _: &Value) -> Result<Value> {
+    let list: Vec<Value> = s
+        .catalog
+        .people()
+        .into_iter()
+        .map(|p| {
+            json!({"name": p.name, "count": p.count, "photo": p.photo.0, "face": {"x0": p.face.x0, "y0": p.face.y0, "x1": p.face.x1, "y1": p.face.y1}})
+        })
+        .collect();
+    Ok(json!(list))
+}
+
 pub fn specs() -> Vec<CommandSpec> {
-    vec![cmd!(
+    vec![
+        cmd!(query "faces.people", "People", [], None, "{} → [{name, count, photo, face: {x0, y0, x1, y1}}] — the people named on faces in the library, most photos first; `photo` shows their largest face", always, people),
+        cmd!(
         "faces.detect",
         "Detect Faces",
         ["Photo"],
@@ -181,7 +196,8 @@ pub fn specs() -> Vec<CommandSpec> {
         "{ids?, apply?: bool (default true), score?: 0.6, nmsIou?: 0.3, maxFaces?} → {photos: [{id, faces: [{rect, score, landmarks}]}]}. Finds faces with the YuNet detector (download it first: `faces.models.download {id: \"yunet-2023mar\"}`) and, unless `apply` is false, adds them as unnamed face regions (one undo step), replacing earlier detections but never regions from XMP or ones you named; the sidecar is not touched",
         has_selection,
         detect
-    )]
+    ),
+    ]
 }
 
 #[cfg(test)]
@@ -193,6 +209,13 @@ mod tests {
     }
     fn region(x0: f64, y0: f64, x1: f64, y1: f64) -> Region {
         Region { rect: lightcraft_geom::Rect { x0, y0, x1, y1 }, kind: RegionKind::Face, name: Some("Ann".into()), description: None }
+    }
+
+    #[test]
+    fn people_lists_nobody_in_a_library_without_named_faces() {
+        let mut s = Session::with_demo();
+        let people = s.execute("faces.people", &json!({})).unwrap();
+        assert_eq!(people, json!([]));
     }
 
     #[test]

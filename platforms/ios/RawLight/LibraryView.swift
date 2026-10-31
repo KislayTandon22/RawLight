@@ -11,6 +11,8 @@ struct LibraryView: View {
     @State private var showFilters = false
     @State private var showLibraries = false
     @State private var showSettings = false
+    @State private var showPeople = false
+    @State private var merging = false
     @State private var newAlbum = ""
     @State private var askAlbum = false
     @State private var exporting = false
@@ -45,6 +47,16 @@ struct LibraryView: View {
         .sheet(isPresented: $showFilters) { FilterSheet().presentationDetents([.medium]) }
         .sheet(isPresented: $showLibraries) { LibrariesSheet() }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .task {
+            // Debug aid for screenshots: RAWLIGHT_SHEET=people|merge opens that sheet on launch.
+            switch ProcessInfo.processInfo.environment["RAWLIGHT_SHEET"] {
+            case "people": try? await Task.sleep(for: .seconds(3)); showPeople = true
+            case "merge": try? await Task.sleep(for: .seconds(8)); model.selection = Set(model.photoIDs.prefix(2)); merging = true
+            default: break
+            }
+        }
+        .sheet(isPresented: $showPeople) { PeopleView() }
+        .sheet(isPresented: $merging) { MergeSheet(ids: Array(model.selection)).presentationDetents([.large]) }
         .alert("New album", isPresented: $askAlbum) {
             TextField("Name", text: $newAlbum)
             Button("Create") { let n = newAlbum; newAlbum = ""; Task { await model.createAlbum(n) } }
@@ -67,6 +79,7 @@ struct LibraryView: View {
                 if !model.albums.isEmpty { Menu("Albums") { albumItems(model.albums) } }
                 Divider()
                 Button { showLibraries = true } label: { Label("Libraries…", systemImage: "externaldrive") }
+                Button { showPeople = true } label: { Label("People…", systemImage: "person.2") }
                 Button { showSettings = true } label: { Label("Settings…", systemImage: "gearshape") }
             } label: {
                 HStack(spacing: 4) { Text(model.sourceLabel).font(.headline).lineLimit(1).frame(maxWidth: hsize == .compact ? 110 : nil, alignment: .leading); Image(systemName: "chevron.down").font(.caption.weight(.bold)) }
@@ -206,6 +219,8 @@ struct LibraryView: View {
                     Menu { ForEach(0...5, id: \.self) { r in Button(r == 0 ? "No rating" : String(repeating: "★", count: r)) { Task { await model.batch("photo.rate", ["rating": r]) } } } } label: { icon("star") }
                     Button { Task { await model.batch("photo.pick") } } label: { icon("flag") }
                     Button { Task { await model.batch("photo.reject") } } label: { icon("xmark.circle") }
+                    Button { if model.selection.count > 1 { merging = true } } label: { icon("square.stack.3d.down.right") }
+                        .accessibilityLabel("Merge").accessibilityIdentifier("merge.open")
                     Menu {
                         Button("New album…") { askAlbum = true }
                         ForEach(flat(model.albums).filter { !$0.folder }) { a in

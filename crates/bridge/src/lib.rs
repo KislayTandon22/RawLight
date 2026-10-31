@@ -52,7 +52,7 @@ fn reply(v: Value) -> *mut c_char {
 pub extern "C" fn rl_session_new(demo: i32) -> *mut RlSession {
     let s = catch_unwind(|| {
         let base = if demo != 0 { Session::with_demo() } else { Session::new() };
-        base.with_fs().with_default_denoise_models().with_system_clock()
+        base.with_fs().with_default_denoise_models().with_default_face_models().with_system_clock()
     });
     match s {
         Ok(s) => Box::into_raw(Box::new(RlSession(s))),

@@ -32,7 +32,7 @@ Needs one bridge addition: close/replace the active session so switching librari
 | Find similar, missing files, relink | `library.findSimilar`, `library.missing`, `photo.relink` | - |
 | Albums, smart albums, quick collection | `album.*` | - |
 | Keywords (hierarchy, sets, suggest) | `keyword.*` | U (add/remove on a photo), - (hierarchy, sets, suggest) |
-| People (face detect, index, name) | `faces.*` (models download) | - |
+| People (face detect, index, name) | `faces.*` (models download), `faces.people` | U (download models with licence, find faces, name them, browse people; recognition suggestions once SFace is installed) |
 | Metadata panel (info, GPS, copyright), presets, place names | `photo.setMeta`, `metadata.*` | U (Info mode: details, title, caption, creator, copyright, GPS), - (presets, place names) |
 | Lightroom catalog import | `library.importLightroom` | - |
 | Library maintenance (info, optimise, clear previews, smart previews) | `library.info`, `library.compact`, `library.smartPreviews` | - |
@@ -90,7 +90,7 @@ History list/restore/clear, named versions (snapshots), undo/redo. Engine: `hist
 
 ## 9. Merge and AI
 HDR merge, panorama, HDR panorama (`merge.*`); AI Denoise (`denoise.*`); face detection and recognition
-(`faces.*`); scene tagging. Models are downloaded on demand. **UI: -**
+(`faces.*`); scene tagging. Models are downloaded on demand. **UI: U** for Merge (select 2+ photos, preview, add to library), AI Denoise and People; scene tagging -.
 
 ## 10. Export and sharing
 Export (format, quality, size, colour space, watermark, sharpening, metadata, rename template), presets,

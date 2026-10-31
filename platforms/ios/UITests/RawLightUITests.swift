@@ -148,4 +148,23 @@ final class RawLightUITests: XCTestCase {
         app.buttons["Settings…"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Preview cache"].waitForExistence(timeout: 10))
     }
+
+    func testPeopleSheetOffersFaceModels() {
+        XCTAssertTrue(app.buttons["tile"].firstMatch.waitForExistence(timeout: 40))
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'All Photos'")).firstMatch.tap()
+        app.buttons["People…"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Face models"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["YuNet (face detector)"].exists, "the detector is offered as an optional download")
+    }
+
+    func testMergeSheetOpensForTwoSelectedPhotos() {
+        XCTAssertTrue(app.buttons["tile"].firstMatch.waitForExistence(timeout: 40))
+        app.buttons["Select"].firstMatch.tap()
+        let tiles = app.buttons.matching(identifier: "tile")
+        tiles.element(boundBy: 0).tap(); tiles.element(boundBy: 1).tap()
+        app.buttons["merge.open"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["merge.preview"].waitForExistence(timeout: 10))
+        app.buttons["merge.preview"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'demo photo'")).firstMatch.waitForExistence(timeout: 20), "a demo library explains why it cannot merge")
+    }
 }
