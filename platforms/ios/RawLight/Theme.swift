@@ -42,3 +42,14 @@ extension View {
     /// A floating panel or bar: Liquid Glass on iOS 26+, material before.
     func panelBackground<S: Shape>(in shape: S) -> some View { modifier(PanelBackground(shape: shape)) }
 }
+
+/// Test and screenshot launch switches (RAWLIGHT_*). They exist only in Debug builds; a shipped app ignores the environment.
+enum DebugEnv {
+    static var vars: [String: String] {
+        #if DEBUG
+        ProcessInfo.processInfo.environment
+        #else
+        [:]
+        #endif
+    }
+}

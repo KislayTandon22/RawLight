@@ -126,7 +126,7 @@ final class AppModel {
         loadSources()
         scanLibraries()
         // UI tests start from a fresh demo library every run
-        if ProcessInfo.processInfo.environment["RAWLIGHT_FRESH"] != nil { await createLibrary(name: "UITest", demo: true); return }
+        if DebugEnv.vars["RAWLIGHT_FRESH"] != nil { await createLibrary(name: "UITest", demo: true); return }
         if libraries.isEmpty { await createLibrary(name: "My Library", demo: true); return }
         let saved = UserDefaults.standard.string(forKey: "currentLibraryName")
         await open(libraries.first { $0.name == saved } ?? libraries[0], seedDemo: false)
@@ -316,12 +316,43 @@ final class AppModel {
         }
     }
 
-    /// Installs the bundled AI denoise model the first time, so nobody has to find a button for it.
-    @discardableResult
-    func ensureDenoiseModel() async -> Bool {
-        guard let url = Bundle.main.url(forResource: "rawdenoise-nind", withExtension: "dtmodel") else { return false }
-        if let s = try? await engine.execute("denoise.status", [:]) as? [String: Any], s["model"] is [String: Any] { return true }
-        do { _ = try await engine.execute("denoise.models.install", ["path": url.path, "acknowledged": true, "activate": true]); return true }
-        catch { return false }
+    // MARK: optional AI denoise model (downloaded on request; never bundled)
+
+    /// Progress of the RawNIND download: nil when none is running.
+    var denoiseDownload: (bytes: Int, total: Int)?
+    var denoiseDownloadError: String?
+
+    /// The model's licence terms, shown before anything is downloaded.
+    func denoiseTerms() async -> (title: String, terms: String, sizeBytes: Int)? {
+        guard let list = try? await engine.execute("denoise.models.list", [:]) as? [String: Any],
+              let r = (list["models"] as? [[String: Any]] ?? []).first(where: { ($0["known"] as? Bool) == true && $0["downloadHost"] != nil }) else { return nil }
+        let lic = r["licence"] as? [String: Any]
+        let terms = [r["name"].map { "Model: \($0)" }, lic?["name"].map { "Licence: \($0)" }, lic?["notice"] as? String,
+                     r["provenance"].map { "Source: \($0)" }, (r["downloadHost"] as? String).map { "Downloaded from \($0) over HTTPS and checked against a fixed checksum." }]
+            .compactMap { $0 }.joined(separator: "\n\n")
+        return ((r["name"] as? String) ?? "AI denoise model", terms, (r["sizeBytes"] as? Int) ?? 0)
+    }
+
+    /// Starts the download (the caller has shown the terms and the user accepted) and follows it until it is installed.
+    func downloadDenoiseModel() async {
+        guard denoiseDownload == nil, let list = try? await engine.execute("denoise.models.list", [:]) as? [String: Any],
+              let id = (list["models"] as? [[String: Any]] ?? []).first(where: { ($0["known"] as? Bool) == true && $0["downloadHost"] != nil })?["id"] as? String else { return }
+        denoiseDownloadError = nil
+        do { _ = try await engine.execute("denoise.models.download", ["id": id, "acknowledged": true]) }
+        catch { denoiseDownloadError = error.localizedDescription; return }
+        denoiseDownload = (0, 0)
+        defer { denoiseDownload = nil }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard let d = try? await engine.execute("denoise.models.downloads", [:]) as? [String: Any],
+                  let row = (d["downloads"] as? [[String: Any]] ?? []).first(where: { ($0["id"] as? String) == id }) else { continue }
+            switch row["state"] as? String {
+            case "running": denoiseDownload = ((row["bytes"] as? Int) ?? 0, (row["total"] as? Int) ?? 0)
+            case "installed", "done": return
+            case "failed": denoiseDownloadError = (row["error"] as? String) ?? "The download failed."; return
+            case "cancelled": return
+            default: break
+            }
+        }
     }
 }

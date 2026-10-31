@@ -66,6 +66,7 @@ struct AIDenoiseCard: View {
     @State private var pending: PendingModel?
     @State private var message: String?
     @State private var generation = -1
+    @Environment(AppModel.self) private var app
 
     struct PendingModel: Identifiable { let id = UUID(); let path: String; let title: String; let terms: String }
 
@@ -84,13 +85,20 @@ struct AIDenoiseCard: View {
             }
             Text("Runs on this iPad with a denoise model. RAW photos only.").font(.footnote).foregroundStyle(.secondary)
             if model == nil {
-                if let bundled = Bundle.main.url(forResource: "rawdenoise-nind", withExtension: "dtmodel") {
-                    Button { Task { await inspectBundled(bundled) } } label: {
-                        Text("Use RawNIND (included)").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 44)
+                if let dl = app.denoiseDownload {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ProgressView(value: dl.total > 0 ? Double(dl.bytes) / Double(dl.total) : nil).tint(Theme.accent)
+                        Text(dl.total > 0 ? "Downloading… \(ByteCountFormatter.string(fromByteCount: Int64(dl.bytes), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(dl.total), countStyle: .file))" : "Starting download…")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Button { Task { await askDownload() } } label: {
+                        Text("Download AI denoise model").font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 44)
                             .background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                     }.buttonStyle(.plain)
-                    Text("Bundled with RawLight under the GPL-3.0; you see the terms before it is installed.").font(.caption).foregroundStyle(.secondary)
+                    Text("RawNIND, about 58 MB. You see its licence first.").font(.caption).foregroundStyle(.secondary)
                 }
+                if let e = app.denoiseDownloadError { Text(e).font(.footnote).foregroundStyle(Theme.accentSoft) }
                 Button { showImporter = true } label: {
                     Text("Add a denoise model…").font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44).fieldBackground(in: Capsule())
                 }.buttonStyle(.plain)
@@ -116,8 +124,8 @@ struct AIDenoiseCard: View {
                 Text("Install only if you accept this model's terms.").font(.footnote).foregroundStyle(.secondary)
                 HStack {
                     Button("Cancel") { pending = nil }.buttonStyle(.bordered).tint(.gray)
-                    Button { let path = p.path; pending = nil; Task { await install(path) } } label: {
-                        Text("Accept and install").font(.headline).frame(maxWidth: .infinity).frame(height: 48).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
+                    Button { let path = p.path; pending = nil; Task { if path.isEmpty { await app.downloadDenoiseModel() } else { await install(path) } } } label: {
+                        Text(p.path.isEmpty ? "Accept and download" : "Accept and install").font(.headline).frame(maxWidth: .infinity).frame(height: 48).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
                     }
                 }
             }
@@ -181,17 +189,9 @@ struct AIDenoiseCard: View {
         } catch { message = error.localizedDescription }
     }
 
-    private func inspectBundled(_ url: URL) async {
-        do {
-            let list = try await engine.execute("denoise.models.list", [:]) as? [String: Any] ?? [:]
-            let known = (list["models"] as? [[String: Any]] ?? []).first { ($0["known"] as? Bool) == true }
-            guard let r = known else { message = "This build has no bundled denoise model support."; return }
-            let lic = r["licence"] as? [String: Any]
-            let notice = "The weights are published under the GNU General Public License v3 and are included in RawLight. They run on this device only. If you pass the model file on, the GPL applies to that copy, including its source, licence and notice obligations."
-            let terms = [r["name"].map { "Model: \($0)" }, lic?["name"].map { "Licence: \($0)" }, notice,
-                         r["provenance"].map { "Source: \($0)" }].compactMap { $0 }.joined(separator: "\n\n")
-            pending = PendingModel(path: url.path, title: (r["name"] as? String) ?? "RawNIND", terms: terms)
-        } catch { message = error.localizedDescription }
+    private func askDownload() async {
+        guard let t = await app.denoiseTerms() else { message = "No downloadable denoise model in this build."; return }
+        pending = PendingModel(path: "", title: t.title, terms: t.terms)
     }
 
     private func install(_ path: String) async {

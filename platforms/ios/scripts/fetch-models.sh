@@ -1,11 +1,7 @@
 #!/bin/sh
-# Fetches the model weights RawLight bundles on iOS: RawNIND denoise (GPL-3.0, darktable-ai) and MobileSAM (Apache-2.0).
+# Fetches the model weights RawLight bundles on iOS: MobileSAM (Apache-2.0). The GPL-3.0 RawNIND denoise model is NOT bundled; the app downloads it on request.
 set -eu
 cd "$(dirname "$0")/../RawLight/Models"
-f=rawdenoise-nind.dtmodel
-sum=d71b5f1e727c85a359e6f74dca9e2016c9d8fc3e2f7ac3e9b347d80ceca969af
-curl -fL -o "$f" https://github.com/darktable-org/darktable-ai/releases/download/release-5.6.0/$f
-echo "$sum  $f" | shasum -a 256 -c -
 
 # MobileSAM Core ML (Apache-2.0, ChaoningZhang/MobileSAM converted by mlboydaisuke), used by the Object mask tool
 SAM=../RawLight/Models/MobileSAM

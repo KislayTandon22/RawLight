@@ -607,7 +607,7 @@ struct EditorView: View {
         info = await i ?? info
         curvePoints = await p
         // Debug aids for screenshots: RAWLIGHT_MODE=crop|mask, RAWLIGHT_MASK=1 adds a radial mask.
-        let env = ProcessInfo.processInfo.environment
+        let env = DebugEnv.vars
         if let m = env["RAWLIGHT_MODE"], let em = EditMode(rawValue: m.capitalized) { mode = em }
         if env["RAWLIGHT_MASK"] != nil { _ = try? await model.engine.execute("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }
         if env["RAWLIGHT_EXPORT"] != nil {

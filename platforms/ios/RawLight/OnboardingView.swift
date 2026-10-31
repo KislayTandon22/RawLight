@@ -11,7 +11,7 @@ struct OnboardingView: View {
     private let items: [(String, String, String)] = [
         ("photo.on.rectangle", "Your photos", "Read the photos you pick and save the ones you export."),
         ("sparkles", "On-device AI", "Subject, sky and object masks and Apple noise reduction run on this device. Nothing is uploaded."),
-        ("wand.and.sparkles", "AI Denoise (RawNIND)", "A raw denoise model is included. It is licensed GPL-3.0 and runs on this device only; its source is at github.com/darktable-org/darktable-ai."),
+        ("wand.and.sparkles", "AI Denoise (optional)", "A raw denoise model (about 58 MB) can be downloaded later from Edit › Detail or Settings, after you see its licence. Nothing is downloaded now."),
     ]
 
     var body: some View {
@@ -34,7 +34,7 @@ struct OnboardingView: View {
                 HStack { if working { ProgressView().tint(.white) }; Text("Agree and continue").font(.headline) }
                     .frame(maxWidth: 420).frame(height: 54).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
             }.buttonStyle(.plain).disabled(working).accessibilityIdentifier("onboarding.continue")
-            Text("By continuing you accept the licence terms above.").font(.caption).foregroundStyle(.secondary)
+            Text("RawLight never uploads your photos.").font(.caption).foregroundStyle(.secondary)
             Spacer(minLength: 20)
         }
         .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.black.ignoresSafeArea())
@@ -43,9 +43,6 @@ struct OnboardingView: View {
     private func accept() async {
         working = true
         _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        if Bundle.main.url(forResource: "rawdenoise-nind", withExtension: "dtmodel") != nil, !(await model.ensureDenoiseModel()) {
-            note = "Denoise model couldn't be set up now; you can add it later in Edit › Detail."
-        }
         working = false
         finish()
     }

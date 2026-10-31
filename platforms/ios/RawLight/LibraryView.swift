@@ -54,7 +54,7 @@ struct LibraryView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         .task {
             // Debug aid for screenshots: RAWLIGHT_SHEET=people|merge opens that sheet on launch.
-            switch ProcessInfo.processInfo.environment["RAWLIGHT_SHEET"] {
+            switch DebugEnv.vars["RAWLIGHT_SHEET"] {
             case "people": try? await Task.sleep(for: .seconds(3)); showPeople = true
             case "merge": try? await Task.sleep(for: .seconds(8)); model.selection = Set(model.photoIDs.prefix(2)); merging = true
             default: break

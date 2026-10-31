@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("maskColor") private var maskColor = "auto"
     @AppStorage("segmenter") private var segmenter = "sam"
     @State private var denoiseModels: [[String: Any]] = []
+    @State private var terms: (title: String, terms: String, sizeBytes: Int)?
     @State private var photos = 0
     @State private var albums = 0
     @State private var cacheBytes = 0
@@ -83,7 +84,8 @@ struct SettingsView: View {
                                 if selected { Label("In use", systemImage: "checkmark.circle.fill").font(.footnote.weight(.semibold)).foregroundStyle(Theme.accent) }
                                 else { Button("Use") { Task { await selectModel(m["id"] as? String) } }.buttonStyle(.bordered).tint(Theme.accent) }
                             } else if (m["known"] as? Bool) == true {
-                                Button("Install") { Task { _ = await model.ensureDenoiseModel(); await loadModels() } }.buttonStyle(.borderedProminent).tint(Theme.accent)
+                                if let dl = model.denoiseDownload { ProgressView(value: dl.total > 0 ? Double(dl.bytes) / Double(dl.total) : nil).frame(width: 90).tint(Theme.accent) }
+                                else { Button("Download") { Task { await askModelDownload() } }.buttonStyle(.borderedProminent).tint(Theme.accent) }
                             }
                         }
                         .swipeActions { if installed { Button("Remove", role: .destructive) { Task { await removeModel(m["id"] as? String) } } } }
@@ -92,11 +94,13 @@ struct SettingsView: View {
                         Button("Switch AI denoise off") { Task { await selectModel(nil) } }
                     }
                 } header: { Text("AI denoise model") } footer: {
-                    Text("RawNIND (GPL-3.0) is included and installs itself. Swipe a model to remove it. To add another .onnx model, use Edit › Detail › Add a denoise model. Everything runs on this device and nothing is uploaded.")
+                    Text("RawNIND (GPL-3.0) is not part of the app: it is downloaded only when you ask, after you see its licence. Swipe a model to remove it. To add another .onnx model, use Edit › Detail › Add a denoise model. Everything runs on this device and nothing is uploaded.")
                 }
                 Section("About") {
                     LabeledContent("RawLight", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
                     Text("The raw engine is LightCraft by storytold, used under the MIT and Apache-2.0 licences. The interface is original. Interface font: Inter (SIL OFL). Subject selection by Apple Vision.").font(.footnote).foregroundStyle(.secondary)
+                    NavigationLink("Acknowledgements") { AcknowledgementsView() }
+                    Link("Privacy policy", destination: URL(string: "https://github.com/KislayTandon22/RawLight/blob/main-rawlight/docs/appstore/privacy-policy.md")!)
                     Link("LightCraft on GitHub", destination: URL(string: "https://github.com/storytold/lightcraft")!)
                 }
                 if let message { Section { Text(message).font(.footnote) } }
@@ -104,6 +108,11 @@ struct SettingsView: View {
             .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { Task { await saveImport() }; dismiss() } } }
             .task { await load(); await loadModels() }
+            .onChange(of: model.denoiseDownload == nil) { _, _ in Task { await loadModels() } }
+            .alert(terms?.title ?? "", isPresented: Binding(get: { terms != nil }, set: { if !$0 { terms = nil } })) {
+                Button("Cancel", role: .cancel) {}
+                Button("Accept and download") { Task { await model.downloadDenoiseModel() } }
+            } message: { Text(terms?.terms ?? "") }
         }
         .presentationBackground(.ultraThinMaterial).presentationCornerRadius(28)
     }
@@ -120,6 +129,8 @@ struct SettingsView: View {
         }
         if let x = try? await model.engine.execute("library.xmpPreferences") as? [String: Any] { autoWrite = x["autoWrite"] as? Bool ?? false }
     }
+
+    private func askModelDownload() async { terms = await model.denoiseTerms() }
 
     private func loadModels() async {
         let r = try? await model.engine.execute("denoise.models.list", [:]) as? [String: Any]
@@ -149,5 +160,27 @@ struct SettingsView: View {
     private func optimise() async {
         do { _ = try await model.engine.execute("library.compact"); message = "Library optimised." } catch { message = error.localizedDescription }
         await load()
+    }
+}
+
+
+/// Licences and credits for everything RawLight is built on.
+struct AcknowledgementsView: View {
+    private let items: [(String, String, String)] = [
+        ("LightCraft", "MIT or Apache-2.0", "The raw engine and editing pipeline, by storytold. github.com/storytold/lightcraft"),
+        ("MobileSAM", "Apache-2.0", "Tap and Lasso selection. Chaoning Zhang et al.; Core ML conversion by mlboydaisuke; prompt encoding after SamKit (Apache-2.0)."),
+        ("Inter", "SIL Open Font License 1.1", "The interface font, by Rasmus Andersson."),
+        ("Apple Vision and Core Image", "Part of iOS", "Subject, Sky and Background selection and Apple noise reduction."),
+        ("RawNIND denoise model", "GPL-3.0", "Optional download, not part of the app. By Brummer and De Vleeschouwer; packaged by darktable-ai (github.com/darktable-org/darktable-ai). The model file stays under the GPL if you pass it on."),
+    ]
+    var body: some View {
+        List(items, id: \.0) { it in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(it.0).font(.headline)
+                Text(it.1).font(.subheadline).foregroundStyle(Theme.accentSoft)
+                Text(it.2).font(.footnote).foregroundStyle(.secondary)
+            }.padding(.vertical, 4)
+        }
+        .navigationTitle("Acknowledgements").navigationBarTitleDisplayMode(.inline)
     }
 }
