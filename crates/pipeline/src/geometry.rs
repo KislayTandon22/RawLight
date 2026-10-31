@@ -54,7 +54,8 @@ impl Frame {
     pub fn with_lens(src_w: usize, src_h: usize, s: &DevelopSettings, apply_crop: bool, lens: Option<&EmbeddedLens>) -> Frame {
         let orient = s.orientation;
         let (ow, oh) = if orient.swaps_axes() { (src_h as f64, src_w as f64) } else { (src_w as f64, src_h as f64) };
-        let crop = if apply_crop { s.crop.geometry } else { CropGeometry::default() };
+        // the crop tool's uncropped view still shows the straighten angle: the photo turns under the whole frame
+        let crop = if apply_crop { s.crop.geometry } else { CropGeometry { angle: s.crop.geometry.angle, ..CropGeometry::default() } };
         let lens = lens.map(|l| reorient_lens(l, orient, src_w as f64, src_h as f64));
         let mut warp = Warp::from_settings(ow, oh, s, lens.as_ref());
         let persp = perspective(s, ow, oh);

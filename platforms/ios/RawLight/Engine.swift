@@ -31,6 +31,15 @@ struct Rendered {
 /// Thin Swift wrapper over the Rust C ABI. Commands run on one serial queue; renders are detached
 /// jobs that run on worker queues so a slow render never blocks a command or another render.
 final class Engine: @unchecked Sendable {
+    /// The engine keeps models and settings under its config folder; inside the app sandbox that is Application Support
+    /// (the default `~/.config` is not somewhere an iOS app can create folders).
+    static func useSandboxConfigFolder() {
+        guard let base = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true) else { return }
+        let dir = base.appending(path: "RawLight", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        setenv("LIGHTCRAFT_CONFIG_DIR", dir.path, 1)
+    }
+
     private let queue = DispatchQueue(label: "rawlight.engine", qos: .userInitiated)
     private let thumbQueue: OperationQueue = {
         let q = OperationQueue()
@@ -41,6 +50,7 @@ final class Engine: @unchecked Sendable {
     private var session: OpaquePointer?
 
     init(demo: Bool) {
+        Engine.useSandboxConfigFolder()
         queue.sync { self.session = rl_session_new(demo ? 1 : 0) }
     }
 

@@ -90,6 +90,15 @@ final class RawLightUITests: XCTestCase {
         }
     }
 
+    func testCropLevelToolArms() {
+        openFirstPhoto()
+        app.buttons["Crop"].firstMatch.tap()
+        let level = app.buttons["crop.level"].firstMatch
+        XCTAssertTrue(level.waitForExistence(timeout: 10))
+        level.tap()
+        XCTAssertTrue(app.staticTexts["Draw a line along the horizon…"].waitForExistence(timeout: 5), "tapping Level arms the line tool")
+    }
+
     func testAddRadialMask() {
         openFirstPhoto()
         app.buttons["Mask"].firstMatch.tap()

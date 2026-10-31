@@ -17,6 +17,13 @@ private enum Handle: String, CaseIterable {
 }
 
 /// Crop rectangle over the uncropped image: dimmed outside, thirds grid, 8 handles, drag inside to move.
+/// "Level" tool: draw a line along something that should be horizontal or vertical and the photo turns to match.
+@Observable final class LevelTool {
+    static let shared = LevelTool()
+    var active = false
+}
+extension Notification.Name { static let cropAngleChanged = Notification.Name("rawlight.cropAngleChanged") }
+
 struct CropOverlay: View {
     let engine: Engine
     let imageRect: CGRect
@@ -25,6 +32,8 @@ struct CropOverlay: View {
     @State private var active: String?
     @State private var dragStart: CGRect?
     @State private var throttle = Throttle()
+    @State private var line: (CGPoint, CGPoint)?
+    private let level = LevelTool.shared
 
     init(engine: Engine, imageRect: CGRect, onChange: @escaping () -> Void) {
         self.engine = engine; self.imageRect = imageRect; self.onChange = onChange
@@ -62,6 +71,47 @@ struct CropOverlay: View {
                 }
             }
             .allowsHitTesting(false)
+            if level.active { levelLayer } else { dragLayer }
+        }
+        .task { rect = Engine.cropRect(await engine.developState()) }
+    }
+
+    /// Drag a line; on release the photo is turned so that line becomes level (or plumb, whichever is nearer).
+    private var levelLayer: some View {
+        ZStack {
+            Color.clear.contentShape(Rectangle())
+            Canvas { ctx, _ in
+                guard let l = line else { return }
+                var p = Path(); p.move(to: l.0); p.addLine(to: l.1)
+                ctx.stroke(p, with: .color(.black.opacity(0.5)), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                ctx.stroke(p, with: .color(Theme.accent), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                for pt in [l.0, l.1] { ctx.fill(Path(ellipseIn: CGRect(x: pt.x - 7, y: pt.y - 7, width: 14, height: 14)), with: .color(.white)) }
+            }.allowsHitTesting(false)
+        }
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { v in line = (v.startLocation, v.location) }
+            .onEnded { v in
+                let l = (v.startLocation, v.location)
+                line = nil
+                let dx = l.1.x - l.0.x, dy = l.1.y - l.0.y
+                guard hypot(dx, dy) > 40 else { return }
+                var turn = -atan2(dy, dx) * 180 / .pi          // a line descending to the right needs a negative angle
+                turn = turn.truncatingRemainder(dividingBy: 90)  // level or plumb, whichever is nearer
+                if turn > 45 { turn -= 90 } else if turn < -45 { turn += 90 }
+                level.active = false
+                Task {
+                    let now = Engine.cropAngle(await engine.developState())
+                    let target = min(45, max(-45, now + turn))
+                    _ = try? await engine.execute("crop.straighten", ["angle": (target * 100).rounded() / 100])
+                    rect = Engine.cropRect(await engine.developState())
+                    NotificationCenter.default.post(name: .cropAngleChanged, object: nil)
+                    onChange()
+                }
+            })
+    }
+
+    private var dragLayer: some View {
+        ZStack {
             Color.clear.contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance: 0)
                     .onChanged { v in
@@ -83,7 +133,6 @@ struct CropOverlay: View {
                     }
                     .onEnded { _ in active = nil; dragStart = nil })
         }
-        .task { rect = Engine.cropRect(await engine.developState()) }
     }
 }
 
@@ -136,6 +185,11 @@ struct CropPanel: View {
                 tool("arrow.up.and.down.righttriangle.up.righttriangle.down", "Flip V") { run("photo.flipVertical") }
                 tool("aspectratio", "Swap") { run("crop.rotateAspect") }
             }
+            Button { LevelTool.shared.active.toggle() } label: {
+                HStack(spacing: 8) { Image(systemName: "level"); Text(LevelTool.shared.active ? "Draw a line along the horizon…" : "Level: draw a line") }
+                    .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 44)
+                    .fieldBackground(LevelTool.shared.active, in: Capsule())
+            }.buttonStyle(.plain).accessibilityIdentifier("crop.level")
             HStack(spacing: 10) {
                 pill("Auto level") { run("crop.autoStraighten"); Task { try? await Task.sleep(for: .milliseconds(300)); await load() } }
                 Menu {
@@ -147,6 +201,8 @@ struct CropPanel: View {
             }
         }
         .task(id: photoID) { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .cropAngleChanged)) { _ in Task { await load() } }
+        .onDisappear { LevelTool.shared.active = false }
     }
 
     private func load() async {
