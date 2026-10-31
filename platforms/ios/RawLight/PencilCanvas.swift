@@ -70,6 +70,8 @@ struct PencilCanvas: UIViewRepresentable {
         }
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+            // The Pencil always wins: a resting palm or finger must neither block nor cancel a Pencil stroke.
+            if active == nil, let pen = touches.first(where: { $0.type == .pencil }) { active = pen; onBegan(sample(pen)); return }
             guard active == nil, event?.allTouches?.count ?? 1 == 1, let t = touches.first, !(pencilOnly && t.type != .pencil) else { return }
             active = t
             onBegan(sample(t))
@@ -78,7 +80,7 @@ struct PencilCanvas: UIViewRepresentable {
         override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
             guard let t = active, touches.contains(t) else { return }
             // a second finger landing means a gesture (undo/redo), not drawing
-            if (event?.allTouches?.count ?? 1) > 1 { cancel(); return }
+            if t.type != .pencil, (event?.allTouches?.count ?? 1) > 1 { cancel(); return }
             onMoved((event?.coalescedTouches(for: t) ?? [t]).map(sample))
         }
 

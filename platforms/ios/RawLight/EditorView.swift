@@ -213,6 +213,11 @@ struct EditorView: View {
                             .gesture(SpatialTapGesture().onEnded { tapObject(at: $0.location, in: rect) })
                         objectMarkers(in: rect)
                     }
+                    if objectPick && mode == .mask && ObjectPicker.shared.busy {
+                        HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Finding edges…").font(.subheadline.weight(.medium)) }
+                            .padding(.horizontal, 14).frame(height: 38).panelBackground(in: Capsule())
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 10).allowsHitTesting(false)
+                    }
                     if objectPick && mode == .mask && ObjectPicker.shared.lasso {
                         PencilCanvas(pencilOnly: UserDefaults.standard.bool(forKey: "pencilOnly"),
                                      onBegan: { lassoStroke = [$0.point] },
@@ -293,10 +298,18 @@ struct EditorView: View {
     /// Lasso: the user draws around something; a few points spread through the loop go to the segmenter, which follows the
     /// nearest real edges instead of the hand-drawn line.
     private func finishLasso(_ stroke: [CGPoint], in rect: CGRect) {
-        guard rect.width > 0, stroke.count > 8 else { return }
+        guard rect.width > 0, stroke.count > 3, let first = stroke.first, let last = stroke.last else { return }
         let poly = stroke.map { CGPoint(x: min(max(($0.x - rect.minX) / rect.width, 0), 1), y: min(max(($0.y - rect.minY) / rect.height, 0), 1)) }
         let xs = poly.map(\.x), ys = poly.map(\.y)
-        guard let x0 = xs.min(), let x1 = xs.max(), let y0 = ys.min(), let y1 = ys.max(), x1 - x0 > 0.02, y1 - y0 > 0.02 else { return }
+        guard let x0 = xs.min(), let x1 = xs.max(), let y0 = ys.min(), let y1 = ys.max(), max(x1 - x0, y1 - y0) > 0.02 else { return }
+        // Like Lightroom: a closed loop selects what is inside it; a rough scribble or line selects what it runs over.
+        let diag = hypot((x1 - x0) * rect.width, (y1 - y0) * rect.height)
+        if hypot(last.x - first.x, last.y - first.y) > 0.35 * diag || (x1 - x0 < 0.03 || y1 - y0 < 0.03) {
+            let n = min(6, max(1, poly.count / 4))
+            let pts = (0..<n).map { poly[min(poly.count - 1, (poly.count - 1) * $0 / max(1, n - 1))] }
+            applyObject(points: pts.map { ($0.x, $0.y) }, lasso: true)
+            return
+        }
         func inside(_ p: CGPoint) -> Bool {
             var c = false, j = poly.count - 1
             for i in 0..<poly.count {
