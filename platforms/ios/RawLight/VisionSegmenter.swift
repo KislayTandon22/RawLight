@@ -11,6 +11,8 @@ private final class VisionSegmenter {
     private var handler: VNImageRequestHandler?
     private var observation: VNInstanceMaskObservation?
     private let lock = NSLock()
+    private var personKey: UInt64 = .max
+    private var personCover: [Float] = []
 
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Int32 {
@@ -51,6 +53,12 @@ private final class VisionSegmenter {
         if !instances.isEmpty {
             guard let mask = try? observation.generateScaledMaskForImage(forInstances: instances, from: handler) else { return -5 }
             Self.sample(mask, into: out, side: side)
+            // Vision often joins a person and what they hold into one instance: tapping the held thing (a parrot) must not
+            // select the person too, so the person is cut out unless a tap landed on them.
+            if let person = person(side: side, handler: handler, key: key),
+               !clicks.contains(where: { c in c.2 && person[min(side - 1, Int(max(0, c.1) * Float(side))) * side + min(side - 1, Int(max(0, c.0) * Float(side)))] > 0.5 }) {
+                for i in 0..<(side * side) where person[i] > 0.5 { out[i] = -8 }
+            }
         } else {
             for i in 0..<(side * side) { out[i] = -8 }
         }
@@ -63,6 +71,28 @@ private final class VisionSegmenter {
             for i in 0..<cover.count where cover[i] > 0.5 { out[i] = -8 }
         }
         return 1
+    }
+
+    /// Where a person is (`side × side`, 0...1), from Vision's person segmentation of the same photo; nil when unavailable.
+    private func person(side: Int, handler: VNImageRequestHandler, key: UInt64) -> [Float]? {
+        if personKey == key, personCover.count == side * side { return personCover }
+        let request = VNGeneratePersonSegmentationRequest()
+        request.qualityLevel = .balanced
+        request.outputPixelFormat = kCVPixelFormatType_OneComponent8
+        guard (try? handler.perform([request])) != nil, let buf = request.results?.first?.pixelBuffer else { return nil }
+        CVPixelBufferLockBaseAddress(buf, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buf, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(buf) else { return nil }
+        let bw = CVPixelBufferGetWidth(buf), bh = CVPixelBufferGetHeight(buf), rowBytes = CVPixelBufferGetBytesPerRow(buf)
+        var cover = [Float](repeating: 0, count: side * side)
+        for sy in 0..<side {
+            for sx in 0..<side {
+                let x = min(bw - 1, (sx * bw + bw / 2) / side), y = min(bh - 1, (sy * bh + bh / 2) / side)
+                cover[sy * side + sx] = Float(base.load(fromByteOffset: y * rowBytes + x, as: UInt8.self)) / 255
+            }
+        }
+        personKey = key; personCover = cover
+        return cover
     }
 
     /// The instance under a click, or the nearest one within a fingertip so taps near an edge still land.

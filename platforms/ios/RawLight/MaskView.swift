@@ -209,6 +209,18 @@ struct MaskOverlay: View {
 extension Notification.Name { static let masksChanged = Notification.Name("rawlight.masksChanged") }
 
 /// Inspector content for masks: list, add menu, per-mask adjustments, brush controls.
+/// State of the "Object" tool: every tap, whether it is still working, and why the last one failed.
+@Observable final class ObjectPicker {
+    static let shared = ObjectPicker()
+    struct Tap: Identifiable { let id = UUID(); let x: Double; let y: Double; let exclude: Bool }
+    var taps: [Tap] = []
+    var busy = false
+    var error: String?
+    var undo: (() -> Void)?
+    var clear: (() -> Void)?
+    func reset() { taps = []; busy = false; error = nil }
+}
+
 struct MaskPanel: View {
     let engine: Engine
     let photoID: UInt64
@@ -263,12 +275,7 @@ struct MaskPanel: View {
                 }
                 if !masks.isEmpty { Button("Delete all", role: .destructive) { run("mask.deleteAll") }.font(.footnote).lineLimit(1).fixedSize() }
             }
-            if objectPick {
-                HStack(spacing: 8) {
-                    Picker("Tap", selection: $objectExclude) { Text("Include").tag(false); Text("Exclude").tag(true) }.pickerStyle(.segmented)
-                    Button("Done") { objectPick = false; message = nil }.buttonStyle(.borderedProminent).tint(Theme.accent)
-                }
-            }
+            if objectPick { objectCard }
             if let message { Text(message).font(.footnote).foregroundStyle(Theme.accentSoft).frame(maxWidth: .infinity, alignment: .leading) }
             ForEach(masks) { m in
                 HStack {
@@ -308,13 +315,46 @@ struct MaskPanel: View {
         .task(id: photoID) { await reload() }
     }
 
+    private var objectCard: some View {
+        let picker = ObjectPicker.shared
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "hand.tap").foregroundStyle(Theme.accent)
+                Text(picker.taps.isEmpty ? "Tap the object you want to edit" : "Tap more to add or cut away parts").font(.subheadline.weight(.semibold))
+                Spacer()
+                if picker.busy { ProgressView().controlSize(.small) }
+            }
+            HStack(spacing: 8) {
+                ForEach([(false, "plus.circle.fill", "Include"), (true, "minus.circle.fill", "Exclude")], id: \.0) { o in
+                    Button { objectExclude = o.0 } label: {
+                        Label(o.2, systemImage: o.1).font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).frame(height: 42)
+                            .foregroundStyle(objectExclude == o.0 ? .white : .primary)
+                            .background(objectExclude == o.0 ? (o.0 ? Color.red.opacity(0.75) : Theme.accent) : Color.clear, in: Capsule())
+                            .fieldBackground(objectExclude != o.0, in: Capsule())
+                    }.buttonStyle(.plain)
+                }
+            }
+            HStack(spacing: 8) {
+                Button { picker.undo?() } label: { Label("Undo tap", systemImage: "arrow.uturn.backward").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
+                    .buttonStyle(.plain).disabled(picker.taps.isEmpty).opacity(picker.taps.isEmpty ? 0.4 : 1)
+                Button { picker.clear?() } label: { Label("Start over", systemImage: "xmark").font(.footnote.weight(.medium)).frame(maxWidth: .infinity).frame(height: 38).fieldBackground(in: Capsule()) }
+                    .buttonStyle(.plain).disabled(picker.taps.isEmpty).opacity(picker.taps.isEmpty ? 0.4 : 1)
+                Button { objectPick = false; message = nil; picker.reset() } label: {
+                    Text("Done").font(.footnote.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 38).background(Theme.accent, in: Capsule()).foregroundStyle(.white)
+                }.buttonStyle(.plain)
+            }
+            if let e = picker.error { Text(e).font(.footnote).foregroundStyle(Theme.accentSoft) }
+        }
+        .padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
     /// One-tap mask types, AI first. Replaces the "Add mask" menu so nothing is hidden.
     private var typeTabs: some View {
         let types: [(symbol: String, title: String, full: String, run: () -> Void)] = [
             ("person.crop.square", "Subject", "Subject", { add(["kind": "subject"]) }),
             ("cloud.sun", "Sky", "Sky", { add(["kind": "sky"]) }),
             ("rectangle.dashed", "Background", "Background", { add(["kind": "background"]) }),
-            ("hand.tap", "Object", "Object", { objectPick = true; objectExclude = false; message = "Tap the object in the photo" }),
+            ("hand.tap", "Object", "Object", { ObjectPicker.shared.reset(); objectPick = true; objectExclude = false; message = nil; showMask = true; onChange() }),
             ("square.split.1x2", "Linear", "Linear gradient", { add(["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }),
             ("circle.dashed", "Radial", "Radial gradient", { add(["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }),
             ("paintbrush", "Brush", "Brush", { add(["kind": "brush"]) }),

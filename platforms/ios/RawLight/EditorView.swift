@@ -81,7 +81,9 @@ struct EditorView: View {
             guard let name = n.object as? String else { return }
             Task { _ = try? await model.engine.execute("curve.applyPreset", ["name": name]); curvePoints = await model.engine.curve(curveChannel); await render() }
         }
-        .onChange(of: objectPick) { _, on in if on { objectMask = nil } }
+        .onChange(of: objectPick) { _, on in
+            if on { objectMask = nil; ObjectPicker.shared.reset(); ObjectPicker.shared.undo = { undoObjectTap() }; ObjectPicker.shared.clear = { clearObjectTaps() } }
+        }
         .task(id: photoID) { await open() }
     }
 
@@ -208,6 +210,7 @@ struct EditorView: View {
                     if objectPick && mode == .mask {
                         Color.clear.contentShape(Rectangle())
                             .gesture(SpatialTapGesture().onEnded { tapObject(at: $0.location, in: rect) })
+                        objectMarkers(in: rect)
                     }
                     if picking {
                         Color.clear.contentShape(Rectangle())
@@ -259,15 +262,61 @@ struct EditorView: View {
         guard rect.width > 0 else { return }
         let x = (p.x - rect.minX) / rect.width, y = (p.y - rect.minY) / rect.height
         guard (0...1).contains(x), (0...1).contains(y) else { return }
+        let picker = ObjectPicker.shared
+        guard !picker.busy else { return }
+        picker.busy = true; picker.error = nil
+        showMask = true
         Task {
-            if let id = objectMask {
-                _ = try? await model.engine.execute("mask.objectPoint", ["x": x, "y": y, "exclude": objectExclude, "id": id])
-            } else if let r = try? await model.engine.execute("mask.add", ["kind": "object", "points": [[x, y]]]) as? [String: Any] {
-                objectMask = (r["activeMask"] as? NSNumber)?.intValue
+            defer { picker.busy = false }
+            do {
+                if let id = objectMask {
+                    _ = try await model.engine.execute("mask.objectPoint", ["x": x, "y": y, "exclude": objectExclude, "id": id])
+                } else if let r = try await model.engine.execute("mask.add", ["kind": "object", "points": [[x, y]]]) as? [String: Any] {
+                    objectMask = (r["activeMask"] as? NSNumber)?.intValue
+                }
+                picker.taps.append(.init(x: x, y: y, exclude: objectExclude))
+            } catch {
+                picker.error = "Couldn't pick an object there. Try the middle of it, or tap again."
             }
             NotificationCenter.default.post(name: .masksChanged, object: nil)
             await render(draft: true)
         }
+    }
+
+    private func undoObjectTap() {
+        let picker = ObjectPicker.shared
+        guard !picker.taps.isEmpty else { return }
+        Task {
+            await command("edit.undo")
+            picker.taps.removeLast()
+            if picker.taps.isEmpty { objectMask = nil }
+            NotificationCenter.default.post(name: .masksChanged, object: nil)
+            await render(draft: true)
+        }
+    }
+
+    private func clearObjectTaps() {
+        let picker = ObjectPicker.shared
+        guard let id = objectMask else { picker.reset(); return }
+        Task {
+            _ = try? await model.engine.execute("mask.delete", ["id": id])
+            objectMask = nil; picker.reset()
+            NotificationCenter.default.post(name: .masksChanged, object: nil)
+            await render(draft: true)
+        }
+    }
+
+    /// Green + / red − where the user tapped, so it is clear what was added and what was cut away.
+    private func objectMarkers(in rect: CGRect) -> some View {
+        ZStack {
+            ForEach(ObjectPicker.shared.taps) { t in
+                Image(systemName: t.exclude ? "minus.circle.fill" : "plus.circle.fill")
+                    .font(.system(size: 26)).symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, t.exclude ? Color.red : Color.green)
+                    .shadow(radius: 2)
+                    .position(x: rect.minX + t.x * rect.width, y: rect.minY + t.y * rect.height)
+            }
+        }.allowsHitTesting(false)
     }
 
     private func fitRect(_ s: CGSize, in box: CGSize) -> CGRect {

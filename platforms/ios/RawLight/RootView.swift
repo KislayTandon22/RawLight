@@ -2,11 +2,15 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("onboarded") private var onboarded = false
+    private var debugLaunch: Bool { ["RAWLIGHT_FRESH", "RAWLIGHT_OPEN", "RAWLIGHT_IMPORT"].contains { ProcessInfo.processInfo.environment[$0] != nil } }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if let id = model.openPhoto {
+            if !onboarded && !debugLaunch {
+                OnboardingView { onboarded = true }
+            } else if let id = model.openPhoto {
                 EditorView(photoID: id)
             } else {
                 LibraryView()

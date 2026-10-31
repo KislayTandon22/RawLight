@@ -38,6 +38,7 @@
 		E19781E0B876437FEE642F69 /* HistogramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6546856C997D6BFE63CC7F /* HistogramView.swift */; };
 		EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0017D18B656BA9A6950B0FC0 /* LooksView.swift */; };
 		F020CEDDF4B2D4BBFB784C1F /* MergeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D54056A2B475E5BC232199 /* MergeView.swift */; };
+		FDBF6196F5C90E3A62BFDB94 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1886B7C94CDA6FA0B22EA2B0 /* OnboardingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +54,7 @@
 /* Begin PBXFileReference section */
 		0017D18B656BA9A6950B0FC0 /* LooksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LooksView.swift; sourceTree = "<group>"; };
 		152DED07BD4B22C089F27083 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		1886B7C94CDA6FA0B22EA2B0 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		188A661C8121EDA12A429069 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		1C6546856C997D6BFE63CC7F /* HistogramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistogramView.swift; sourceTree = "<group>"; };
 		1CFD216B06873D6E60DE5790 /* HealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealView.swift; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 				0017D18B656BA9A6950B0FC0 /* LooksView.swift */,
 				746AE174CA016CAF647AD43E /* MaskView.swift */,
 				95D54056A2B475E5BC232199 /* MergeView.swift */,
+				1886B7C94CDA6FA0B22EA2B0 /* OnboardingView.swift */,
 				C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */,
 				6C7D902551F3651E28059614 /* PeopleView.swift */,
 				B53F6B346DD9D41185372DC8 /* QuickEditBar.swift */,
@@ -307,6 +310,7 @@
 				EBDD36B2376930E3BAB578D3 /* LooksView.swift in Sources */,
 				DE40CCFDD3086F9DC37835BB /* MaskView.swift in Sources */,
 				F020CEDDF4B2D4BBFB784C1F /* MergeView.swift in Sources */,
+				FDBF6196F5C90E3A62BFDB94 /* OnboardingView.swift in Sources */,
 				C5735DAD209D36E1619418F5 /* PencilCanvas.swift in Sources */,
 				58364B204B7E1675E9171D4E /* PeopleView.swift in Sources */,
 				8C79FA307FF3C4C3B4F5C502 /* QuickEditBar.swift in Sources */,
