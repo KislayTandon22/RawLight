@@ -407,7 +407,7 @@ struct MaskPanel: View {
             await reload(); onChange()
         }
     }
-    private func select(_ id: Int) { Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
+    private func select(_ id: Int) { showMask = true; Task { _ = try? await engine.execute("mask.select", ["id": id]); await reload() } }
     private func add(_ p: [String: Any]) {
         let picker = ObjectPicker.shared
         guard !picker.busy else { return }
@@ -430,6 +430,7 @@ struct MaskPanel: View {
     private func run(_ id: String, _ p: [String: Any] = [:]) { Task { _ = try? await engine.execute(id, p); await reload(); onChange() } }
     private func set(_ key: String, _ v: Double) {
         guard let id = active else { return }
+        if showMask { showMask = false }   // judge the edit on the true colours, not under the red overlay
         if let i = masks.firstIndex(where: { $0.id == id }) { masks[i].adjust[key] = v }
         throttle.run { _ = try? await engine.execute("mask.adjust", ["id": id, "values": [key: v]]); onChange() }
     }
