@@ -112,6 +112,7 @@ final class RawLightUITests: XCTestCase {
         app.buttons["Detail"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["AI Denoise"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Sharpening"].exists)
+        XCTAssertTrue(app.staticTexts["Apple noise reduction"].exists)
     }
 
     func testExportSheetOpensAndExports() {

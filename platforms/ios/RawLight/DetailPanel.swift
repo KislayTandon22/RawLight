@@ -8,6 +8,8 @@ struct DetailPanel: View {
     let controls: [Control]
     let set: (String, Double, Bool) -> Void
     let onChange: () -> Void
+    @Binding var appleLevel: Double
+    let onApple: () -> Void
 
     private func slider(_ id: String, _ label: String? = nil) -> some View {
         Group {
@@ -36,6 +38,15 @@ struct DetailPanel: View {
                 slider("detail.nrLuminance", "Luminance"); slider("detail.nrDetail", "Detail"); slider("detail.nrContrast", "Contrast")
                 Divider().opacity(0.3).padding(.vertical, 2)
                 slider("detail.nrColor", "Colour"); slider("detail.nrColorDetail", "Colour detail"); slider("detail.nrColorSmoothness", "Smoothness")
+            }
+            section("Apple noise reduction") {
+                HStack {
+                    Text("Strength").font(.subheadline)
+                    Slider(value: $appleLevel, in: 0...100, step: 1) { editing in if !editing { onApple() } }.tint(Theme.accent)
+                    Text("\(Int(appleLevel))").font(.subheadline).monospacedDigit().frame(width: 34, alignment: .trailing)
+                }
+                .padding(.horizontal, 6)
+                Text("Core Image filtering on the device, applied to the preview and to JPEG and PNG exports. It is not an AI model.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 6).padding(.bottom, 4)
             }
             AIDenoiseCard(engine: engine, photoID: photoID, amount: controls.first { $0.id == "enhance.denoise" }, set: set, onChange: onChange)
         }

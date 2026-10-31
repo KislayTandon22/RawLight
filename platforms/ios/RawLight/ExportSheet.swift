@@ -63,11 +63,27 @@ struct ExportSheet: View {
         let dir = FileManager.default.temporaryDirectory.appending(path: "RawLight-Export-\(UUID().uuidString)", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         var p: [String: Any] = ["ids": ids, "format": format, "quality": Int(quality), "longEdge": longEdge, "colorSpace": colorSpace]
-        if ids.count == 1 { p["path"] = dir.appending(path: "RawLight-\(ids[0]).\(ext)").path } else { p["dir"] = dir.path }
         do {
-            let r = try await model.engine.execute("app.export", p)
-            let files = ((r as? [String: Any])?["files"] as? [[String: Any]]) ?? []
-            results = files.compactMap { ($0["path"] as? String).map { URL(fileURLWithPath: $0) } }
+            if ids.contains(where: { AppleDenoise.level($0) > 0 }) {
+                // photos with Apple noise reduction are exported one by one so each file is filtered at its own strength
+                var out: [URL] = []
+                for id in ids {
+                    var q = p; q["ids"] = [id]; q["path"] = dir.appending(path: "RawLight-\(id).\(ext)").path
+                    let r = try await model.engine.execute("app.export", q)
+                    for f in ((r as? [String: Any])?["files"] as? [[String: Any]]) ?? [] {
+                        guard let path = f["path"] as? String else { continue }
+                        let url = URL(fileURLWithPath: path)
+                        AppleDenoise.apply(toFile: url, level: AppleDenoise.level(id), quality: quality)
+                        out.append(url)
+                    }
+                }
+                results = out
+            } else {
+                if ids.count == 1 { p["path"] = dir.appending(path: "RawLight-\(ids[0]).\(ext)").path } else { p["dir"] = dir.path }
+                let r = try await model.engine.execute("app.export", p)
+                let files = ((r as? [String: Any])?["files"] as? [[String: Any]]) ?? []
+                results = files.compactMap { ($0["path"] as? String).map { URL(fileURLWithPath: $0) } }
+            }
             if results.isEmpty { error = "Nothing was exported" }
         } catch { self.error = error.localizedDescription }
     }

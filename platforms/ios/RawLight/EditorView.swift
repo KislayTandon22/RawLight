@@ -52,6 +52,7 @@ struct EditorView: View {
     @State private var live = Throttle()
     @State private var compare = "off"
     @State private var hdrOn = false
+    @State private var appleLevel = 0.0
     @State private var rendition = "HDR"
     @State private var beforeImage: UIImage?
     @State private var peek = false
@@ -416,7 +417,7 @@ struct EditorView: View {
                             .onChange(of: curveChannel) { _, c in Task { curvePoints = await model.engine.curve(c) } }
                     }
                     if group == "Detail" {
-                        DetailPanel(engine: model.engine, photoID: photoID, controls: controls, set: { id, v, c in set(id, v, commit: c) }) { Task { await reloadControls(); await render() } }
+                        DetailPanel(engine: model.engine, photoID: photoID, controls: controls, set: { id, v, c in set(id, v, commit: c) }, onChange: { Task { await reloadControls(); await render() } }, appleLevel: $appleLevel, onApple: { AppleDenoise.setLevel(appleLevel, for: photoID); Task { await render() } })
                     } else if group == "Colour" {
                         ColourPanel(controls: controls, set: { id, v, commit in set(id, v, commit: commit) }, tab: $colourTab, band: $colourBand, picking: $picking)
                     } else { ForEach(visible) { c in
@@ -442,6 +443,7 @@ struct EditorView: View {
 
     private func open() async {
         scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero; beforeImage = nil; peek = false
+        appleLevel = AppleDenoise.level(photoID)
         if compare != "off" { await loadBefore() }
         try? await model.engine.execute("library.select", ["ids": [photoID], "active": photoID])
         async let c = model.engine.controls()
@@ -521,7 +523,7 @@ struct EditorView: View {
         let id = photoID
         if let r = await model.engine.render(id, maxEdge: draft ? 900 : 1600, kind: (mode == .crop || mode == .mask || mode == .heal) ? .uncropped : (draft ? .draft : .full),
                                             maskOverlay: mode == .mask && showMask ? (activeMask ?? 0) : nil), id == photoID {
-            image = r.image; histogram = r.histogram
+            image = AppleDenoise.apply(r.image, level: appleLevel); histogram = r.histogram
             if !draft { info.edited = true }
         }
     }
