@@ -431,7 +431,7 @@ struct MaskPanel: View {
             // AI masks are found in the background; refresh until the region shows up
             if !failed, ["subject", "sky", "background", "object"].contains(p["kind"] as? String ?? "") {
                 message = "Finding the \(p["kind"] as? String ?? "") on this device…"
-                for _ in 0..<28 { try? await Task.sleep(for: .milliseconds(250)); onChange() }
+                for i in 0..<28 { try? await Task.sleep(for: .milliseconds(250)); if i % 2 == 1 { await reload() }; onChange() }
                 message = nil
             }
         }
