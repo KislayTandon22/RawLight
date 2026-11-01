@@ -650,6 +650,12 @@ fn new_album_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
 /// Draw the My Photos sidebar: title and open-library name, the scrollable sources, albums,
 /// folders and sections, with the section visibility menu on the title.
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+    // Pro desktop layout: while developing, the left dock holds Navigator, Presets, Snapshots and History
+    if super::chrome_pro::active(app, ui.ctx())
+        && let Some(photo) = app.session.active()
+    {
+        return super::left_pro::show(app, ui, photo);
+    }
     let t = Tokens::get(ui.ctx());
     let frame = egui::Frame::NONE
         .fill(if crate::glass::active(ui.ctx()) { egui::Color32::TRANSPARENT } else { t.chrome })

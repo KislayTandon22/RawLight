@@ -512,6 +512,10 @@ pub fn show(app: &mut crate::LightcraftApp, ui: &mut egui::Ui) {
     if let Some(mut canvas) = canvas {
         let ui = &mut canvas;
         crate::panels::bottombar::show(app, ui);
+        if crate::panels::chrome_pro::active(app, ui.ctx()) {
+            crate::panels::chrome_pro::option_bar(app, ui);
+            crate::panels::chrome_pro::tool_strip(app, ui);
+        }
         let bg = if matches!(
             app.ui.view,
             crate::state::ViewMode::Detail | crate::state::ViewMode::Compare | crate::state::ViewMode::Survey | crate::state::ViewMode::Reference
