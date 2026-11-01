@@ -299,6 +299,60 @@ fn saved_card(app: &mut LightcraftApp, ui: &mut Ui, t: &Tokens, h: f32, opts: &m
     }
 }
 
+/// The saved watermarks as a compact block for the Classic and touch Export dialogs: a chip per
+/// saved watermark (tap to apply, × to delete) and a field that saves the current one.
+pub(crate) fn saved_compact(app: &mut LightcraftApp, ui: &mut Ui, opts: &mut ExportOptions) {
+    let Some(dir) = watermark_store::dir() else { return };
+    let ctx = ui.ctx().clone();
+    let list = saved_list(&ctx);
+    let t = Tokens::get(&ctx);
+    ui.add_space(6.0);
+    ui.label(RichText::new(crate::i18n::tr("Saved watermarks")).font(t.semibold(12.0)).color(t.text_label));
+    let (mut load, mut delete) = (None, None);
+    ui.horizontal_wrapped(|ui| {
+        for s in list.iter() {
+            if crate::widgets::text_button(ui, &format!("exportWmSaved-{}", s.name), &s.name, false).clicked() {
+                load = Some(s.watermark.clone());
+            }
+            if crate::widgets::text_button(ui, &format!("exportWmSavedDelete-{}", s.name), "×", false).clicked() {
+                delete = Some(s.name.clone());
+            }
+        }
+    });
+    let name_id = egui::Id::unique("lightcraft-export-wm-save-name-compact");
+    let mut name: String = ctx.data(|d| d.get_temp(name_id)).unwrap_or_default();
+    ui.horizontal(|ui| {
+        let r = ui.add(egui::TextEdit::singleline(&mut name).hint_text(crate::i18n::tr("Name")).desired_width(180.0));
+        crate::widgets::register(ui, "field:exportWmSaveNameCompact", r.rect);
+        let commit = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+        if (crate::widgets::text_button(ui, "exportWmSaveCurrentCompact", crate::i18n::tr("Save current"), false).clicked() || commit)
+            && let Some(wm) = opts.watermark.as_ref()
+        {
+            match watermark_store::save_in(&dir, &name, wm) {
+                Ok(_) => {
+                    app.toast(&ctx, crate::i18n::tr_format!("Saved watermark “{}”", name.trim()));
+                    name.clear();
+                    refresh_saved(&ctx);
+                }
+                Err(e) => app.toast(&ctx, e),
+            }
+        }
+    });
+    ctx.data_mut(|d| d.insert_temp(name_id, name));
+    if let Some(wm) = load {
+        opts.watermark = Some(wm);
+    }
+    if let Some(n) = delete {
+        match watermark_store::delete_in(&dir, &n) {
+            Ok(()) => {
+                app.toast(&ctx, crate::i18n::tr_format!("Deleted watermark “{}”", n));
+                refresh_saved(&ctx);
+            }
+            Err(e) => app.toast(&ctx, e),
+        }
+    }
+}
+
 /// A 64x38 thumbnail of how the watermark sits on a photo.
 fn paint_thumb(p: &egui::Painter, rect: Rect, wm: &Watermark, t: &Tokens) {
     p.rect_filled(rect, CornerRadius::same(4), Color32::from_rgb(70, 78, 96));
@@ -331,7 +385,7 @@ fn paint_thumb(p: &egui::Painter, rect: Rect, wm: &Watermark, t: &Tokens) {
 /// Cells register as `button:exportWmAnchor-{i}`.
 pub fn anchor_grid(ui: &mut Ui, anchor: &mut Anchor) {
     let t = Tokens::get(ui.ctx());
-    let (cw, ch, gap) = (36.0, 28.0, 4.0);
+    let (cw, ch, gap) = if crate::theme::touch_ui(ui.ctx()) { (56.0, 44.0, 6.0) } else { (36.0, 28.0, 4.0) };
     let size = vec2(cw * 3.0 + gap * 2.0, ch * 3.0 + gap * 2.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let cursor_id = egui::Id::unique("lightcraft-export-wm-anchor-cursor");

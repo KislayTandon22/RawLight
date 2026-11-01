@@ -147,3 +147,26 @@ fn pro_settings_has_the_navigation_and_a_shortcuts_page() {
     let r = c.request("engine.execute", json!({"command": "app.settings", "params": {"tab": "shortcuts"}}), T);
     assert_eq!(r["ok"], false, "{r}");
 }
+
+/// The 3×3 position grid and the border controls are in the Classic and touch Export dialogs too, not
+/// only in Pro.
+#[test]
+fn classic_and_touch_export_have_the_position_grid_and_frame_controls() {
+    for touch in [false, true] {
+        let mut h = demo(false);
+        if touch {
+            crate::theme::set_touch_ui(&h.view.ctx, true);
+        }
+        run(&mut h, "library.selectAll");
+        run(&mut h, "dialog.export");
+        if let Some(Dialog::Export { opts, .. }) = &mut h.app.ui.dialog {
+            opts.watermark = Some(lightcraft_engine::export::Watermark { text: "© T".into(), ..Default::default() });
+        }
+        for _ in 0..4 {
+            h.step();
+        }
+        let ids: Vec<String> = h.app.widgets.iter().map(|(id, _)| id.clone()).collect();
+        assert!(ids.iter().any(|i| i == "button:exportWmAnchor-4"), "touch={touch}: position grid missing: {ids:?}");
+        assert!(ids.iter().any(|i| i.contains("export.watermarkBorder")), "touch={touch}: border control missing");
+    }
+}

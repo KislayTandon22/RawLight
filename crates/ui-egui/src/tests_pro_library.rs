@@ -106,3 +106,27 @@ fn small_helpers() {
     assert!((uv.width() - 1.0 / 3.0).abs() < 1e-4 && (uv.height() - 1.0).abs() < 1e-4, "{uv:?}");
     assert_eq!(crate::panels::grid_pro::cover_uv([0, 0], egui::Rect::NOTHING), egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)));
 }
+
+/// The Library's right panel in Pro stacks the histogram, Quick Develop, Info and Keywords; Classic
+/// keeps the Edit panel there.
+#[test]
+fn pro_right_panel_stacks_quick_develop_info_and_keywords() {
+    use crate::state::RightPanel;
+    let mut pro = grid(DesktopLayout::Pro);
+    pro.app.ui.right = RightPanel::Edit;
+    pro.app.session.selection.ids = vec![PhotoId(1)];
+    pro.app.session.selection.active = Some(PhotoId(1));
+    pro.settle(SETTLE);
+    for id in ["section:libQuickDevelop", "section:keywording"] {
+        assert!(widget(&pro, id).is_some(), "{id} missing in the Pro Library panel");
+    }
+    assert!(widget(&pro, "section:pro.basic").is_none(), "the Develop dock is not shown in the Library");
+
+    let mut classic = grid(DesktopLayout::Classic);
+    classic.app.ui.right = RightPanel::Edit;
+    classic.app.session.selection.ids = vec![PhotoId(1)];
+    classic.app.session.selection.active = Some(PhotoId(1));
+    classic.settle(SETTLE);
+    assert!(widget(&classic, "section:libQuickDevelop").is_none());
+    assert!(widget(&classic, "section:keywording").is_none());
+}

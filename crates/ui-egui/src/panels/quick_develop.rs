@@ -92,6 +92,40 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     reset_row(app, ui, &t, touch, &target_ids);
 }
 
+/// Desktop Pro, Library views: the short Quick Develop block (White Balance, five tone controls,
+/// Auto and Reset), applied to every selected photo as relative steps.
+pub(super) fn compact(app: &mut LightcraftApp, ui: &mut Ui, id: PhotoId) {
+    let t = Tokens::get(ui.ctx());
+    let targets: Vec<PhotoId> = if !app.session.selection.ids.is_empty() { app.session.selection.ids.clone() } else { vec![id] };
+    let target_ids: Vec<u64> = targets.iter().map(|p| p.0).collect();
+    if targets.len() > 1 {
+        let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 22.0), Sense::hover());
+        let note = crate::i18n::tr_format!("Editing {n} photos", n = targets.len());
+        ui.painter().text(pos2(r.left() + 16.0, r.center().y), Align2::LEFT_CENTER, note, t.font(11.0), t.accent);
+    }
+    wb_preset_row(app, ui, &t, false, &target_ids);
+    let steps = (-20.0, -5.0, 5.0, 20.0);
+    let labels = ("<< -20", "< -5", "+5 >", "+20 >>");
+    nudge_row(
+        app,
+        ui,
+        &t,
+        false,
+        "Exposure",
+        "light.exposure",
+        &target_ids,
+        (-1.0, -0.33333, 0.33333, 1.0),
+        ("<< -1.0", "< -0.33", "+0.33 >", "+1.0 >>"),
+    );
+    for (label, key) in
+        [("Contrast", "light.contrast"), ("Highlights", "light.highlights"), ("Shadows", "light.shadows"), ("Vibrance", "color.vibrance")]
+    {
+        nudge_row(app, ui, &t, false, label, key, &target_ids, steps, labels);
+    }
+    auto_tone_button(app, ui, &t, false, &target_ids);
+    reset_row(app, ui, &t, false, &target_ids);
+}
+
 fn header_with_badge(ui: &mut Ui, t: &Tokens, touch: bool, count: usize) {
     let h = if touch { 48.0 } else { 40.0 };
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());

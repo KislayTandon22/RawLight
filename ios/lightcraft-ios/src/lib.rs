@@ -426,6 +426,37 @@ fn create_services(egui_ctx: Context) -> Services {
         rx.recv().ok().and_then(|mut paths| paths.pop())
     }));
 
+    // Watermark files (.json): import from Files, export to Files
+    let wm_open_ctx = egui_ctx.clone();
+    services.pick_watermark_file = Some(Box::new(move || {
+        let (tx, rx) = channel();
+        let payload = Box::new(PickerCallbackPayload { tx, ctx: wm_open_ctx.clone() });
+        let ctx_ptr = Box::into_raw(payload) as *mut c_void;
+        let title = CString::new("Import Watermark").unwrap_or_default();
+        let filter_name = CString::new("Watermark").unwrap_or_default();
+        let filter_exts = CString::new("json").unwrap_or_default();
+        // SAFETY: `ios_show_native_picker` is defined by the Swift host linked into this app; the pointers live until it returns and `ctx_ptr` is a boxed payload the callback takes back.
+        unsafe {
+            ios_show_native_picker(1, title.as_ptr(), filter_name.as_ptr(), filter_exts.as_ptr(), std::ptr::null(), ctx_ptr, on_picker_complete);
+        }
+        rx.recv().ok().unwrap_or_default()
+    }));
+    let wm_save_ctx = egui_ctx.clone();
+    services.save_watermark_file = Some(Box::new(move |name: &str| {
+        let (tx, rx) = channel();
+        let payload = Box::new(PickerCallbackPayload { tx, ctx: wm_save_ctx.clone() });
+        let ctx_ptr = Box::into_raw(payload) as *mut c_void;
+        let title = CString::new("Export Watermark").unwrap_or_default();
+        let filter_name = CString::new("Watermark").unwrap_or_default();
+        let filter_exts = CString::new("json").unwrap_or_default();
+        let file_name = CString::new(name).unwrap_or_default();
+        // SAFETY: as above.
+        unsafe {
+            ios_show_native_picker(3, title.as_ptr(), filter_name.as_ptr(), filter_exts.as_ptr(), file_name.as_ptr(), ctx_ptr, on_picker_complete);
+        }
+        rx.recv().ok().and_then(|mut paths| paths.pop())
+    }));
+
     // Free storage on the device, so an import that will not fit is refused before it starts
     services.free_space = Some(Box::new(|| {
         // SAFETY: `ios_free_disk_bytes` is defined by the Swift host linked into this app; it takes no arguments and returns a plain integer.

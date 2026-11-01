@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::LightcraftApp;
 use crate::icons::{Icon, paint};
-use crate::state::RightPanel;
+use crate::state::{RightPanel, ViewMode};
 use crate::theme::Tokens;
 use crate::widgets::{divider, register, slider, text_button};
 
@@ -45,7 +45,8 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             return;
         };
         // Pro desktop layout: the Develop dock pins its histogram and action bar around its own scroll area
-        if crate::theme::desktop_pro(ui.ctx()) && app.ui.right == RightPanel::Edit {
+        let pro_grid = crate::theme::desktop_pro(ui.ctx()) && matches!(app.ui.view, ViewMode::PhotoGrid | ViewMode::SquareGrid);
+        if crate::theme::desktop_pro(ui.ctx()) && app.ui.right == RightPanel::Edit && !pro_grid {
             super::edit_pro::dock(app, ui, id);
             return;
         }
@@ -69,6 +70,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 super::ui_pro::dock_style(ui);
             }
             match app.ui.right {
+                RightPanel::QuickDevelop | RightPanel::Edit | RightPanel::Info if pro_grid => library_pro(app, ui, id),
                 RightPanel::QuickDevelop => super::quick_develop::show(app, ui, id),
                 RightPanel::Edit => super::edit::show(app, ui, id),
                 RightPanel::Profiles => super::profiles::show(app, ui, id),
@@ -85,6 +87,19 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         });
         ui.data_mut(|d| d.insert_temp(egui::Id::unique(AREA), scrolled.id));
     });
+}
+
+/// Desktop Pro, Library views: the histogram, Quick Develop, the photo's Info (rating, label,
+/// title, caption…) and its Keywords stacked, each section folding on its own.
+fn library_pro(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
+    super::edit::histogram(app, ui, id);
+    if fold_header(app, ui, "libQuickDevelop", "Quick Develop") {
+        super::quick_develop::compact(app, ui, id);
+    }
+    info(app, ui, id);
+    if fold_header(app, ui, "keywording", "Keywords") {
+        keywording(app, ui);
+    }
 }
 
 /// The panel's scroll area, its offset as the last pass started, and how far

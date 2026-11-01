@@ -445,7 +445,7 @@ pub(crate) fn export_body(
                         )
                     });
                 }
-                choices(ui, "Position", "exportWmAnchor", &WM_POSITIONS, &mut wm.anchor);
+                field(ui, "Position", |ui| crate::export_pro::anchor_grid(ui, &mut wm.anchor));
                 choices(ui, "Rotate", "exportWmRotation", &[(0u16, "0°"), (90, "90°"), (180, "180°"), (270, "270°")], &mut wm.rotation);
                 let mut size = wm.size as f64 * 100.0;
                 if !graphic && num(ui, &WM_SIZE, &mut size) {
@@ -472,6 +472,9 @@ pub(crate) fn export_body(
                 }
                 watermark_frame_controls(ui, wm);
                 watermark_file_buttons(app, ui, wm);
+            }
+            if opts.watermark.is_some() {
+                crate::export_pro::saved_compact(app, ui, opts);
             }
             if opts.watermark != wm_shown {
                 // the preview above was drawn with the old settings
@@ -2598,13 +2601,6 @@ pub(crate) fn watermark_file_buttons(app: &mut LightcraftApp, ui: &mut egui::Ui,
     });
 }
 
-/// All nine positions supported by both the text and graphic watermark renderer.
-/// Keep them in grid order so bottom-centre and edge-centre anchors are available in Export.
-const WM_POSITIONS: [(lightcraft_engine::export::Anchor, &str); 9] = {
-    use lightcraft_engine::export::Anchor::*;
-    [(TopLeft, "↖"), (Top, "↑"), (TopRight, "↗"), (Left, "←"), (Center, "•"), (Right, "→"), (BottomLeft, "↙"), (Bottom, "↓"), (BottomRight, "↘")]
-};
-
 pub(crate) const WM_IMAGE_WIDTH: ControlSpec = spec("export.watermarkImageWidth", "Width (% of photo)", 2.0, 100.0, 20.0, 1.0);
 pub(crate) const WM_SIZE: ControlSpec = spec("export.watermarkSize", "Size (% of short edge)", 1.0, 15.0, 3.5, 0.5);
 pub(crate) const WM_OPACITY: ControlSpec = spec("export.watermarkOpacity", "Opacity (%)", 5.0, 100.0, 70.0, 1.0);
@@ -2831,7 +2827,7 @@ fn just_opened(ui: &egui::Ui, key: &str) -> bool {
 
 #[cfg(test)]
 mod watermark_position_tests {
-    use super::WM_POSITIONS;
+    use crate::export_pro::ANCHORS as WM_POSITIONS;
     use lightcraft_engine::export::Anchor;
 
     #[test]
@@ -2849,7 +2845,7 @@ mod watermark_position_tests {
         ];
         assert_eq!(WM_POSITIONS.len(), anchors.len());
         for anchor in anchors {
-            assert_eq!(WM_POSITIONS.iter().filter(|(position, _)| *position == anchor).count(), 1);
+            assert_eq!(WM_POSITIONS.iter().filter(|position| **position == anchor).count(), 1);
         }
     }
 }
