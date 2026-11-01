@@ -45,7 +45,7 @@ pub(crate) fn control(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSet
 }
 
 /// Relative temperature scale for rendered (non-raw) files: −100..100 ↔ Kelvin via mired shift.
-const REL_TEMP: ControlSpec = ControlSpec {
+pub(super) const REL_TEMP: ControlSpec = ControlSpec {
     id: "wb.tempRel",
     label: "Temp",
     section: Section::Color,
@@ -56,7 +56,7 @@ const REL_TEMP: ControlSpec = ControlSpec {
     decimals: 0,
     track: Track::Temp,
 };
-const REL_TINT: ControlSpec = ControlSpec {
+pub(super) const REL_TINT: ControlSpec = ControlSpec {
     id: "wb.tintRel",
     label: "Tint",
     section: Section::Color,
@@ -68,16 +68,21 @@ const REL_TINT: ControlSpec = ControlSpec {
     track: Track::Tint,
 };
 
-fn k_to_rel(k: f64) -> f64 {
+pub(super) fn k_to_rel(k: f64) -> f64 {
     ((1e6 / 6500.0 - 1e6 / k) / 0.8).clamp(-100.0, 100.0)
 }
-fn rel_to_k(r: f64) -> f64 {
+pub(super) fn rel_to_k(r: f64) -> f64 {
     1e6 / (1e6 / 6500.0 - r * 0.8)
 }
 
 pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
         super::edit_touch::show(app, ui, id);
+        return;
+    }
+    // Pro desktop layout: dense groups (the right dock calls `edit_pro::dock` itself; this covers other hosts of the panel)
+    if crate::theme::desktop_pro(ui.ctx()) {
+        super::edit_pro::scroll_body(app, ui, id);
         return;
     }
     let t = Tokens::get(ui.ctx());
@@ -481,7 +486,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
 /// Browse…. Like the menu bar's menus, the dropdown and each submenu stay inside the window and
 /// scroll when their rows don't fit (issue #2059: a folder of many imported profiles ran past the
 /// window's bottom edge). `below` is the dropdown's bottom edge, which the menu hangs from.
-fn profile_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings, below: f32) {
+pub(super) fn profile_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings, below: f32) {
     crate::menu_level::level(ui, 1, Some(below), |ui| profile_menu_rows(app, ui, d, below));
 }
 
@@ -629,7 +634,7 @@ fn section(
 // ------------------------------------------------------------------------------ histogram
 
 /// The current photo's existing preview histogram, shared by Histogram and Tone Curve.
-fn preview_histogram(app: &LightcraftApp, id: PhotoId) -> Option<lightcraft_raster::Histogram> {
+pub(super) fn preview_histogram(app: &LightcraftApp, id: PhotoId) -> Option<lightcraft_raster::Histogram> {
     app.renderer
         .textures
         .get(&Slot::Main)
@@ -860,7 +865,7 @@ pub(crate) fn histogram(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId)
 // ------------------------------------------------------------------------------ soft proofing
 
 /// The Soft Proofing strip under the histogram: proof profile, gamut warnings, Create Proof Copy.
-fn soft_proofing(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
+pub(super) fn soft_proofing(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     use lightcraft_engine::pipeline::OutputSpace;
     let t = Tokens::get(ui.ctx());
     egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 8, bottom: 6 }).show(ui, |ui| {
@@ -1450,7 +1455,7 @@ fn set_tat(app: &mut LightcraftApp, ctx: &egui::Context, tool: &str, active: boo
 
 // ------------------------------------------------------------------------------ colour mixer
 
-fn mixer(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
+pub(super) fn mixer(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
     let t = Tokens::get(ui.ctx());
     let bands = lightcraft_develop::MIXER_BANDS;
     let sel = bands.iter().position(|b| *b == app.ui.mixer_mode).unwrap_or(0);
@@ -1524,7 +1529,7 @@ fn oklch_color(l: f64, c: f64, h_deg: f64) -> Color32 {
 
 /// Point Color: swatches of the samples (+ the eyedropper), the selected sample's shifts and range,
 /// and "Visualize range".
-fn point_color(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
+pub(super) fn point_color(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
     let t = Tokens::get(ui.ctx());
     let n = d.point_colors.len();
     if app.ui.point_color >= n && n > 0 {
@@ -1596,7 +1601,7 @@ fn point_color(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) 
 /// The Light panel's HDR row: the HDR switch and Visualize HDR, then (HDR on) the headroom limit.
 /// The Light panel's HDR settings while HDR editing is on (the switch itself is the HDR button
 /// next to B&W): Visualize HDR range and the headroom limit.
-fn hdr_row(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
+pub(super) fn hdr_row(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings) {
     if !d.hdr.enabled {
         return;
     }
@@ -1624,7 +1629,7 @@ const GRADING_TABS: [(&str, &str, Icon); 4] = [
 /// The wheels, in the order of `UiState::grading_hidden`.
 const GRADING_WHEELS: [(&str, &str); 3] = [("shadows", "Shadows"), ("midtones", "Midtones"), ("highlights", "Highlights")];
 
-fn grading(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings, photo: PhotoId) {
+pub(super) fn grading(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &DevelopSettings, photo: PhotoId) {
     let mode = GRADING_TABS.iter().find(|(k, ..)| *k == app.ui.grading_mode).map_or("3way", |(k, ..)| *k);
     egui::Frame::NONE.inner_margin(egui::Margin { left: 24, right: 22, top: 6, bottom: 2 }).show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -2092,7 +2097,7 @@ pub(crate) fn reload_preview_only(app: &mut LightcraftApp, ctx: &egui::Context, 
 }
 
 /// The Reset button's tooltip with the reset shortcut as this platform writes it (issue #1751).
-fn reset_tip(keymap: &crate::shortcuts::Keymap, mac: bool) -> String {
+pub(super) fn reset_tip(keymap: &crate::shortcuts::Keymap, mac: bool) -> String {
     let base = crate::i18n::tr("Reset all edits");
     match crate::shortcuts::shortcut_of(keymap, "develop.reset") {
         Some(sc) => format!("{base} ({})", crate::menubar::shortcut_text(sc, mac)),

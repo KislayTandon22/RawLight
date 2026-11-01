@@ -44,6 +44,11 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             }
             return;
         };
+        // Pro desktop layout: the Develop dock pins its histogram and action bar around its own scroll area
+        if crate::theme::desktop_pro(ui.ctx()) && app.ui.right == RightPanel::Edit {
+            super::edit_pro::dock(app, ui, id);
+            return;
+        }
         super::right_touch::title_row(app, ui, &t);
         let mut area = egui::ScrollArea::vertical().id_salt("right-scroll").auto_shrink([false, false]);
         if let Some(offset) = held {
@@ -60,6 +65,9 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         });
         let scrolled = area.show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
+            if crate::theme::desktop_pro(ui.ctx()) {
+                super::ui_pro::dock_style(ui);
+            }
             match app.ui.right {
                 RightPanel::QuickDevelop => super::quick_develop::show(app, ui, id),
                 RightPanel::Edit => super::edit::show(app, ui, id),
