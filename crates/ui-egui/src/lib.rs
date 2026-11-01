@@ -181,6 +181,8 @@ mod tests_preview_limit;
 #[cfg(test)]
 mod tests_print;
 #[cfg(test)]
+mod tests_pro_develop;
+#[cfg(test)]
 mod tests_pro_library;
 #[cfg(test)]
 mod tests_profile_menu;
@@ -2720,6 +2722,9 @@ impl LightcraftApp {
         panels::topbar::show(self, ui);
         panels::library_problem::banner(self, ui);
         panels::strip::show(self, ui);
+        if panels::canvas_pro::active(self, &ctx) {
+            panels::canvas_pro::status_bar(self, ui);
+        }
         // filled: the gaps the dock leaves between its panes show chrome, not the dark clear colour
         // (iPad glass: the canvas colour, so the gaps around the floating panels are the same tone as the photo area)
         let tokens = theme::Tokens::get(&ctx);

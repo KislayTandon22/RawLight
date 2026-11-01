@@ -288,7 +288,12 @@ impl Tokens {
     }
 
     pub fn get(ctx: &egui::Context) -> Tokens {
-        ctx.data(|d| d.get_temp::<Tokens>(egui::Id::NULL)).unwrap_or_default()
+        let mut t = ctx.data(|d| d.get_temp::<Tokens>(egui::Id::NULL)).unwrap_or_default();
+        if desktop_pro(ctx) {
+            // Pro desktop layout: a 104pt filmstrip
+            t.film_h = crate::panels::ui_pro::FILM_H;
+        }
+        t
     }
     pub fn font(&self, size: f32) -> FontId {
         FontId::proportional(size)

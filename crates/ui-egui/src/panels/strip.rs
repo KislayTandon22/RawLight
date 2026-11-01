@@ -95,6 +95,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     if crate::glass::active(ui.ctx()) && crate::theme::phone(ui.ctx()) {
         return show_phone(app, ui);
     }
+    // Pro desktop layout: the tools live in the strip on the canvas's left (`canvas_pro::tool_strip`)
+    if super::canvas_pro::active(app, ui.ctx()) {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let glass = crate::glass::active(ui.ctx());
     egui::Panel::right("tool_strip")
