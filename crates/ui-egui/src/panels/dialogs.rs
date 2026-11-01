@@ -1722,10 +1722,16 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                         buttons_w += ok_button.desired_size(ui).x;
                     }
                     ui.add_space((ui.available_width() - buttons_w).max(0.0));
+                    // Pro on Windows: the default button first, then Cancel (macOS and the Classic layout: Cancel, then the default)
+                    let ok_first = crate::theme::desktop_pro(ctx) && ctx.os() == egui::os::OperatingSystem::Windows;
+                    let mut ok_button = Some(ok_button);
+                    let mut r = (ok_first && !ok.is_empty()).then(|| ok_button.take().map(|b| b.show(ui))).flatten();
                     if !informational && cancel_button.show(ui).clicked() {
                         close = true;
                     }
-                    let r = (!ok.is_empty()).then(|| ok_button.show(ui));
+                    if !ok_first {
+                        r = (!ok.is_empty()).then(|| ok_button.take().map(|b| b.show(ui))).flatten();
+                    }
                     if r.is_some_and(|r| r.clicked()) {
                         if informational {
                             close = true;

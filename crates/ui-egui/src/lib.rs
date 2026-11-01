@@ -105,8 +105,6 @@ mod tests_dialog_primary;
 #[cfg(test)]
 mod tests_dialog_settings;
 #[cfg(test)]
-mod tests_pro_dialogs;
-#[cfg(test)]
 mod tests_dialog_tab;
 #[cfg(test)]
 mod tests_dialogs;
@@ -188,6 +186,8 @@ mod tests_preset_import;
 mod tests_preview_limit;
 #[cfg(test)]
 mod tests_print;
+#[cfg(test)]
+mod tests_pro_dialogs;
 #[cfg(test)]
 mod tests_profile_menu;
 #[cfg(test)]

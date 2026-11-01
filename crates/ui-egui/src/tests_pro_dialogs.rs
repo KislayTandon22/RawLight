@@ -98,7 +98,8 @@ fn pro_menus_gain_the_palette_shortcuts_editor_and_batch_rename() {
 
 #[test]
 fn the_palette_shortcut_takes_no_existing_binding() {
-    let taken: Vec<&str> = crate::shortcuts::bindable().iter().filter(|b| b.id != "app.palette" && b.default == Some(crate::palette::SHORTCUT)).map(|b| b.id).collect();
+    let taken: Vec<&str> =
+        crate::shortcuts::bindable().iter().filter(|b| b.id != "app.palette" && b.default == Some(crate::palette::SHORTCUT)).map(|b| b.id).collect();
     assert!(taken.is_empty(), "{} is shared with {taken:?}", crate::palette::SHORTCUT);
 }
 

@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn fuzzy_needs_letters_in_order_and_prefers_runs() {
         assert!(fuzzy("zzz", "Photo Grid").is_none());
-        assert!(fuzzy("gp", "Photo Grid").is_some());
+        assert!(fuzzy("gp", "Photo Grid").is_none(), "letters must come in order");
         assert!(fuzzy("pg", "Photo Grid").is_some());
         let tight = fuzzy("grid", "Photo Grid").map(|r| r.0);
         let loose = fuzzy("grid", "Go Right In Detail").map(|r| r.0);
