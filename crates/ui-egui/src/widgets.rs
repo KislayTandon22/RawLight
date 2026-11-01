@@ -279,7 +279,7 @@ pub fn lerp(a: Color32, b: Color32, t: f32) -> Color32 {
 /// Band colours for the 8 colour-mixer bands (swatches and tracks).
 pub const BAND_COLORS: [&str; 8] = ["#aa0000", "#bb6600", "#aaaa00", "#009900", "#00aaaa", "#0044cc", "#7722aa", "#aa0077"];
 
-fn track_stops(track: &Track) -> Option<Vec<Color32>> {
+pub(crate) fn track_stops(track: &Track) -> Option<Vec<Color32>> {
     Some(match track {
         Track::Plain | Track::Centered => return None,
         Track::Temp => ["#193961", "#47566a", "#60666d", "#70705b", "#737339", "#75742a"].iter().map(|h| hex(h)).collect(),
@@ -380,6 +380,10 @@ const THUMB_RING: f32 = 7.0;
 /// Esc keeps the old one. Drag the value sideways to scrub it, as if dragging the thumb (Shift: a tenth
 /// as far).
 pub fn slider(ui: &mut Ui, spec: &ControlSpec, value: f64, enabled: bool, label_override: Option<&str>) -> SliderOut {
+    // the Pro desktop layout draws every slider as a dense one-line row
+    if crate::theme::desktop_pro(ui.ctx()) {
+        return crate::panels::slider_pro::row(ui, spec, value, enabled, label_override);
+    }
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();
     let (row, _) = ui.allocate_exact_size(vec2(w, t.slider_row_h), Sense::hover());
@@ -1260,7 +1264,7 @@ mod numeric_entry_tests;
 #[path = "widgets/tests_slider_reset.rs"]
 mod slider_reset_tests;
 
-fn focused_slider_key() -> egui::Id {
+pub(crate) fn focused_slider_key() -> egui::Id {
     egui::Id::unique("lightcraft-focused-slider")
 }
 
