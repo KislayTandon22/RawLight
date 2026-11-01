@@ -1114,6 +1114,21 @@ fn appearance(ui: &mut egui::Ui, t: &Tokens, s: &mut crate::state::AppSettings, 
     ui.horizontal_wrapped(|ui| {
         choices(ui, "settingsAppearance", &[(M::Auto, "Sync with System"), (M::Dark, "Dark Mode"), (M::Light, "Light Mode")], &mut s.appearance_mode);
     });
+    if !crate::theme::touch_ui(ui.ctx()) {
+        ui.add_space(4.0);
+        ui.label(RichText::new(crate::i18n::tr("Layout")).color(t.text_label));
+        ui.horizontal_wrapped(|ui| {
+            use crate::state::DesktopLayout as L;
+            choices(ui, "settingsLayout", &[(L::Classic, "Classic"), (L::Pro, "Pro")], &mut s.desktop_layout);
+        });
+        hint(
+            ui,
+            t,
+            crate::i18n::tr(
+                "Pro is a denser layout for keyboard and mouse, in the look of the iPad app. Classic is the layout LightCraft has always had.",
+            ),
+        );
+    }
     ui.add_space(4.0);
     let light_active = s.theme(system) == s.light_theme.kind();
     let available = ui.available_width();

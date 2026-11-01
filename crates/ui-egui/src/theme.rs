@@ -443,6 +443,16 @@ pub fn touch_ui(ctx: &egui::Context) -> bool {
     ctx.data_mut(|data| data.get_persisted::<bool>(egui::Id::unique("lightcraft-touch-ui"))).unwrap_or(false)
 }
 
+/// Record whether the Pro desktop layout is chosen (Settings ▸ Appearance ▸ Layout).
+pub fn set_desktop_pro(ctx: &egui::Context, enabled: bool) {
+    ctx.data_mut(|data| data.insert_temp(egui::Id::unique("lightcraft-desktop-pro"), enabled));
+}
+
+/// Whether the Pro desktop layout applies: chosen in Settings, and never on a touch host.
+pub fn desktop_pro(ctx: &egui::Context) -> bool {
+    !touch_ui(ctx) && ctx.data(|data| data.get_temp::<bool>(egui::Id::unique("lightcraft-desktop-pro"))).unwrap_or(false)
+}
+
 /// Touch UI on a phone-sized window (the short side under 500pt): the iPhone, never an iPad, even in Split View.
 pub fn phone(ctx: &egui::Context) -> bool {
     let r = ctx.content_rect();

@@ -371,6 +371,17 @@ impl LightsOut {
 /// How many libraries File ▸ Open Recent Library remembers.
 pub const RECENT_LIBRARIES: usize = 8;
 
+/// The desktop layout (Settings ▸ Interface ▸ Appearance ▸ Layout). The touch UI ignores it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DesktopLayout {
+    /// The layout LightCraft has always had.
+    #[default]
+    Classic,
+    /// RawLight's dense keyboard-and-pointer layout, in the iPad app's look.
+    Pro,
+}
+
 /// Whether the interface uses the dark or the light theme (Settings ▸ Interface ▸ Appearance).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -501,6 +512,8 @@ pub struct AppSettings {
     pub keymap: crate::shortcuts::Keymap,
     /// Auto (follow the system), Dark or Light.
     pub appearance_mode: AppearanceMode,
+    /// Classic or Pro desktop layout (the touch UI has its own).
+    pub desktop_layout: DesktopLayout,
     /// The theme of the dark appearance.
     pub dark_theme: DarkTheme,
     /// The theme of the light appearance.
@@ -566,6 +579,7 @@ impl Default for AppSettings {
             loupe_messages: true,
             keymap: Default::default(),
             appearance_mode: AppearanceMode::Dark,
+            desktop_layout: DesktopLayout::Classic,
             dark_theme: DarkTheme::Charcoal,
             light_theme: LightTheme::Silver,
             favorite_themes: Vec::new(),
