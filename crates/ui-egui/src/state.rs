@@ -1148,6 +1148,12 @@ pub struct UiState {
     /// The Print dialog's page, selection and drag.
     #[serde(skip)]
     pub print: crate::print_view::PrintUi,
+    /// The Pro desktop command palette, when open.
+    #[serde(skip)]
+    pub palette: Option<crate::palette::PaletteState>,
+    /// The Pro desktop keyboard shortcut overlay (`?`) is on screen.
+    #[serde(skip)]
+    pub shortcut_overlay: bool,
 }
 
 /// Settings group ids (`SettingsGroup` serde names) a new preset includes by default: everything
@@ -1672,6 +1678,8 @@ impl Default for UiState {
             status: String::new(),
             dialog: None,
             print: Default::default(),
+            palette: None,
+            shortcut_overlay: false,
         }
     }
 }

@@ -41,6 +41,7 @@ const LABEL_W: f32 = 150.0;
 pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, tab: &str) {
     let t = Tokens::get(ui.ctx());
     match tab {
+        "shortcuts" => super::keymap::body(app, ui, &t),
         "import" => import_tab(app, ui, &t),
         "performance" => performance_tab(app, ui, &t),
         "display" => display_tab(app, ui, &t),
@@ -79,6 +80,9 @@ const PREVIEW_CHROME: f32 = 82.0;
 /// On Slideshow the slide preview is pinned between the tab bar and the page (where the room
 /// allows), and comes off that page's room.
 pub fn window(app: &mut LightcraftApp, ui: &mut egui::Ui, tab: &mut String, max_height: f32) {
+    if crate::theme::desktop_pro(ui.ctx()) {
+        return crate::settings_pro::window(app, ui, tab, max_height);
+    }
     ui.set_width((ui.ctx().content_rect().width() - 64.0).clamp(240.0, PAGE_SIZE.x));
     let top = ui.cursor().top();
     if crate::theme::touch_ui(ui.ctx()) {

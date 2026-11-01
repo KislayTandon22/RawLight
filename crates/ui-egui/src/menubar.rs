@@ -175,7 +175,9 @@ const LAYOUT: &[(&str, &[&str])] = &[
             "@Select by",
             "---",
             "view.focusSearch",
+            "app.palette",
             "---",
+            "app.shortcutsEditor",
             "app.settings",
         ],
     ),
@@ -348,6 +350,9 @@ const HIDDEN: &[&str] = &[
     "library.import",
     "preset.create",
 ];
+
+/// Menu commands of the Pro desktop layout; the Classic menus don't show them.
+const PRO_ONLY: &[&str] = &["app.palette", "app.shortcutsEditor"];
 
 /// The selection includes a photo in Recently Deleted.
 pub(crate) fn selection_deleted(app: &LightcraftApp) -> bool {
@@ -850,8 +855,18 @@ fn tidy(v: Vec<MenuNode>) -> Vec<MenuNode> {
 
 /// The whole menu bar: (title, items) per menu in [`MENUS`] order.
 pub fn menu_bar(app: &LightcraftApp) -> Vec<(String, Vec<MenuNode>)> {
-    let entries: Vec<MenuEntry> =
-        crate::menus::menu_entries(app).into_iter().filter(|e| !HIDDEN.contains(&e.id.as_str()) && host_supports(app, &e.id)).collect();
+    let pro = app.ui.settings.desktop_layout == crate::state::DesktopLayout::Pro;
+    let entries: Vec<MenuEntry> = crate::menus::menu_entries(app)
+        .into_iter()
+        .filter(|e| !HIDDEN.contains(&e.id.as_str()) && host_supports(app, &e.id) && (pro || !PRO_ONLY.contains(&e.id.as_str())))
+        .map(|mut e| {
+            // the Pro layout names the Photo menu's rename for what it is
+            if pro && e.id == "dialog.rename" {
+                e.label = "Batch Rename…".into();
+            }
+            e
+        })
+        .collect();
     let mut used = vec![false; entries.len()];
     let mut bar = Vec::new();
     for title in MENUS {

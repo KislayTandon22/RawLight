@@ -281,6 +281,10 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("app.github", "LightCraft on GitHub", None, "Help"),
     ("app.artcraft", "ArtCraft Website", None, "Help"),
     ("app.shortcuts", "Keyboard Shortcuts", Some("Cmd+/"), "Help"),
+    // Pro desktop layout only (the menu bar hides these in Classic, `menubar::PRO_ONLY`)
+    ("app.palette", "Command Palette…", Some(crate::palette::SHORTCUT), "Edit"),
+    ("app.shortcutOverlay", "Shortcut Overlay", None, ""),
+    ("app.shortcutsEditor", "Shortcuts Editor…", None, "Edit"),
     ("app.setShortcut", "Set Keyboard Shortcut", None, ""),
     ("app.resetShortcuts", "Reset All Keyboard Shortcuts", None, ""),
     ("app.export", "Export Now", None, ""),
@@ -855,7 +859,10 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
         }
         "app.settings" => {
             let tab = p.get("tab").and_then(Value::as_str).unwrap_or("general");
-            if !crate::panels::settings::TABS.iter().any(|(id, _)| *id == tab) {
+            if !crate::panels::settings::TABS.iter().any(|(id, _)| *id == tab)
+                && !(app.ui.settings.desktop_layout == crate::state::DesktopLayout::Pro
+                    && crate::settings_pro::PAGES.iter().any(|(id, _)| *id == tab))
+            {
                 let tabs: Vec<&str> = crate::panels::settings::TABS.iter().map(|(id, _)| *id).collect();
                 return Some(Err(format!("unknown settings tab `{tab}` ({})", tabs.join("|"))));
             }
@@ -1665,6 +1672,22 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
                 app.ui.dialog = Some(Dialog::SystemInfo { rows });
             }
             Ok(r)
+        }
+        "app.palette" => {
+            if app.ui.palette.is_some() {
+                app.ui.palette = None;
+            } else {
+                crate::palette::open(app);
+            }
+            Ok(Value::Null)
+        }
+        "app.shortcutOverlay" => {
+            crate::palette::toggle_overlay(app);
+            Ok(Value::Null)
+        }
+        "app.shortcutsEditor" => {
+            app.ui.dialog = Some(Dialog::Settings { tab: "shortcuts".into() });
+            Ok(Value::Null)
         }
         "app.shortcuts" => {
             app.ui.dialog = Some(Dialog::Shortcuts);
