@@ -321,6 +321,10 @@ pub struct Services {
     pub pick_print_templates: Option<PickFiles>,
     /// Save dialog for an exported print template (`.lcprint`).
     pub save_print_template: Option<SaveFile>,
+    /// Open dialog for a watermark file (`.json`; Export ▸ Watermark ▸ Import…).
+    pub pick_watermark_file: Option<PickFiles>,
+    /// Save dialog for an exported watermark file (`.json`; Export ▸ Watermark ▸ Export…).
+    pub save_watermark_file: Option<SaveFile>,
     /// Free space on the device storage, so a Copy or Move that will not fit is stopped before it starts.
     pub free_space: Option<FreeSpaceFn>,
     pub write: Option<WriteFn>,

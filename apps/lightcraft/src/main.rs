@@ -721,6 +721,24 @@ fn services(cc: &eframe::CreationContext<'_>, log_file: Option<&std::path::Path>
                 .save_file()
                 .map(|p| p.to_string_lossy().to_string())
         })),
+        // no portable free-space query without unsafe code; the desktop OS reports a full disk itself
+        free_space: None,
+        pick_watermark_file: Some(Box::new(|| {
+            file_dialog()
+                .set_title(lightcraft_ui_egui::i18n::tr("Import Watermark"))
+                .add_filter_nocase(lightcraft_ui_egui::i18n::tr("Watermark"), &["json"])
+                .pick_file()
+                .map(|p| vec![p.to_string_lossy().to_string()])
+                .unwrap_or_default()
+        })),
+        save_watermark_file: Some(Box::new(|name: &str| {
+            file_dialog()
+                .set_title(lightcraft_ui_egui::i18n::tr("Export Watermark"))
+                .add_filter_nocase(lightcraft_ui_egui::i18n::tr("Watermark"), &["json"])
+                .set_file_name(name)
+                .save_file()
+                .map(|p| p.to_string_lossy().to_string())
+        })),
         pick_print_templates: Some(Box::new(|| {
             file_dialog()
                 .set_title(lightcraft_ui_egui::i18n::tr("Import Print Templates"))

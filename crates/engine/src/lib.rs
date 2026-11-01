@@ -83,6 +83,7 @@ pub mod sync;
 pub mod text;
 mod view;
 pub mod walk;
+pub mod watermark_pack;
 
 use std::sync::Arc;
 

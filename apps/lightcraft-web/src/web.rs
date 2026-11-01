@@ -233,6 +233,10 @@ fn services(originals: Originals, backend: Option<Backend>, files: Files, frozen
         save_slideshow_template: None,
         pick_print_templates: None,
         save_print_template: None,
+        // no portable free-space query without unsafe code; the desktop OS reports a full disk itself
+        free_space: None,
+        pick_watermark_file: None,
+        save_watermark_file: None,
         write: Some(Box::new(download)),
         // the browser download path has no meaningful create-new file write; the control channel
         // (and therefore screenshot paths) is not available on the web

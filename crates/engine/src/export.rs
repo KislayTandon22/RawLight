@@ -307,6 +307,18 @@ pub struct Watermark {
     pub image: String,
     /// The graphic's width as a fraction of the photo's width.
     pub image_width: f32,
+    /// Width of a frame drawn around the watermark, as a fraction of the short edge (0 = none).
+    pub border_width: f32,
+    /// sRGB colour of the frame.
+    pub border_color: [u8; 3],
+    /// Space between the watermark and its frame (and background), as a fraction of the short edge.
+    pub padding: f32,
+    /// Opacity of a filled box behind the watermark, 0..1 (0 = none); multiplied by `opacity`.
+    pub background_opacity: f32,
+    /// sRGB colour of the box.
+    pub background_color: [u8; 3],
+    /// Corner radius of the frame and box, as a fraction of the short edge.
+    pub radius: f32,
     /// The colour space the photo is in (set by the encoder; the graphic is converted into it).
     #[serde(skip)]
     pub target: Option<OutputSpace>,
@@ -327,6 +339,12 @@ impl Default for Watermark {
             shadow: true,
             image: String::new(),
             image_width: 0.2,
+            border_width: 0.0,
+            border_color: [255; 3],
+            padding: 0.0,
+            background_opacity: 0.0,
+            background_color: [0; 3],
+            radius: 0.0,
             target: None,
         }
     }
@@ -352,6 +370,81 @@ fn turn(turns: u8, x: f32, y: f32, w: f32, h: f32) -> (f32, f32) {
         2 => (w - 1.0 - x, h - 1.0 - y),
         3 => (y, w - 1.0 - x),
         _ => (x, y),
+    }
+}
+
+/// Ranges of the frame settings, as fractions of the short edge.
+pub const WATERMARK_BORDER_RANGE: (f32, f32) = (0.0, 0.05);
+pub const WATERMARK_PADDING_RANGE: (f32, f32) = (0.0, 0.1);
+pub const WATERMARK_RADIUS_RANGE: (f32, f32) = (0.0, 0.05);
+
+impl Watermark {
+    fn frame_border(&self, short: f32) -> f32 {
+        self.border_width.clamp(WATERMARK_BORDER_RANGE.0, WATERMARK_BORDER_RANGE.1) * short
+    }
+    /// Does the watermark have a frame or a box behind it?
+    fn has_frame(&self) -> bool {
+        self.border_width > 0.0 || self.background_opacity > 0.0
+    }
+    /// How far the frame reaches past the watermark on every side, in pixels (0 without a frame).
+    fn frame_extent(&self, short: f32) -> f32 {
+        if self.has_frame() {
+            self.frame_border(short) + self.padding.clamp(WATERMARK_PADDING_RANGE.0, WATERMARK_PADDING_RANGE.1) * short
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Coverage 0..1 of the rounded rectangle centred at `c` with half-size `half` and corner radius `r`
+/// at the pixel centre `p` (one pixel of anti-aliasing).
+fn rounded_rect_cover(p: (f32, f32), c: (f32, f32), half: (f32, f32), r: f32) -> f32 {
+    let r = r.clamp(0.0, half.0.min(half.1).max(0.0));
+    let q = ((p.0 - c.0).abs() - (half.0 - r), (p.1 - c.1).abs() - (half.1 - r));
+    let d = (q.0.max(0.0).powi(2) + q.1.max(0.0).powi(2)).sqrt() + q.0.max(q.1).min(0.0) - r;
+    (0.5 - d).clamp(0.0, 1.0)
+}
+
+/// Draw the box and frame of `wm` over the `ow × oh` area at (`ox`, `oy`): the background first,
+/// then the border ring. `col` converts an sRGB colour into the image's space.
+fn draw_frame(
+    wm: &Watermark,
+    short: f32,
+    (ox, oy, ow, oh): (f32, f32, f32, f32),
+    (width, height): (usize, usize),
+    col: impl Fn([u8; 3]) -> [u8; 3],
+    blend_px: &mut impl FnMut(usize, usize, f32, [u8; 3]),
+) {
+    if !wm.has_frame() || ow <= 0.0 || oh <= 0.0 {
+        return;
+    }
+    let border = wm.frame_border(short).min(ow.min(oh) / 2.0);
+    let radius = wm.radius.clamp(WATERMARK_RADIUS_RANGE.0, WATERMARK_RADIUS_RANGE.1) * short;
+    let (c, half) = ((ox + ow / 2.0, oy + oh / 2.0), (ow / 2.0, oh / 2.0));
+    let inner_half = ((half.0 - border).max(0.0), (half.1 - border).max(0.0));
+    let inner_r = (radius - border).max(0.0);
+    let alpha = wm.opacity.clamp(0.0, 1.0);
+    let (fill_a, bg, bc) = (wm.background_opacity.clamp(0.0, 1.0) * alpha, col(wm.background_color), col(wm.border_color));
+    let x0 = ox.floor().max(0.0) as usize;
+    let y0 = oy.floor().max(0.0) as usize;
+    let x1 = ((ox + ow).ceil().max(0.0) as usize).min(width);
+    let y1 = ((oy + oh).ceil().max(0.0) as usize).min(height);
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let p = (x as f32 + 0.5, y as f32 + 0.5);
+            let outer = rounded_rect_cover(p, c, half, radius);
+            if outer <= 0.0 {
+                continue;
+            }
+            let inner = if border > 0.0 { rounded_rect_cover(p, c, inner_half, inner_r) } else { outer };
+            if fill_a > 0.0 && inner > 0.0 {
+                blend_px(x, y, inner * fill_a, bg);
+            }
+            let ring = (outer - inner).clamp(0.0, 1.0);
+            if border > 0.0 && ring > 0.0 {
+                blend_px(x, y, ring * alpha, bc);
+            }
+        }
     }
 }
 
@@ -446,7 +539,10 @@ fn watermark_coverage(
     let (tw, th) = (layout.width, layout.height);
     // laid out unturned in a tw × th box, placed by the box it becomes
     let turns = wm.quarter_turns();
-    let (bw, bh) = if turns % 2 == 1 { (th, tw) } else { (tw, th) };
+    let (cw, ch) = if turns % 2 == 1 { (th, tw) } else { (tw, th) };
+    // the frame and box grow the placed area; the insets are measured to its outer edge
+    let fx = wm.frame_extent(short);
+    let (bw, bh) = (cw + 2.0 * fx, ch + 2.0 * fx);
     let (ix, iy) = (wm.inset_x.clamp(0.0, 0.4) * short, wm.inset_y.clamp(0.0, 0.4) * short);
     let (w, h) = (width as f32, height as f32);
     use Anchor::*;
@@ -460,6 +556,8 @@ fn watermark_coverage(
         Left | Center | Right => (h - bh) / 2.0,
         BottomLeft | Bottom | BottomRight => h - iy - bh,
     };
+    draw_frame(wm, short, (ox, oy, bw, bh), (width, height), |c| c, &mut blend_px);
+    let (ox, oy) = (ox + fx, oy + fx);
     let alpha = wm.opacity.clamp(0.0, 1.0);
     let passes: &[(f32, [u8; 3], f32)] =
         if wm.shadow { &[((px * 0.05).max(floor_scale), [0, 0, 0], 0.45), (0.0, wm.color, 1.0)] } else { &[(0.0, wm.color, 1.0)] };
@@ -525,8 +623,9 @@ fn logo_coverage(width: usize, height: usize, wm: &Watermark, mut blend_px: impl
     let short = width.min(height) as f32;
     let (ix, iy) = (wm.inset_x.clamp(0.0, 0.4) * short, wm.inset_y.clamp(0.0, 0.4) * short);
     use Anchor::*;
-    let available_w = width as f64 - if matches!(wm.anchor, Top | Center | Bottom) { 0.0 } else { ix as f64 };
-    let available_h = height as f64 - if matches!(wm.anchor, Left | Center | Right) { 0.0 } else { iy as f64 };
+    let fx = wm.frame_extent(short);
+    let available_w = (width as f64 - if matches!(wm.anchor, Top | Center | Bottom) { 0.0 } else { ix as f64 } - 2.0 * fx as f64).max(1.0);
+    let available_h = (height as f64 - if matches!(wm.anchor, Left | Center | Right) { 0.0 } else { iy as f64 } - 2.0 * fx as f64).max(1.0);
     let (max_w, max_h) = if turns % 2 == 1 { (available_h, available_w) } else { (available_w, available_h) };
     let scale =
         (wm.image_width.clamp(0.01, 1.0) as f64 * width as f64 / logo.width as f64).min(max_w / logo.width as f64).min(max_h / logo.height as f64);
@@ -539,20 +638,22 @@ fn logo_coverage(width: usize, height: usize, wm: &Watermark, mut blend_px: impl
     });
     let scaled = lightcraft_raster::resample::resize(&pre, lw, lh, lightcraft_raster::resample::Filter::Mitchell);
     let (bw, bh) = if turns % 2 == 1 { (lh, lw) } else { (lw, lh) };
-    let (w, h, lwf, lhf) = (width as f32, height as f32, bw as f32, bh as f32);
-    let ox = match wm.anchor {
+    let (w, h, lwf, lhf) = (width as f32, height as f32, bw as f32 + 2.0 * fx, bh as f32 + 2.0 * fx);
+    let fox = match wm.anchor {
         TopLeft | Left | BottomLeft => ix,
         Top | Center | Bottom => (w - lwf) / 2.0,
         TopRight | Right | BottomRight => w - ix - lwf,
     }
-    .max(0.0) as usize;
-    let oy = match wm.anchor {
+    .max(0.0);
+    let foy = match wm.anchor {
         TopLeft | Top | TopRight => iy,
         Left | Center | Right => (h - lhf) / 2.0,
         BottomLeft | Bottom | BottomRight => h - iy - lhf,
     }
-    .max(0.0) as usize;
+    .max(0.0);
     let space = wm.target.unwrap_or(OutputSpace::Srgb);
+    draw_frame(wm, short, (fox, foy, lwf, lhf), (width, height), |c| srgb8_in(space, c), &mut blend_px);
+    let (ox, oy) = ((fox + fx) as usize, (foy + fx) as usize);
     let op = wm.opacity.clamp(0.0, 1.0);
     for y in 0..lh {
         for x in 0..lw {
@@ -769,8 +870,27 @@ pub fn apple_photos_unsupported() -> Option<&'static str> {
 
 /// The keys of a `watermark` object ([`Watermark`], camelCase). `inset` sets `insetX` and `insetY`
 /// together (what versions before the two margins wrote); either of those, when given, wins.
-pub const WATERMARK_PARAMS: &[&str] =
-    &["text", "vertical", "size", "opacity", "anchor", "insetX", "insetY", "inset", "rotation", "color", "shadow", "image", "imageWidth"];
+pub const WATERMARK_PARAMS: &[&str] = &[
+    "text",
+    "vertical",
+    "size",
+    "opacity",
+    "anchor",
+    "insetX",
+    "insetY",
+    "inset",
+    "rotation",
+    "color",
+    "shadow",
+    "image",
+    "imageWidth",
+    "borderWidth",
+    "borderColor",
+    "padding",
+    "backgroundOpacity",
+    "backgroundColor",
+    "radius",
+];
 
 /// Text height as a fraction of the short edge: the range the renderer draws without clamping.
 pub const WATERMARK_SIZE_RANGE: (f32, f32) = (0.005, 0.5);
@@ -1034,7 +1154,7 @@ impl ExportOptions {
             Value::Object(o) => o,
             _ => {
                 return Err(bad(
-                    "`watermark` must be text or an object {text, vertical, size, opacity, anchor, insetX, insetY, inset, rotation, color, shadow, image, imageWidth}".into(),
+                    "`watermark` must be text or an object {text, vertical, size, opacity, anchor, insetX, insetY, inset, rotation, color, shadow, image, imageWidth, borderWidth, borderColor, padding, backgroundOpacity, backgroundColor, radius}".into(),
                 ));
             }
         };
@@ -1059,6 +1179,10 @@ impl ExportOptions {
                 "opacity" => frac(k, v, (0.0, 1.0), "0 = invisible, 1 = solid")?,
                 "insetX" | "insetY" | "inset" => frac(k, v, WATERMARK_INSET_RANGE, "fraction of the short edge")?,
                 "imageWidth" => frac(k, v, WATERMARK_IMAGE_WIDTH_RANGE, "fraction of the photo's width")?,
+                "borderWidth" => frac(k, v, WATERMARK_BORDER_RANGE, "fraction of the short edge")?,
+                "padding" => frac(k, v, WATERMARK_PADDING_RANGE, "fraction of the short edge")?,
+                "radius" => frac(k, v, WATERMARK_RADIUS_RANGE, "fraction of the short edge")?,
+                "backgroundOpacity" => frac(k, v, (0.0, 1.0), "0 = no box, 1 = solid")?,
                 "rotation" => {
                     if !matches!(whole(v), Some(0 | 90 | 180 | 270)) {
                         return Err(bad("`watermark.rotation` must be 0, 90, 180 or 270 (degrees clockwise)".into()));
@@ -1069,10 +1193,10 @@ impl ExportOptions {
                         bad("`watermark.anchor` must be one of topLeft|top|topRight|left|center|right|bottomLeft|bottom|bottomRight".into())
                     })?;
                 }
-                "color" => {
+                "color" | "borderColor" | "backgroundColor" => {
                     let ok = v.as_array().is_some_and(|a| a.len() == 3 && a.iter().all(|c| matches!(whole(c), Some(0..=255))));
                     if !ok {
-                        return Err(bad("`watermark.color` must be [r, g, b] with 0..255 each (sRGB)".into()));
+                        return Err(bad(format!("`watermark.{k}` must be [r, g, b] with 0..255 each (sRGB)")));
                     }
                 }
                 _ => return Err(bad(unknown_key("watermark key", k, WATERMARK_PARAMS))),
@@ -3628,10 +3752,10 @@ mod tests {
         use serde_json::json;
         let err = |w: serde_json::Value| ExportOptions::from_params(&json!({"watermark": w})).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(err(json!(5)).contains(
-            "`watermark` must be text or an object {text, vertical, size, opacity, anchor, insetX, insetY, inset, rotation, color, shadow, image, imageWidth}"
+            "`watermark` must be text or an object {text, vertical, size, opacity, anchor, insetX, insetY, inset, rotation, color, shadow, image, imageWidth, borderWidth, borderColor, padding, backgroundOpacity, backgroundColor, radius}"
         ));
         assert!(err(json!({"text": "x", "bogus": 1})).contains(
-            "unknown watermark key `bogus` (one of text, vertical, size, opacity, anchor, insetX, insetY, inset, rotation, color, shadow, image, imageWidth)"
+            "unknown watermark key `bogus` (one of text, vertical, size, opacity, anchor, insetX, insetY, inset, rotation, color, shadow, image, imageWidth, borderWidth, borderColor, padding, backgroundOpacity, backgroundColor, radius)"
         ));
         assert!(err(json!({"text": "x", "sizee": 0.1})).contains("did you mean `size`"));
         for size in [json!(3), json!(0.5001), json!(0), json!("big")] {
@@ -3831,5 +3955,88 @@ mod tests {
         assert_eq!(render_weight(1000 * 500, 1000, SourceLevel::Preview, 0), 1000 * 500 * 12);
         assert_eq!(render_weight(0, 0, SourceLevel::Full, 0), 0);
         assert!(render_weight(usize::MAX, 1, SourceLevel::Full, usize::MAX) > 0, "no overflow");
+    }
+}
+
+#[cfg(test)]
+mod watermark_frame_tests {
+    use super::*;
+
+    /// Per-pixel coverage of `wm` on a 400×300 image.
+    fn cover(wm: &Watermark) -> Vec<f32> {
+        let mut px = vec![0f32; 400 * 300];
+        watermark_coverage(400, 300, wm, &[], 1.0, |x, y, k, _| px[y * 400 + x] = px[y * 400 + x].max(k));
+        px
+    }
+
+    fn bounds(px: &[f32]) -> Option<(usize, usize, usize, usize)> {
+        let hit: Vec<usize> = (0..px.len()).filter(|i| px[*i] > 0.0).collect();
+        let (x0, x1) = (hit.iter().map(|i| i % 400).min()?, hit.iter().map(|i| i % 400).max()?);
+        let (y0, y1) = (hit.iter().map(|i| i / 400).min()?, hit.iter().map(|i| i / 400).max()?);
+        Some((x0, y0, x1, y1))
+    }
+
+    fn base() -> Watermark {
+        Watermark { text: "Studio".into(), shadow: false, opacity: 1.0, ..Default::default() }
+    }
+
+    #[test]
+    fn no_frame_draws_exactly_what_it_did_before() {
+        let plain = bounds(&cover(&base())).expect("text");
+        let zeroed = Watermark { border_width: 0.0, background_opacity: 0.0, padding: 0.05, radius: 0.02, ..base() };
+        assert_eq!(bounds(&cover(&zeroed)), Some(plain));
+    }
+
+    #[test]
+    fn border_surrounds_the_text_and_insets_measure_to_its_outer_edge() {
+        let plain = bounds(&cover(&base())).expect("text");
+        let framed = Watermark { border_width: 0.01, padding: 0.02, ..base() };
+        let b = bounds(&cover(&framed)).expect("frame");
+        assert!(b.0 < plain.0 && b.1 < plain.1, "the frame reaches past the text on the top left: {b:?} vs {plain:?}");
+        // bottom right anchor: the outer edge keeps the inset (2.5% of 300 = 7.5 px)
+        assert!(b.2 <= 400 - 7 && b.2 >= 400 - 9, "{b:?}");
+        assert!(b.3 <= 300 - 7 && b.3 >= 300 - 9, "{b:?}");
+    }
+
+    #[test]
+    fn background_fills_the_box_and_border_leaves_the_middle_empty() {
+        let mut ring = Watermark { text: " ".into(), border_width: 0.02, padding: 0.06, ..base() };
+        ring.text = "I".into();
+        let px = cover(&ring);
+        let (x0, y0, x1, y1) = bounds(&px).expect("ring");
+        let (cx, cy) = ((x0 + x1) / 2, (y0 + y1) / 2);
+        assert!(px[y0 * 400 + cx] > 0.9, "the top edge of the border is solid");
+        let edge_gap = px[(y0 + 10) * 400 + x0 + 10];
+        assert_eq!(edge_gap, 0.0, "inside the ring, between border and text, nothing is drawn");
+        let boxed = Watermark { background_opacity: 1.0, ..ring };
+        let filled = cover(&boxed);
+        assert!(filled[(y0 + 10) * 400 + x0 + 10] > 0.9, "the box fills the padding");
+        assert!(cx < 400 && cy < 300);
+    }
+
+    #[test]
+    fn rounded_corners_leave_the_corner_pixel_empty() {
+        let square = Watermark { background_opacity: 1.0, padding: 0.04, ..base() };
+        let round = Watermark { radius: 0.03, ..square.clone() };
+        let (x0, y0, ..) = bounds(&cover(&square)).expect("box");
+        assert!(cover(&square)[(y0 + 1) * 400 + x0 + 1] > 0.9, "the square box is solid next to its corner");
+        assert!(cover(&round)[y0 * 400 + x0] < 0.05, "the rounded corner is cut away");
+        assert!(cover(&round)[(y0 + 1) * 400 + x0 + 1] < 0.5);
+    }
+
+    #[test]
+    fn frame_settings_are_clamped_and_never_panic() {
+        let wild = Watermark { border_width: 99.0, padding: 99.0, radius: 99.0, background_opacity: 9.0, ..base() };
+        let _ = cover(&wild);
+        let nan = Watermark { border_width: f32::NAN, padding: f32::INFINITY, ..base() };
+        let _ = cover(&nan);
+    }
+
+    #[test]
+    fn frame_keys_validate() {
+        let err = |v: serde_json::Value| ExportOptions::validate_watermark("export", &v).unwrap_err().to_string();
+        assert!(ExportOptions::validate_watermark("export", &serde_json::json!({"text": "x", "borderWidth": 0.01, "borderColor": [1, 2, 3], "padding": 0.02, "backgroundOpacity": 0.5, "backgroundColor": [0, 0, 0], "radius": 0.01})).is_ok());
+        assert!(err(serde_json::json!({"borderWidth": 0.5})).contains("borderWidth"));
+        assert!(err(serde_json::json!({"borderColor": [1, 2]})).contains("borderColor"));
     }
 }

@@ -506,6 +506,10 @@ impl OverlaySettings {
             w.rotation = 0;
         }
         w.image_width = f(w.image_width, 0.01, 1.0, d.image_width);
+        w.border_width = f(w.border_width, 0.0, 0.05, d.border_width);
+        w.padding = f(w.padding, 0.0, 0.1, d.padding);
+        w.radius = f(w.radius, 0.0, 0.05, d.radius);
+        w.background_opacity = f(w.background_opacity, 0.0, 1.0, d.background_opacity);
         cut(&mut w.text);
         w.target = None;
         self

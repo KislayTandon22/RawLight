@@ -1105,7 +1105,10 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
                         }
                         if !graphic {
                             toggle(ui, &mut wm.shadow, "Shadow");
+                            field(ui, "Colour", |ui| ui.color_edit_button_srgb(&mut wm.color));
                         }
+                        watermark_frame_controls(ui, wm);
+                        watermark_file_buttons(app, ui, wm);
                     }
                     if opts.watermark != wm_shown {
                         // the preview above was drawn with the old settings
@@ -2355,6 +2358,81 @@ fn export_size(ui: &mut egui::Ui, full: &mut bool, r: &mut lightcraft_engine::ex
         *ppi = p as u16;
     }
 }
+const WM_BORDER: ControlSpec = ControlSpec { decimals: 1, ..spec("export.watermarkBorder", "Border width (% of short edge)", 0.0, 5.0, 0.0, 0.1) };
+const WM_PADDING: ControlSpec = ControlSpec { decimals: 1, ..spec("export.watermarkPadding", "Padding (% of short edge)", 0.0, 10.0, 0.0, 0.1) };
+const WM_RADIUS: ControlSpec = ControlSpec { decimals: 1, ..spec("export.watermarkRadius", "Corner radius (% of short edge)", 0.0, 5.0, 0.0, 0.1) };
+const WM_BACKGROUND: ControlSpec = spec("export.watermarkBackground", "Background box (%)", 0.0, 100.0, 0.0, 1.0);
+
+/// A frame around the watermark and a box behind it: border width and colour, padding, corner
+/// radius, background colour and opacity.
+fn watermark_frame_controls(ui: &mut egui::Ui, wm: &mut lightcraft_engine::export::Watermark) {
+    let mut v = wm.border_width as f64 * 100.0;
+    if num(ui, &WM_BORDER, &mut v) {
+        wm.border_width = (v / 100.0) as f32;
+    }
+    if wm.border_width > 0.0 {
+        field(ui, "Border colour", |ui| ui.color_edit_button_srgb(&mut wm.border_color));
+    }
+    let mut v = wm.background_opacity as f64 * 100.0;
+    if num(ui, &WM_BACKGROUND, &mut v) {
+        wm.background_opacity = (v / 100.0) as f32;
+    }
+    if wm.background_opacity > 0.0 {
+        field(ui, "Background colour", |ui| ui.color_edit_button_srgb(&mut wm.background_color));
+    }
+    if wm.border_width > 0.0 || wm.background_opacity > 0.0 {
+        let mut v = wm.padding as f64 * 100.0;
+        if num(ui, &WM_PADDING, &mut v) {
+            wm.padding = (v / 100.0) as f32;
+        }
+        let mut v = wm.radius as f64 * 100.0;
+        if num(ui, &WM_RADIUS, &mut v) {
+            wm.radius = (v / 100.0) as f32;
+        }
+    }
+}
+
+/// Import and Export of a portable watermark file (settings and graphic in one `.json`).
+fn watermark_file_buttons(app: &mut LightcraftApp, ui: &mut egui::Ui, wm: &mut lightcraft_engine::export::Watermark) {
+    let ctx = ui.ctx().clone();
+    ui.horizontal(|ui| {
+        if app.services.save_watermark_file.is_some()
+            && crate::widgets::text_button(ui, "exportWmSave", crate::i18n::tr("Export watermark…"), false).clicked()
+        {
+            let file = "Watermark.json";
+            if let Some(path) = app.services.save_watermark_file.as_mut().and_then(|save| save(file)) {
+                let name = std::path::Path::new(&path).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                match lightcraft_engine::watermark_pack::export_json(wm, &name)
+                    .and_then(|json| std::fs::write(&path, json).map_err(|e| e.to_string()))
+                {
+                    Ok(()) => app.toast(&ctx, crate::i18n::tr_format!("Exported to {path}", path = path)),
+                    Err(e) => app.toast(&ctx, e),
+                }
+            }
+        }
+        if app.services.pick_watermark_file.is_some()
+            && crate::widgets::text_button(ui, "exportWmLoad", crate::i18n::tr("Import watermark…"), false).clicked()
+        {
+            let picked = app.services.pick_watermark_file.as_mut().map(|pick| pick()).unwrap_or_default();
+            if let Some(path) = picked.into_iter().next() {
+                let assets = lightcraft_engine::config::config_dir()
+                    .map(|d| d.join("watermarks"))
+                    .unwrap_or_else(|| std::env::temp_dir().join("lightcraft-watermarks"));
+                match std::fs::read_to_string(&path)
+                    .map_err(|e| e.to_string())
+                    .and_then(|json| lightcraft_engine::watermark_pack::import_json(&json, &assets))
+                {
+                    Ok((name, imported)) => {
+                        *wm = imported;
+                        app.toast(&ctx, crate::i18n::tr_format!("Imported {name}", name = name));
+                    }
+                    Err(e) => app.toast(&ctx, e),
+                }
+            }
+        }
+    });
+}
+
 /// All nine positions supported by both the text and graphic watermark renderer.
 /// Keep them in grid order so bottom-centre and edge-centre anchors are available in Export.
 const WM_POSITIONS: [(lightcraft_engine::export::Anchor, &str); 9] = {
