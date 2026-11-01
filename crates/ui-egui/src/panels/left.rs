@@ -26,7 +26,23 @@ const ROW_HEIGHT: f32 = 29.0;
 
 /// A row's height: a finger-sized one on the iPad.
 fn row_h(ctx: &egui::Context) -> f32 {
-    if crate::theme::touch_ui(ctx) { 44.0 } else { ROW_HEIGHT }
+    if crate::theme::touch_ui(ctx) {
+        44.0
+    } else if super::chrome_pro::on(ctx) {
+        super::chrome_pro::ROW_H
+    } else {
+        ROW_HEIGHT
+    }
+}
+
+/// A section header's height (the desktop Pro layout's is denser).
+fn section_header_h(ctx: &egui::Context) -> f32 {
+    if super::chrome_pro::on(ctx) { 26.0 } else { SECTION_HEADER }
+}
+
+/// The gap above a section.
+fn section_gap(ctx: &egui::Context) -> f32 {
+    if super::chrome_pro::on(ctx) { 6.0 } else { SECTION_GAP }
 }
 
 /// Temp-data key of the row (its widget id after `source:`, lower-case) the sidebar scrolls to
@@ -156,24 +172,36 @@ fn row_sensed(
     let visible_right: f32 = ui.data(|d| d.get_temp(egui::Id::unique("left-visible-right"))).unwrap_or(f32::MAX);
     let edge = r.right().min(visible_right);
     let inner = Rect::from_min_max(r.min + vec2(8.0, 0.0), pos2((r.right() - 8.0).min(edge - 8.0).max(r.left() + 8.0), r.bottom()));
+    let pro = super::chrome_pro::on(ui.ctx());
     if selected {
-        ui.painter().rect_filled(inner, 4.0, t.canvas);
+        // desktop Pro: the accent wash instead of the canvas tone
+        ui.painter().rect_filled(inner, if pro { 5.0 } else { 4.0 }, if pro { super::chrome_pro::accent_bg(&t) } else { t.canvas });
         register(ui, format!("highlight:{id}"), inner);
     } else if resp.hovered() {
         ui.painter().rect_filled(inner, 4.0, t.hover.gamma_multiply(0.6));
     }
+    let icon_px = if pro { 14.0 } else { 16.0 };
     paint(
         ui.painter(),
-        Rect::from_min_size(pos2(r.left() + 18.0 + indent, r.center().y - 8.0), vec2(16.0, 16.0)),
+        Rect::from_min_size(pos2(r.left() + if pro { 16.0 } else { 18.0 } + indent, r.center().y - icon_px / 2.0), vec2(icon_px, icon_px)),
         icon,
         if selected { t.text } else { t.icon },
     );
-    let font = t.font(13.5);
+    let font = t.font(if pro { 12.0 } else { 13.5 });
     let color = if selected { t.text } else { t.text_label };
     // a count of nothing is there, but fainter: the rows that hold photos stand out
-    let count_color = |n: usize| if n == 0 { t.text_dim.gamma_multiply(0.55) } else { t.text_dim };
-    let count_galley = count.filter(|_| app.ui.show_counts).map(|n| ui.painter().layout_no_wrap(n.to_string(), t.font(12.5), count_color(n)));
-    let label_left = r.left() + 42.0 + indent;
+    let count_color = |n: usize| {
+        if pro && selected {
+            super::chrome_pro::accent_text(&t)
+        } else if n == 0 {
+            t.text_dim.gamma_multiply(0.55)
+        } else {
+            t.text_dim
+        }
+    };
+    let count_font = t.font(if pro { 11.0 } else { 12.5 });
+    let count_galley = count.filter(|_| app.ui.show_counts).map(|n| ui.painter().layout_no_wrap(n.to_string(), count_font, count_color(n)));
+    let label_left = r.left() + if pro { 38.0 } else { 42.0 } + indent;
     let count_left = count_galley.as_ref().map_or(edge - 18.0, |g| edge - 18.0 - g.size().x);
     // a label's dot sits just before the count
     if let Some(c) = mark {
@@ -284,12 +312,12 @@ fn section(
     rows: usize,
     body: impl FnOnce(&mut LightcraftApp, &mut egui::Ui),
 ) -> PlacedSection {
-    ui.add_space(SECTION_GAP);
-    let (header, _) = ui.allocate_exact_size(vec2(ui.available_width(), SECTION_HEADER), Sense::hover());
+    ui.add_space(section_gap(ui.ctx()));
+    let (header, _) = ui.allocate_exact_size(vec2(ui.available_width(), section_header_h(ui.ctx())), Sense::hover());
     // a hairline in the gap above tells the sections apart
     let t = Tokens::get(ui.ctx());
     let edge = visible_right(ui).min(header.right());
-    let y = header.top() - SECTION_GAP / 2.0;
+    let y = header.top() - section_gap(ui.ctx()) / 2.0;
     ui.painter().hline(header.left() + 18.0..=(edge - 18.0).max(header.left() + 18.0), y, egui::Stroke::new(1.0, t.divider));
     let show = egui::Id::unique("left-show-section");
     if let Some((asked, frame)) = ui.data(|d| d.get_temp::<(SidebarSection, u64)>(show))
@@ -328,8 +356,8 @@ fn visible_right(ui: &egui::Ui) -> f32 {
 fn pinned_header(app: &mut LightcraftApp, ui: &mut egui::Ui, placed: &[PlacedSection], view_top: f32) {
     let pinned = placed.iter().find(|p| p.open && p.top < view_top && p.bottom > view_top);
     let rect = pinned.map(|p| {
-        let top = view_top.min(p.bottom - SECTION_HEADER);
-        Rect::from_x_y_ranges(ui.max_rect().x_range(), top..=top + SECTION_HEADER)
+        let top = view_top.min(p.bottom - section_header_h(ui.ctx()));
+        Rect::from_x_y_ranges(ui.max_rect().x_range(), top..=top + section_header_h(ui.ctx()))
     });
     // rows ask where it is (next frame: they are laid out before it)
     ui.data_mut(|d| d.insert_temp(egui::Id::unique("left-pinned-rect"), rect));
@@ -414,8 +442,8 @@ fn section_drag(app: &mut LightcraftApp, ui: &mut egui::Ui, placed: &[PlacedSect
     }
     // the line: in the gap above the section it would go before, or below the last one
     let y = match before {
-        Some(b) => placed.iter().find(|p| p.section == b).map(|p| p.top - SECTION_GAP / 2.0),
-        None => placed.last().map(|p| p.bottom + SECTION_GAP / 2.0),
+        Some(b) => placed.iter().find(|p| p.section == b).map(|p| p.top - section_gap(ui.ctx()) / 2.0),
+        None => placed.last().map(|p| p.bottom + section_gap(ui.ctx()) / 2.0),
     };
     if let Some(y) = y {
         let t = Tokens::get(ui.ctx());
@@ -485,7 +513,12 @@ fn section_header(app: &mut LightcraftApp, ui: &mut egui::Ui, section: SidebarSe
     register(ui, format!("{widget}Chevron:{id}"), Rect::from_center_size(c, vec2(16.0, 16.0)));
     let col = if hovered { t.text } else { t.text_dim };
     paint(ui.painter(), Rect::from_center_size(c, vec2(16.0, 16.0)), if open { Icon::ChevronDown } else { Icon::ChevronRight }, col);
-    ui.painter().text(pos2(r.left() + 18.0, r.center().y), Align2::LEFT_CENTER, title, t.semibold(13.5), t.text_label);
+    if super::chrome_pro::on(ui.ctx()) {
+        // desktop Pro: small upper-case title
+        ui.painter().text(pos2(r.left() + 20.0, r.center().y), Align2::LEFT_CENTER, title.to_uppercase(), t.semibold(10.5), t.text_dim);
+    } else {
+        ui.painter().text(pos2(r.left() + 18.0, r.center().y), Align2::LEFT_CENTER, title, t.semibold(13.5), t.text_label);
+    }
     let button = header_button(section);
     // (an album being dragged puts "Top Level" in the Albums header)
     let room = !(section == SidebarSection::Albums && app.ui.dragging_album.is_some());
@@ -657,15 +690,19 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     frame.show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
         // the title offers the sections' menu too: where hidden sections come back from
-        let (hr, title) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+        // (desktop Pro: no title row, the collection's name is in the toolbar)
+        let title_h = if super::chrome_pro::on(ui.ctx()) { 4.0 } else { 44.0 };
+        let (hr, title) = ui.allocate_exact_size(vec2(ui.available_width(), title_h), Sense::click());
         crate::widgets::announce(&title, crate::i18n::tr("My Photos"));
         register(ui, "sidebarTitle", hr);
         crate::widgets::context_menu(&title, |ui| sections_menu(app, ui, None));
         // the open library's name under the title, so nobody edits in the wrong one (issue #902)
         let library = crate::panels::settings::open_library_name(app);
         let title_y = if library.is_some() { hr.center().y - 7.0 } else { hr.center().y };
-        ui.painter().text(pos2(hr.left() + 18.0, title_y), Align2::LEFT_CENTER, crate::i18n::tr("My Photos"), t.semibold(15.0), t.text);
-        if let Some(name) = library {
+        if title_h > 8.0 {
+            ui.painter().text(pos2(hr.left() + 18.0, title_y), Align2::LEFT_CENTER, crate::i18n::tr("My Photos"), t.semibold(15.0), t.text);
+        }
+        if let Some(name) = library.filter(|_| title_h > 8.0) {
             ui.painter().with_clip_rect(hr.shrink2(vec2(18.0, 0.0))).text(
                 pos2(hr.left() + 18.0, hr.center().y + 10.0),
                 Align2::LEFT_CENTER,
@@ -778,7 +815,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             }
             ui.data_mut(|d| d.remove::<String>(egui::Id::unique(SCROLL_TO_ROW)));
             // room below the last section (a section dragged to the end is dropped here)
-            ui.add_space(SECTION_GAP * 2.0);
+            ui.add_space(section_gap(ui.ctx()) * 2.0);
             pinned_header(app, ui, &placed, view_top);
             section_drag(app, ui, &placed);
             // what the rows asked for becomes next frame's width

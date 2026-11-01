@@ -181,6 +181,8 @@ mod tests_preview_limit;
 #[cfg(test)]
 mod tests_print;
 #[cfg(test)]
+mod tests_pro_library;
+#[cfg(test)]
 mod tests_profile_menu;
 #[cfg(test)]
 mod tests_profiles_layout;

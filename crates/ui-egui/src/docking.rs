@@ -481,6 +481,12 @@ pub fn show(app: &mut crate::LightcraftApp, ui: &mut egui::Ui) {
         style.text = egui::Color32::TRANSPARENT;
         style.inactive_text = egui::Color32::TRANSPARENT;
     }
+    if crate::theme::desktop_pro(ui.ctx()) {
+        // desktop Pro: the panels carry their own headers, no tab strip above them
+        style.tab_height = 1.0;
+        style.text = egui::Color32::TRANSPARENT;
+        style.inactive_text = egui::Color32::TRANSPARENT;
+    }
     style.accent = t.accent;
     style.font = t.font(12.0);
     // Tool and preset panels publish hover previews before the photo consumes them.

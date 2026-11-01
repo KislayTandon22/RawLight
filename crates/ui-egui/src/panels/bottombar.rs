@@ -24,6 +24,10 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     if crate::theme::touch_ui(ui.ctx()) {
         return super::bottombar_touch::show(app, ui);
     }
+    // the desktop Pro layout's status bar in the grids (bottombar_pro.rs); other views keep this bar
+    if super::chrome_pro::on(ui.ctx()) && matches!(app.ui.view, ViewMode::PhotoGrid | ViewMode::SquareGrid) {
+        return super::bottombar_pro::show(app, ui);
+    }
     let t = Tokens::get(ui.ctx());
     egui::Panel::bottom("bottom_bar")
         .exact_size(t.bottom_bar_h)
@@ -272,7 +276,7 @@ fn click_zoom_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     }
 }
 
-fn sort_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
+pub(super) fn sort_menu(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     use lightcraft_catalog::GroupBy;
     use lightcraft_catalog::SortKey::*;
     let cur = app.session.sort;

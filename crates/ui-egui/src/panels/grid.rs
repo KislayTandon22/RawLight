@@ -286,6 +286,8 @@ pub fn rows_between(rows: &[GridRow], top: f32, bottom: f32) -> &[GridRow] {
 
 fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
+    // desktop Pro: square rounded tiles, the title lives in the toolbar (grid_pro.rs)
+    let pro = super::chrome_pro::on(ui.ctx());
     let (generation, ids) = app.session.visible_shared();
     // header: source title + count
     let sel_n = app.session.selection.ids.len();
@@ -298,7 +300,7 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             let local = app.caches.grid.local(&app.session.catalog, &ids, generation);
             folder_header(app, ui, &b, &ids, local, &cnt);
         }
-        None if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) && !crate::theme::phone(ui.ctx()) => {
+        None if (crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) && !crate::theme::phone(ui.ctx())) || pro => {
             // V4: the collection name lives in the top bar and the count in the bottom pill
         }
         None => {
@@ -351,7 +353,8 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         return;
     }
     let ppp = ui.ctx().pixels_per_point();
-    let square = app.ui.view == ViewMode::SquareGrid;
+    let cell_square = app.ui.view == ViewMode::SquareGrid;
+    let square = cell_square || pro;
     let target = app.ui.thumb_size;
     let avail_w = ui.available_width() - 8.0;
     let by = resolve_group(app.session.sort.group, target);
@@ -379,8 +382,16 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
             };
             let spans: Vec<(usize, usize)> = runs.iter().map(|r| (r.start, r.count)).collect();
             // iPad: the photos keep the same side margin as the headers and bars instead of touching the screen edge
-            let inset = if crate::theme::touch_ui(ui.ctx()) { TOUCH_GRID_INSET } else { 0.0 };
-            let mut l = layout(shapes, &spans, avail_w - 2.0 * inset, target, square);
+            let inset = if crate::theme::touch_ui(ui.ctx()) {
+                TOUCH_GRID_INSET
+            } else if pro {
+                super::grid_pro::INSET
+            } else {
+                0.0
+            };
+            let (gap, header_h) =
+                if pro { (super::chrome_pro::TILE_GAP, super::grid_pro::HEADER_H) } else { (if square { 1.0 } else { 6.0 }, HEADER_H) };
+            let mut l = layout_spaced(shapes, &spans, avail_w - 2.0 * inset, target, square, gap, header_h, pro);
             if inset > 0.0 {
                 l.cells.iter_mut().chain(l.headers.iter_mut()).for_each(|r| *r = r.translate(vec2(inset, 0.0)));
             }
@@ -415,6 +426,8 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         if let Some(r) = scroll_to {
             ui.scroll_to_rect(r.translate(origin.to_vec2()), None);
         }
+        // desktop Pro: dragging on empty space draws a marquee (the cells are above it)
+        let marquee = if pro { Some(super::grid_pro::marquee_begin(ui, area, viewport)) } else { None };
         // only the rows on screen and a screen above and below it (their thumbnails are prefetched)
         let prefetch = viewport.expand2(vec2(0.0, viewport.height()));
         for row in rows_between(&lay.rows, prefetch.top(), prefetch.bottom()) {
@@ -427,11 +440,14 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                 visible_ids.insert(id);
                 let r = rect.translate(origin.to_vec2());
                 let onscreen = rect.intersects(viewport);
-                cell(app, ui, id, r, square, onscreen, ppp);
+                cell(app, ui, id, r, cell_square, onscreen, ppp);
                 if let Some((sid, pos)) = stacks.get(&id) {
                     stack_badge(app, ui, id, *sid, *pos, r, square);
                 }
             }
+        }
+        if let Some(m) = marquee {
+            super::grid_pro::marquee_end(app, ui, m, &lay.cells, &ids, origin, viewport);
         }
         // date headers (top to bottom); the current group's header sticks to the top while its
         // photos scroll by
@@ -452,8 +468,9 @@ fn show_inner(app: &mut LightcraftApp, ui: &mut egui::Ui) {
         {
             // pushed up by the next header as it arrives
             let next_top = lay.headers.get(g + 1).map(|h| h.top()).unwrap_or(f32::INFINITY);
-            let y = viewport.top().min(next_top - HEADER_H);
-            let hr = Rect::from_min_size(pos2(0.0, y), vec2(area.width(), HEADER_H)).translate(origin.to_vec2());
+            let header_h = if pro { super::grid_pro::HEADER_H } else { HEADER_H };
+            let y = viewport.top().min(next_top - header_h);
+            let hr = Rect::from_min_size(pos2(0.0, y), vec2(area.width(), header_h)).translate(origin.to_vec2());
             group_header(app, ui, run, &ids, hr, true);
         }
     });
@@ -599,24 +616,38 @@ pub fn resolve_group(by: GroupBy, thumb_size: f32) -> GroupBy {
 /// below its header. Justified rows fill the width exactly except a group's last row, which keeps
 /// the target height.
 pub fn layout(aspects: &[f32], groups: &[(usize, usize)], avail_w: f32, target: f32, square: bool) -> GridLayout {
+    layout_spaced(aspects, groups, avail_w, target, square, if square { 1.0 } else { 6.0 }, HEADER_H, false)
+}
+
+/// [`layout`] with the gap between cells and the date header's height given (the Pro layout's).
+pub fn layout_spaced(
+    aspects: &[f32],
+    groups: &[(usize, usize)],
+    avail_w: f32,
+    target: f32,
+    square: bool,
+    gap: f32,
+    header_h: f32,
+    fixed: bool,
+) -> GridLayout {
     let n = aspects.len();
     let whole = [(0, n)];
     let (groups, headed) = if groups.is_empty() { (&whole[..], false) } else { (groups, true) };
-    let gap = if square { 1.0 } else { 6.0 };
     let mut out = GridLayout { cells: vec![Rect::NOTHING; n], headers: Vec::with_capacity(groups.len()), rows: Vec::new(), height: 0.0 };
     let mut y = 4.0f32;
     for &(start, count) in groups {
         let end = (start + count).min(n);
         if headed {
-            out.headers.push(Rect::from_min_size(pos2(0.0, y), vec2(avail_w + 8.0, HEADER_H)));
-            y += HEADER_H;
+            out.headers.push(Rect::from_min_size(pos2(0.0, y), vec2(avail_w + 8.0, header_h)));
+            y += header_h;
         }
         if start >= end {
             continue;
         }
         if square {
             let cols = ((avail_w + gap) / (target + gap)).floor().max(1.0);
-            let cw = (avail_w - gap * (cols - 1.0)) / cols;
+            // (`fixed`: tiles keep the size asked for and the rest of the row stays empty)
+            let cw = if fixed { target.min(avail_w.max(1.0)) } else { (avail_w - gap * (cols - 1.0)) / cols };
             for i in start..end {
                 let k = (i - start) as f32;
                 let (c, r) = (k % cols, (k / cols).floor());
@@ -678,10 +709,17 @@ fn group_header(app: &mut LightcraftApp, ui: &mut egui::Ui, run: &DateRun, ids: 
         p.rect_filled(r, 0.0, t.canvas);
         p.hline(r.x_range(), r.bottom(), Stroke::new(1.0, t.divider));
     }
-    let g = p.layout_no_wrap(crate::i18n::date_group_label(&run.key, false), t.semibold(15.0), if resp.hovered() { t.text } else { t.text_label });
+    let pro = super::chrome_pro::on(ui.ctx());
+    let g = p.layout_no_wrap(
+        crate::i18n::date_group_label(&run.key, false),
+        t.semibold(if pro { 13.0 } else { 15.0 }),
+        if resp.hovered() || pro { t.text } else { t.text_label },
+    );
     // iPad: the title lines up with the photos below it (a pinned header spans the whole width, the others start at the photos)
     let x = r.left()
-        + if !crate::theme::touch_ui(ui.ctx()) {
+        + if pro {
+            super::grid_pro::INSET + 4.0
+        } else if !crate::theme::touch_ui(ui.ctx()) {
             8.0
         } else if pinned {
             TOUCH_GRID_INSET
@@ -695,7 +733,7 @@ fn group_header(app: &mut LightcraftApp, ui: &mut egui::Ui, run: &DateRun, ids: 
         pos2(x + gw + 10.0, r.center().y),
         Align2::LEFT_CENTER,
         crate::i18n::tr_format!("· {n} photo{}", if n == 1 { "" } else { "s" }, n = n),
-        t.font(12.5),
+        t.font(if pro { 11.0 } else { 12.5 }),
         t.text_dim,
     );
     if resp.clicked() {
@@ -797,7 +835,14 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
     }
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &spoken));
     let active = state == lightcraft_engine::SelectionState::Active;
-    let round = if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) { 18.0 } else { 0.0 };
+    let pro = super::chrome_pro::on(ui.ctx());
+    let round = if pro {
+        super::chrome_pro::TILE_RADIUS
+    } else if crate::theme::touch_ui(ui.ctx()) && crate::glass::active(ui.ctx()) {
+        18.0
+    } else {
+        0.0
+    };
     let p = ui.painter();
     let img_rect = if square {
         let base = if selected { t.cell_selected } else { t.cell };
@@ -812,15 +857,21 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
     if let Some(tex) = app.renderer.thumb(id) {
         let [tw, th] = tex.size;
         // Preserve the decoded preview's ratio when it differs from the catalog dimensions.
-        let fit = super::detail::fit_texture_rect(img_rect, [tw, th]);
-        let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+        let (fit, uv) = if pro {
+            // Pro tiles are squares filled edge to edge (the middle of the photo)
+            (img_rect, super::grid_pro::cover_uv([tw, th], img_rect))
+        } else {
+            (super::detail::fit_texture_rect(img_rect, [tw, th]), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)))
+        };
         if round > 0.0 {
             // V4: rounded tiles; the photo is painted as a textured rounded rect
             p.add(egui::epaint::RectShape::filled(fit, round, Color32::WHITE).with_texture(tex.tex.id(), uv));
         } else {
             p.image(tex.tex.id(), fit, uv, Color32::WHITE);
         }
-        if active {
+        if pro {
+            // (the Pro selection ring is drawn with the overlays)
+        } else if active {
             p.rect_stroke(fit.expand(if square { 2.0 } else { 0.0 }), round, Stroke::new(2.0, Color32::WHITE), StrokeKind::Outside);
         } else if selected {
             p.rect_stroke(fit, round, Stroke::new(2.0, Color32::from_gray(170)), StrokeKind::Outside);
@@ -829,7 +880,9 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         let ph = img_rect.shrink(if square { 20.0 } else { 0.0 });
         p.rect_filled(ph, round, t.skeleton);
         // not drawn yet (or unreadable): the selection is still visible
-        if active {
+        if pro {
+            // (the Pro selection ring is drawn with the overlays)
+        } else if active {
             p.rect_stroke(ph, 0.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Outside);
         } else if selected {
             // a light theme's skeleton is itself mid-grey: the ring takes the dim text colour
@@ -875,12 +928,15 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         crate::state::GridBadges::Never => false,
     };
     let badge_bar = Rect::from_min_max(pos2(img_rect.left(), img_rect.bottom() - 24.0), img_rect.right_bottom());
-    if !square && photo.label.is_some() {
+    if !square && !pro && photo.label.is_some() {
         // Justified photos fill the whole cell, so the label shows as a translucent tinted footer
         // over the photo's bottom edge (opaque, it would hide 24 px of every labelled photo).
         p.rect_filled(badge_bar, 0.0, crate::theme::label_background(t.cell, photo.label, selected).gamma_multiply(0.7));
     }
-    if show_badges {
+    if pro {
+        super::grid_pro::tile_overlay(app, ui, id, &photo, img_rect, &resp, state);
+    }
+    if show_badges && !pro {
         let bar = badge_bar;
         if (resp.hovered() || selected) && (square || photo.label.is_none()) {
             p.rect_filled(bar, 0.0, Color32::from_black_alpha(120));
@@ -932,7 +988,7 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
             .on_hover_text(crate::i18n::tr_format!("Preview only — {}", crate::widgets::preview_only_explanation(why)));
     }
     if photo.flag == Flag::Reject {
-        p.rect_filled(img_rect, 0.0, Color32::from_black_alpha(110));
+        p.rect_filled(img_rect, round, Color32::from_black_alpha(110));
     }
     super::grid_touch::missing_badge(app, ui, p, &t, img_rect, &photo, id);
     super::grid_touch::select_circle(app, ui, p, &t, img_rect, id, selected);
@@ -949,7 +1005,9 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         }
         return;
     }
-    if resp.clicked() {
+    // Pro: the stars and flag shown on hover rate and flag the photo instead of selecting it
+    let quick = pro && resp.clicked() && super::grid_pro::quick_action(app, ui, &photo, img_rect);
+    if resp.clicked() && !quick {
         let m = ui.input(|i| i.modifiers);
         let mode = if m.shift {
             "range"
@@ -1236,6 +1294,14 @@ pub fn toggle_stack(app: &mut LightcraftApp, ctx: &egui::Context, id: PhotoId) {
 }
 
 pub fn context_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
+    if super::chrome_pro::on(ui.ctx()) {
+        return super::grid_pro::context_menu(app, ui, id);
+    }
+    classic_context_menu(app, ui, id);
+}
+
+/// The Classic right-click menu (also the Pro menu's "More" submenu).
+pub(super) fn classic_context_menu(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId) {
     if !app.session.selection.contains(id) {
         let _ = app.run("library.select", json!({"ids": [id.0]}));
     }

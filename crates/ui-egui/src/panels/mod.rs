@@ -2,8 +2,10 @@
 
 pub mod activity;
 pub mod bottombar;
+pub mod bottombar_pro;
 pub mod bottombar_touch;
 pub mod chips;
+pub mod chrome_pro;
 pub mod compare;
 pub mod crop_overlay;
 pub mod denoise;
@@ -18,6 +20,7 @@ pub mod faces;
 pub mod filterbar;
 pub mod grid;
 mod grid_bar_touch;
+pub mod grid_pro;
 mod grid_touch;
 pub mod histogram;
 pub mod keymap;
@@ -49,6 +52,7 @@ pub mod slide_titles;
 pub mod slideshow;
 pub mod strip;
 pub mod topbar;
+pub mod topbar_pro;
 pub mod topbar_touch;
 pub mod unnamed;
 
