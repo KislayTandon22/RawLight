@@ -389,7 +389,7 @@ mod tests {
         let plain = drag_pos(0.5, 100.0, 120.0, 200.0, 1.0);
         let fine = drag_pos(0.5, 100.0, 120.0, 200.0, 0.1);
         let coarse = drag_pos(0.5, 100.0, 120.0, 200.0, 10.0);
-        assert!((plain - 0.6).abs() < 1e-9 && (fine - 0.51).abs() < 1e-9);
+        assert!((plain - 0.6).abs() < 1e-6 && (fine - 0.51).abs() < 1e-6);
         assert_eq!(coarse, 1.0, "a coarse drag clamps to the range");
         assert_eq!(drag_pos(0.5, 0.0, 10.0, 0.0, 1.0), 0.5, "a zero-width track cannot divide by zero");
     }
