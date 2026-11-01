@@ -1138,6 +1138,17 @@ fn dup_counts(d: &ImportDialog) -> (usize, usize, usize) {
 
 /// The dialog body: options, then the candidate grid.
 pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
+    if crate::theme::desktop_pro(ui.ctx()) {
+        return crate::import_pro::body(app, ui, d);
+    }
+    header_and_grid(app, ui, d, None);
+    ui.add_space(4.0);
+    options(app, ui, d);
+}
+
+/// The counts line, the file-type toggles and the thumbnail grid. `grid_h`: the grid's height when
+/// the caller sets it (the Pro layout); else it takes what the window leaves after the options.
+pub(crate) fn header_and_grid(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog, grid_h: Option<f32>) {
     let t = Tokens::get(ui.ctx());
     let n = d.candidates.len();
     let (dups, in_source, trashed) = dup_counts(d);
@@ -1191,7 +1202,7 @@ pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
         let y = |key: &str| m.get_temp::<f32>(egui::Id::unique(key));
         y(CONTENT_BOTTOM).zip(y(GRID_BOTTOM)).map(|(content, grid)| content - grid)
     });
-    let mut grid_h = grid_height(ui.available_height(), below.unwrap_or(DEFAULT_BELOW_GRID), cell + 26.0);
+    let mut grid_h = grid_h.unwrap_or_else(|| grid_height(ui.available_height(), below.unwrap_or(DEFAULT_BELOW_GRID), cell + 26.0));
     if crate::theme::touch_ui(ui.ctx()) {
         // iPad: no more room than the rows need, and never more than a third of the screen: the options below stay in reach
         grid_h = grid_h.min(rows as f32 * (cell + 26.0)).min(ui.ctx().content_rect().height() * 0.34).max(cell + 26.0);
@@ -1212,8 +1223,12 @@ pub fn body(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
     if !ui.is_sizing_pass() {
         ui.ctx().data_mut(|m| m.insert_temp(egui::Id::unique(GRID_BOTTOM), grid.inner_rect.bottom()));
     }
-    ui.add_space(4.0);
-    // options
+}
+
+/// The options under (Classic) or beside (Pro) the grid: source, transfer, destination, rename,
+/// album, preset, metadata and keywords.
+pub(crate) fn options(app: &mut LightcraftApp, ui: &mut egui::Ui, d: &mut ImportDialog) {
+    let t = Tokens::get(ui.ctx());
     if !d.sources.is_empty() {
         field(ui, "Source", |ui| {
             // (whether each source is a folder is checked off the UI thread, once)

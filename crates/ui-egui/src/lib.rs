@@ -17,6 +17,7 @@ pub mod date_picker;
 pub mod dialogs_touch;
 pub mod docking;
 mod drop_overlay;
+pub mod export_pro;
 pub mod export_task;
 mod focus_scan;
 mod frame_rate;
@@ -26,6 +27,7 @@ pub mod headless;
 pub mod i18n;
 pub mod icons;
 pub mod import;
+pub mod import_pro;
 pub mod lightroom_destination;
 pub mod lightroom_import;
 pub mod links;
@@ -34,16 +36,19 @@ pub mod menubar;
 pub mod menus;
 pub mod merge;
 mod model_setup;
+pub mod palette;
 pub mod panels;
 pub mod pencil;
 pub mod pick;
 pub mod print_view;
+pub mod pro_ui;
 pub mod progress;
 pub mod rating;
 pub mod recheck;
 pub mod region;
 pub mod reload;
 pub mod render;
+pub mod settings_pro;
 pub mod shortcuts;
 pub mod sidebar;
 pub mod slideshow_export;
@@ -56,6 +61,7 @@ pub mod theme;
 pub mod touch;
 pub mod ui_kit_touch;
 pub mod updates_ui;
+pub mod watermark_store;
 pub mod widgets;
 pub mod window_place;
 
@@ -98,6 +104,8 @@ mod tests_dialog_fit;
 mod tests_dialog_primary;
 #[cfg(test)]
 mod tests_dialog_settings;
+#[cfg(test)]
+mod tests_pro_dialogs;
 #[cfg(test)]
 mod tests_dialog_tab;
 #[cfg(test)]
@@ -2155,6 +2163,7 @@ impl LightcraftApp {
         panels::library_problem::logic(self, ctx);
         if self.fonts_ready && !updates_ui::blocks_input(self) {
             shortcuts::handle(self, ctx);
+            palette::handle_keys(self, ctx);
         }
         // two- and three-finger taps are the iPad's undo / redo: a desktop touchscreen must not edit by accident
         let touch_events = ctx.input(|i| i.raw.events.clone());
@@ -2700,6 +2709,7 @@ impl LightcraftApp {
                 panels::notices::hide_background_pointer(&ctx);
             }
             panels::dialogs::show(self, &ctx, notice_blocks);
+            palette::show(self, &ctx);
             updates_ui::show(self, &ctx);
             panels::library_problem::show(self, &ctx, notice_blocks);
             panels::toast(self, &ctx);
@@ -2738,6 +2748,7 @@ impl LightcraftApp {
             panels::notices::hide_background_pointer(&ctx);
         }
         panels::dialogs::show(self, &ctx, notice_blocks);
+        palette::show(self, &ctx);
         updates_ui::show(self, &ctx);
         panels::library_problem::show(self, &ctx, notice_blocks);
         export_task::poll(self, &ctx);
