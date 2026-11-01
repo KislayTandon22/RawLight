@@ -105,7 +105,7 @@ fn tab_width(available: f32, tab_count: usize) -> f32 {
     if tab_count == 0 {
         return 0.0;
     }
-    ((available - 16.0).max(0.0) / tab_count as f32).clamp(44.0, 66.0)
+    ((available - 32.0).max(0.0) / tab_count as f32).clamp(44.0, 66.0)
 }
 
 fn capsule_width(tab_count: usize, item_width: f32) -> f32 {
@@ -144,16 +144,16 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
                         let t = Tokens::get(ui.ctx());
                         crate::icons::paint(
                             ui.painter(),
-                            egui::Rect::from_center_size(pos2(response.rect.center().x, response.rect.top() + 17.0), vec2(20.0, 20.0)),
+                            egui::Rect::from_center_size(pos2(response.rect.center().x, response.rect.center().y - 10.0), vec2(20.0, 20.0)),
                             Icon::More,
-                            t.text,
+                            t.text.gamma_multiply(0.62),
                         );
                         ui.painter().text(
-                            pos2(response.rect.center().x, response.rect.bottom() - 7.0),
+                            pos2(response.rect.center().x, response.rect.center().y + 14.5),
                             egui::Align2::CENTER_CENTER,
                             tab.label(),
                             t.font(12.0),
-                            t.text,
+                            t.text.gamma_multiply(0.62),
                         );
                         egui::Popup::menu(&response).show(|ui| {
                             crate::widgets::touch_menu_style(ui);
@@ -301,7 +301,8 @@ mod tests {
         assert_eq!(ipad, 66.0);
         assert_eq!(capsule_width(7, ipad), 478.0);
         let phone = tab_width(375.0, 6);
-        assert!((capsule_width(6, phone) - 375.0).abs() < f32::EPSILON);
+        // V4: the floating tab bar keeps 8pt from each screen edge
+        assert!((capsule_width(6, phone) - 359.0).abs() < f32::EPSILON);
         assert_eq!(tab_width(50.0, 6), 44.0);
         assert_eq!(tab_width(700.0, 7), 66.0);
     }

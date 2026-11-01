@@ -2,7 +2,7 @@
 //! badge and the circular selection ticks on a cell). `grid.rs` calls these; each returns at once
 //! unless `theme::touch_ui` is on, so desktop is untouched.
 
-use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
+use egui::{Color32, Rect, Sense, Stroke, pos2, vec2};
 use lightcraft_catalog::{Photo, PhotoId, Source};
 use serde_json::json;
 
@@ -26,24 +26,30 @@ pub(super) fn empty_library_in(app: &mut LightcraftApp, ui: &mut egui::Ui, r: eg
     }
     let t = Tokens::get(ui.ctx());
     let c = r.center();
-    let p = ui.painter();
-    p.text(c - vec2(0.0, 74.0), Align2::CENTER_CENTER, crate::i18n::tr("No photos yet"), t.semibold(22.0), t.text);
-    p.text(
-        c - vec2(0.0, 40.0),
-        Align2::CENTER_CENTER,
-        crate::i18n::tr("Bring in photos from Files or your Photos library to start editing."),
+    let side = 24.0;
+    let wrap = (r.width() - 2.0 * side).max(120.0);
+    // two square tiles side by side; they shrink with the panel so neither is clipped
+    let gap = 12.0;
+    let tile = 150.0f32.min((r.width() - gap - 2.0 * side) / 2.0).max(96.0);
+    let title = ui.painter().layout(crate::i18n::tr("No photos yet").to_string(), t.semibold(22.0), t.text, wrap);
+    let body = ui.painter().layout(
+        crate::i18n::tr("Bring in photos from Files or your Photos library to start editing.").to_string(),
         t.font(14.0),
         t.text_dim,
+        wrap,
     );
-    let gap = 12.0;
-    // two buttons side by side; narrower on a Split View / portrait panel so neither is clipped
-    let (w, h) = (210.0f32.min((r.width() - gap - 32.0) / 2.0).max(110.0), 46.0);
-    let y = c.y + 2.0;
-    let import_folder = Rect::from_min_size(pos2(c.x - w - gap / 2.0, y), vec2(w, h));
-    let import_photos = Rect::from_min_size(pos2(c.x + gap / 2.0, y), vec2(w, h));
-    for (rect, id, label, command, primary) in [
-        (import_folder, "emptyImportFolder", "Import from Folder", "file.addFolder", true),
-        (import_photos, "emptyImportPhotos", "Import Photos", "file.addPhotos", false),
+    let block_h = title.size().y + 10.0 + body.size().y + 22.0 + tile;
+    let top = c.y - block_h / 2.0;
+    let p = ui.painter();
+    p.galley(pos2(c.x - title.size().x / 2.0, top), title.clone(), t.text);
+    let body_y = top + title.size().y + 10.0;
+    p.galley(pos2(c.x - body.size().x / 2.0, body_y), body.clone(), t.text_dim);
+    let y = body_y + body.size().y + 22.0;
+    let import_folder = Rect::from_min_size(pos2(c.x - tile - gap / 2.0, y), vec2(tile, tile));
+    let import_photos = Rect::from_min_size(pos2(c.x + gap / 2.0, y), vec2(tile, tile));
+    for (rect, id, label, command, primary, icon) in [
+        (import_folder, "emptyImportFolder", "Import from Folder", "file.addFolder", true, Icon::Folder),
+        (import_photos, "emptyImportPhotos", "Import Photos", "file.addPhotos", false, Icon::Photos),
     ] {
         let resp = ui.interact(rect, egui::Id::unique(id), Sense::click());
         register(ui, format!("button:{id}"), rect);
@@ -55,8 +61,11 @@ pub(super) fn empty_library_in(app: &mut LightcraftApp, ui: &mut egui::Ui, r: eg
             (false, _, true) => Color32::from_white_alpha(34),
             _ => Color32::from_white_alpha(22),
         };
-        ui.painter().rect_filled(rect, h / 2.0, fill);
-        ui.painter().text(rect.center(), Align2::CENTER_CENTER, crate::i18n::tr(label), t.semibold(15.0), Color32::WHITE);
+        ui.painter().rect_filled(rect, 22.0, fill);
+        paint(ui.painter(), Rect::from_center_size(pos2(rect.center().x, rect.top() + tile * 0.36), vec2(34.0, 34.0)), icon, Color32::WHITE);
+        let text = ui.painter().layout(crate::i18n::tr(label).to_string(), t.semibold(15.0), Color32::WHITE, tile - 20.0);
+        let text_pos = pos2(rect.center().x - text.size().x / 2.0, rect.top() + tile * 0.62);
+        ui.painter().galley(text_pos, text, Color32::WHITE);
         if resp.clicked() {
             let _ = app.run(command, json!({}));
         }
