@@ -15,6 +15,8 @@ struct ExportSheet: View {
     @State private var watermarkOn = false
     @State private var watermark = Watermark()
     @State private var editingWatermark = false
+    @State private var savedWatermarks = WatermarkStore.shared
+    @State private var watermarkName: String?
 
     private let sizes: [(String, Int)] = [("1600", 1600), ("3000", 3000), ("Full", 0)]
 
@@ -42,6 +44,18 @@ struct ExportSheet: View {
             }
             HStack {
                 Toggle("Watermark", isOn: $watermarkOn).tint(Theme.accent)
+                Menu {
+                    if savedWatermarks.names.isEmpty {
+                        Text("No saved watermarks yet")
+                    } else {
+                        ForEach(savedWatermarks.names, id: \.self) { name in
+                            Button { Task { await useSaved(name) } } label: {
+                                if name == watermarkName { Label(name, systemImage: "checkmark") } else { Text(name) }
+                            }
+                        }
+                    }
+                } label: { Label(watermarkName ?? "Saved", systemImage: "tray.full") }
+                    .buttonStyle(.bordered).tint(Theme.accent)
                 if watermarkOn {
                     Button { editingWatermark = true } label: { Label(watermark.hasContent ? "Edit" : "Set up", systemImage: "slider.horizontal.3") }
                         .buttonStyle(.bordered).tint(Theme.accent)
@@ -66,6 +80,16 @@ struct ExportSheet: View {
         .sheet(isPresented: $editingWatermark) {
             WatermarkEditor(watermark: $watermark, photoID: ids.first, exportShortEdge: longEdge == 0 ? 0 : longEdge * 2 / 3)
         }
+    }
+
+    /// Apply a saved watermark and switch the watermark on.
+    private func useSaved(_ name: String) async {
+        do {
+            watermark = try await savedWatermarks.load(name, engine: model.engine)
+            watermarkName = name
+            watermarkOn = true
+            error = nil
+        } catch { self.error = error.localizedDescription }
     }
 
     private func footer(_ title: String, _ icon: String) -> some View {
