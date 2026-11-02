@@ -134,6 +134,38 @@ final class Engine: @unchecked Sendable {
         return result
     }
 
+    /// A preview of `id` with `watermark` (an `app.export` watermark object) drawn on it as an export whose short edge
+    /// is `exportShortEdge` pixels would have it. Nil when the watermark has nothing to draw or the photo can't render.
+    func renderWatermarked(_ id: UInt64, maxEdge: Int, watermark: [String: Any], exportShortEdge: Int) async -> UIImage? {
+        guard let data = try? JSONSerialization.data(withJSONObject: watermark) else { return nil }
+        let json = String(decoding: data, as: UTF8.self)
+        return await withCheckedContinuation { cont in
+            queue.async {
+                var w: UInt32 = 0, h: UInt32 = 0, len: UInt = 0
+                guard let p = rl_render_watermarked(self.session, id, UInt32(maxEdge), UInt32(maxEdge), json, UInt32(max(exportShortEdge, 0)), &w, &h, &len) else {
+                    return cont.resume(returning: nil)
+                }
+                let bytes = Data(bytes: p, count: Int(len))
+                rl_buffer_free(p, len)
+                cont.resume(returning: Self.image(rgba: bytes, width: Int(w), height: Int(h)))
+            }
+        }
+    }
+
+    /// The text of a portable watermark file: the settings and, for a graphic, the picture itself.
+    func watermarkFile(_ watermark: [String: Any], name: String) async throws -> String {
+        let r = try await execute("watermark.exportJson", ["watermark": watermark, "name": name]) as? [String: Any]
+        guard let json = r?["json"] as? String else { throw EngineError.message("bad reply") }
+        return json
+    }
+
+    /// The watermark in a portable file; a graphic is stored under `dir`.
+    func watermarkFromFile(_ json: String, dir: URL) async throws -> (name: String, watermark: [String: Any]) {
+        let r = try await execute("watermark.importJson", ["json": json, "dir": dir.path]) as? [String: Any]
+        guard let wm = r?["watermark"] as? [String: Any] else { throw EngineError.message("bad reply") }
+        return (r?["name"] as? String ?? "", wm)
+    }
+
     /// A preview of `id` as if the look `preset` were applied; the photo's edits are not touched.
     func renderPreset(_ id: UInt64, preset: String, amount: Int = 100, edge: Int = 240) async -> UIImage? {
         let job: OpaquePointer? = await withCheckedContinuation { cont in

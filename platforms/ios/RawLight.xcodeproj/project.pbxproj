@@ -13,12 +13,14 @@
 		1B9D62DBAB2A7F77BA3F1B5C /* CustomSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 920F6F245BCB82FDCCB54E3D /* CustomSegmenter.swift */; };
 		28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */; };
 		2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D206DF744DE049ABECA7CEDA /* LibraryView.swift */; };
+		2CE64B5C03DBCC13CDD2DF27 /* WatermarkEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB6A6B69F2D2CE6D8600DE7 /* WatermarkEditor.swift */; };
 		31706586C5570C3DD9D03174 /* RegionGrow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6819299CDC16F1CDE6499E5E /* RegionGrow.swift */; };
 		326FA768309B93DAE3053ECA /* CurveEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A475B1E68A117F49D9DE92CD /* CurveEditor.swift */; };
 		36664514EEF83F8D61D1B199 /* ColourPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BECC7399FD2375C6CDB41443 /* ColourPanel.swift */; };
 		3BB14D222F14AB07090A16BC /* MobileSAM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18421792E5E532A0A9F48969 /* MobileSAM.swift */; };
 		3CF358D6A978E2BA7AA5D496 /* HealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFD216B06873D6E60DE5790 /* HealView.swift */; };
 		3E4BA2F8EFFB2BCEED3CA64B /* HEICConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6DF24124F0C739F5ECBE4F /* HEICConverter.swift */; };
+		4893EC115052F77716F6E34B /* WatermarkModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1A4C0A68BF976DA4186857 /* WatermarkModel.swift */; };
 		58364B204B7E1675E9171D4E /* PeopleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7D902551F3651E28059614 /* PeopleView.swift */; };
 		6EAC3CE9DAD5F37575A428A5 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152DED07BD4B22C089F27083 /* AppModel.swift */; };
 		719E99E7BC32BEFA09BD09FA /* ColorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59AD332855C4111D6E843DC0 /* ColorSlider.swift */; };
@@ -65,6 +67,7 @@
 		1C6546856C997D6BFE63CC7F /* HistogramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistogramView.swift; sourceTree = "<group>"; };
 		1CFD216B06873D6E60DE5790 /* HealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealView.swift; sourceTree = "<group>"; };
 		277B51930533BFDC91FF340B /* SliderTouch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SliderTouch.swift; sourceTree = "<group>"; };
+		3E1A4C0A68BF976DA4186857 /* WatermarkModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkModel.swift; sourceTree = "<group>"; };
 		438329D6F328A0BBB5ED54BA /* mobile_sam_decoder.mlpackage */ = {isa = PBXFileReference; path = mobile_sam_decoder.mlpackage; sourceTree = "<group>"; };
 		48C0A5D018031985E8DCD890 /* CropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropView.swift; sourceTree = "<group>"; };
 		59AD332855C4111D6E843DC0 /* ColorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorSlider.swift; sourceTree = "<group>"; };
@@ -98,6 +101,7 @@
 		D934F9B15D5972DDA61E86D6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E01EA1FF9FF1F0A27F722E35 /* RawLightUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawLightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF4B46A240031B4D3BF5DBAB /* mobile_sam_prompt_encoder_weights.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = mobile_sam_prompt_encoder_weights.json; sourceTree = "<group>"; };
+		FEB6A6B69F2D2CE6D8600DE7 /* WatermarkEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -166,6 +170,8 @@
 				277B51930533BFDC91FF340B /* SliderTouch.swift */,
 				8560E8AC4BC45B87ADF19267 /* Theme.swift */,
 				D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */,
+				FEB6A6B69F2D2CE6D8600DE7 /* WatermarkEditor.swift */,
+				3E1A4C0A68BF976DA4186857 /* WatermarkModel.swift */,
 				A1D6E0AA7252760CFEC43212 /* Models */,
 			);
 			path = RawLight;
@@ -347,6 +353,8 @@
 				B8B505C9E283481733E40688 /* SliderTouch.swift in Sources */,
 				DA401EEC3416B0F48E6B4D0D /* Theme.swift in Sources */,
 				28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */,
+				2CE64B5C03DBCC13CDD2DF27 /* WatermarkEditor.swift in Sources */,
+				4893EC115052F77716F6E34B /* WatermarkModel.swift in Sources */,
 				EC5DCD41490301922E236920 /* mobile_sam_decoder.mlpackage in Sources */,
 				7BE7E3F1EFD2E55AE3C08AA9 /* mobile_sam_encoder.mlpackage in Sources */,
 			);

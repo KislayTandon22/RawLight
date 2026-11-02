@@ -17,6 +17,10 @@ char *rl_visible_ids(RlSession *session);
 /* RGBA8 sRGB, fitted in max_w x max_h; NULL on failure; free with rl_buffer_free(ptr, len). */
 unsigned char *rl_render(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h,
                          unsigned *out_w, unsigned *out_h, unsigned long *out_len);
+/* Like rl_render, with the watermark (app.export "watermark" JSON) drawn as an export whose short edge is export_short_edge px would have it. */
+unsigned char *rl_render_watermarked(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h,
+                                     const char *watermark_json, unsigned export_short_edge,
+                                     unsigned *out_w, unsigned *out_h, unsigned long *out_len);
 /* Like rl_render, plus hist[1024] = 256 bins each of red, green, blue, luma (hist may be NULL). */
 unsigned char *rl_render_hist(RlSession *session, unsigned long long id, unsigned max_w, unsigned max_h,
                               unsigned *out_w, unsigned *out_h, unsigned long *out_len, unsigned *hist);
