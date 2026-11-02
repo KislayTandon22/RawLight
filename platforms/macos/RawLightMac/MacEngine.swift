@@ -8,6 +8,7 @@ final class MacEngine: @unchecked Sendable {
         let q = OperationQueue(); q.maxConcurrentOperationCount = 4; q.qualityOfService = .utility; return q
     }()
     private var session: OpaquePointer?
+    private let thumbCache: NSCache<NSString, NSImage> = { let c = NSCache<NSString, NSImage>(); c.countLimit = 600; return c }()
 
     init(demo: Bool) {
         queue.sync { self.session = rl_session_new(demo ? 1 : 0) }
@@ -37,7 +38,15 @@ final class MacEngine: @unchecked Sendable {
         }
     }
 
-    func thumbnail(_ id: UInt64, edge: Int) async -> NSImage? {
+    func thumbnail(_ id: UInt64, edge: Int, version: Int = 0) async -> NSImage? {
+        let key = "\(id)-\(edge)-\(version)" as NSString
+        if let hit = thumbCache.object(forKey: key) { return hit }
+        let img = await renderThumbnail(id, edge: edge)
+        if let img { thumbCache.setObject(img, forKey: key) }
+        return img
+    }
+
+    private func renderThumbnail(_ id: UInt64, edge: Int) async -> NSImage? {
         let job: OpaquePointer? = await withCheckedContinuation { cont in
             queue.async { cont.resume(returning: rl_job_new(self.session, id, UInt32(edge), UInt32(edge), 1)) }
         }

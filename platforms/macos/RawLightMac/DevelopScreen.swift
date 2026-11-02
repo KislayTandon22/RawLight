@@ -6,6 +6,14 @@ import SwiftUI
     var histogram: [UInt32] = []
     var collapsed: Set<String> = []
     var hdrOn = false
+    var tool = "Edit"
+    var presets: [(id: String, name: String)] = []
+    var history: [String] = []
+    var historyCursor = 0
+    var message: String?
+    var lastPreset: String?
+    var healMode = "heal"
+    var healSize = 0.06
     private var pending: (() async -> Void)?
     private var busy = false
     var onCommit: ((UInt64) -> Void)?
@@ -18,12 +26,41 @@ import SwiftUI
 
     func open(_ id: UInt64, engine: MacEngine) async {
         _ = try? await engine.execute("library.select", ["ids": [id], "active": id])
-        controls = await engine.controls()
+        async let ctl = engine.controls()
+        await render(id, engine, draft: true)   // quick first picture
+        controls = await ctl
         await render(id, engine, draft: false)
+        await reloadLists(engine)
+    }
+
+    func reloadLists(_ engine: MacEngine) async {
+        if let arr = try? await engine.execute("presets.list") as? [[String: Any]] {
+            presets = arr.compactMap { d in (d["id"] as? String).flatMap { i in (d["name"] as? String).map { (i, $0) } } }
+        }
+        if let r = try? await engine.execute("history.list") as? [String: Any] {
+            history = (r["history"] as? [String]) ?? []
+            historyCursor = (r["cursor"] as? NSNumber)?.intValue ?? 0
+        }
+    }
+
+    func applyPreset(_ pid: String, amount: Int, id: UInt64, engine: MacEngine) async {
+        if lastPreset != nil { _ = try? await engine.execute("edit.undo") }
+        do { _ = try await engine.execute("preset.apply", ["id": pid, "amount": amount]); lastPreset = pid; message = nil } catch { message = error.localizedDescription }
+        controls = await engine.controls(); await render(id, engine, draft: false); await reloadLists(engine); onCommit?(id)
+    }
+
+    func addSpot(x: Double, y: Double, id: UInt64, engine: MacEngine) async {
+        do { _ = try await engine.execute("spot.add", ["mode": healMode, "points": [[x, y]], "size": healSize]); message = nil } catch { message = error.localizedDescription }
+        await render(id, engine, draft: false); await reloadLists(engine); onCommit?(id)
+    }
+
+    func run(_ command: String, _ params: [String: Any] = [:], id: UInt64, engine: MacEngine) async {
+        do { _ = try await engine.execute(command, params); message = nil } catch { message = error.localizedDescription }
+        controls = await engine.controls(); await render(id, engine, draft: false); await reloadLists(engine); onCommit?(id)
     }
 
     func render(_ id: UInt64, _ engine: MacEngine, draft: Bool) async {
-        if let r = await engine.render(id, maxEdge: 2200, kind: draft ? 2 : 0) { image = r.image; histogram = r.histogram }
+        if let r = await engine.render(id, maxEdge: draft ? 1100 : 2200, kind: draft ? 2 : 0) { image = r.image; histogram = r.histogram }
     }
 
     /// Latest value wins while a render is in flight.
@@ -78,7 +115,24 @@ struct DevelopScreen: View {
         }
         .background(MacTheme.bg)
         .environment(dev)
-        .onAppear { dev.onCommit = { lib.thumbVersion[$0, default: 0] += 1 } }
+        .onAppear {
+            dev.onCommit = { lib.thumbVersion[$0, default: 0] += 1 }
+            lib.devAction = { a in
+                guard let id = lib.activeID else { return }
+                let e = lib.engine
+                Task { @MainActor in
+                    switch a {
+                    case "auto": await dev.quick("develop.auto", id: id, engine: e)
+                    case "bw": await dev.quick("develop.treatment", id: id, engine: e)
+                    case "reset": await dev.resetAll(id: id, engine: e)
+                    case "undo", "redo": await dev.quick("edit.\(a)", id: id, engine: e)
+                    default: break
+                    }
+                }
+            }
+        }
+        .onDisappear { lib.devAction = nil }
+        .onChange(of: lib.toolRequest) { _, t in if let t { dev.tool = t; lib.toolRequest = nil } }
         .task(id: lib.activeID) {
             guard let id = lib.activeID else { return }
             await dev.open(id, engine: lib.engine)
@@ -144,6 +198,7 @@ private struct DevTopBar: View {
 
 private struct LeftDock: View {
     @Environment(LibraryModel.self) private var lib
+    @Environment(DevelopModel.self) private var dev
     var body: some View {
         ScrollView {
             VStack(spacing: 6) {
@@ -152,15 +207,17 @@ private struct LeftDock: View {
                 }
                 card("Presets") {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(["Vivid", "Soft Portrait", "Cinematic", "Black & White", "Faded Film"], id: \.self) { p in
-                            Text(p).font(.system(size: 12)).foregroundStyle(.white.opacity(0.85)).padding(.horizontal, 12).frame(height: 24)
+                        ForEach(dev.presets.prefix(8), id: \.id) { p in
+                            Button { if let id = lib.activeID { Task { await dev.applyPreset(p.id, amount: 100, id: id, engine: lib.engine) } } } label: {
+                                Text(p.name).font(.system(size: 12)).foregroundStyle(.white.opacity(0.85)).padding(.horizontal, 12).frame(maxWidth: .infinity, alignment: .leading).frame(height: 24).contentShape(Rectangle())
+                            }.buttonStyle(.plain)
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 4)
                 }
                 card("History") {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(["Import", "Exposure +0.40", "Contrast +12"], id: \.self) { p in
-                            HStack(spacing: 8) { Circle().fill(Color.white.opacity(0.25)).frame(width: 5, height: 5); Text(p).font(.system(size: 12)) }
+                        ForEach(Array(dev.history.suffix(8).enumerated()), id: \.offset) { _, p in
+                            HStack(spacing: 8) { Circle().fill(Color.white.opacity(0.25)).frame(width: 5, height: 5); Text(p).font(.system(size: 12)).lineLimit(1) }
                                 .padding(.horizontal, 12).frame(height: 24)
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 4)
@@ -178,11 +235,12 @@ private struct LeftDock: View {
 }
 
 private struct ToolBar: View {
-    @State private var sel = 0
-    private let names = ["Edit", "Crop", "Mask", "Heal", "Looks", "Picker"]
+    @Environment(DevelopModel.self) private var dev
+    private let names = ["Edit", "Crop", "Mask", "Heal", "Looks", "History", "Info"]
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(Array(["slider.horizontal.3", "crop", "circle.dashed", "bandage", "wand.and.stars", "eyedropper"].enumerated()), id: \.offset) { i, n in
+            ForEach(Array(["slider.horizontal.3", "crop", "circle.lefthalf.filled.inverse", "bandage", "sparkles", "clock.arrow.circlepath", "info.circle"].enumerated()), id: \.offset) { i, n in
+                let sel = names.firstIndex(of: dev.tool) ?? 0
                 HStack(spacing: 6) {
                     Image(systemName: n).font(.system(size: 13))
                     Text(names[i]).font(.system(size: 12, weight: .medium))
@@ -190,7 +248,7 @@ private struct ToolBar: View {
                 .padding(.horizontal, 12).frame(height: 30)
                 .background(sel == i ? MacTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 8))
                 .foregroundStyle(sel == i ? .white : MacTheme.dim)
-                .onTapGesture { sel = i }
+                .onTapGesture { dev.tool = names[i] }.help("\(names[i])  (\(["E","C","M","H","L","Y","I"][i]))")
             }
             Spacer()
         }.padding(.horizontal, 5).frame(maxWidth: .infinity).glass()
@@ -199,8 +257,22 @@ private struct ToolBar: View {
 
 private struct DevImage: View {
     @Environment(DevelopModel.self) private var dev
+    @Environment(LibraryModel.self) private var lib
     var body: some View {
-        if let img = dev.image { Image(nsImage: img).resizable().scaledToFit() } else { ProgressView().controlSize(.small) }
+        if let img = dev.image {
+            Image(nsImage: img).resizable().scaledToFit()
+                .overlay {
+                    if dev.tool == "Heal" {
+                        GeometryReader { g in
+                            Color.clear.contentShape(Rectangle())
+                                .onTapGesture { p in
+                                    guard let id = lib.activeID, g.size.width > 0, g.size.height > 0 else { return }
+                                    Task { await dev.addSpot(x: p.x / g.size.width, y: p.y / g.size.height, id: id, engine: lib.engine) }
+                                }
+                        }
+                    }
+                }
+        } else { ProgressView().controlSize(.small) }
     }
 }
 
@@ -226,7 +298,7 @@ private struct Filmstrip: View {
     @Environment(LibraryModel.self) private var lib
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) { ForEach(lib.ids, id: \.self) { FilmThumb(id: $0) } }.padding(.horizontal, 10)
+            LazyHStack(spacing: 6) { ForEach(lib.ids, id: \.self) { FilmThumb(id: $0) } }.padding(.horizontal, 10)
         }.frame(height: 84).glass()
     }
 }
@@ -241,7 +313,7 @@ private struct FilmThumb: View {
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(lib.activeID == id ? MacTheme.accent : .clear, lineWidth: 2))
             .onTapGesture { lib.activeID = id; lib.selection = [id] }
-            .task(id: lib.thumbVersion[id]) { image = await lib.engine.thumbnail(id, edge: 160) }
+            .task(id: lib.thumbVersion[id]) { image = await lib.engine.thumbnail(id, edge: 160, version: lib.thumbVersion[id] ?? 0) }
     }
 }
 
@@ -257,10 +329,14 @@ private struct RightDock: View {
                 quick("HDR", "sun.max") { await dev.quick("develop.hdr", ["enabled": !dev.hdrOn], id: $0, engine: lib.engine); dev.hdrOn.toggle() }
             }.padding(.horizontal, 10).padding(.bottom, 10)
             Divider().overlay(MacTheme.line)
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(dev.sections(), id: \.self) { s in Group_(section: s) }
+            if dev.tool == "Edit" {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(dev.sections(), id: \.self) { s in Group_(section: s) }
+                    }
                 }
+            } else {
+                ToolPanel()
             }
             Divider().overlay(MacTheme.line)
             HStack(spacing: 6) {

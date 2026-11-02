@@ -30,6 +30,15 @@ extension LibraryModel {
         _ = try? await engine.execute(cmd, ["ids": targetIDs])
         refreshThumbs()
     }
+    /// Move the active photo (Develop) or the single selection (Library) by `step`.
+    func step(_ step: Int) {
+        guard !ids.isEmpty else { return }
+        let cur = activeID ?? selection.first
+        let i = cur.flatMap { ids.firstIndex(of: $0) } ?? (step > 0 ? -1 : ids.count)
+        let n = min(max(i + step, 0), ids.count - 1)
+        selection = [ids[n]]
+        if module == "Develop" { activeID = ids[n] } else { activeID = ids[n] }
+    }
     func refreshThumbs() { for id in targetIDs { thumbVersion[id, default: 0] += 1 } }
     func go(_ module: String) {
         if module == "Develop", activeID == nil, let f = ids.first { openDevelop(f) } else { self.module = module }
@@ -100,15 +109,30 @@ struct RawLightCommands: Commands {
         }
         CommandMenu("Photo") {
             ForEach(1...5, id: \.self) { n in
-                Button("Rate \(n) Star\(n == 1 ? "" : "s")") { Task { await model.rate(n) } }.keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: [])
+                Button("Rate \(n) Star\(n == 1 ? "" : "s")  (\(n))") { Task { await model.rate(n) } }
             }
-            Button("Clear Rating") { Task { await model.rate(0) } }.keyboardShortcut("0", modifiers: [])
+            Button("Clear Rating  (0)") { Task { await model.rate(0) } }
             Divider()
-            Button("Pick") { Task { await model.flag("photo.pick") } }.keyboardShortcut("p", modifiers: [])
-            Button("Reject") { Task { await model.flag("photo.reject") } }.keyboardShortcut("x", modifiers: [])
-            Button("Remove Flag") { Task { await model.flag("photo.unflag") } }.keyboardShortcut("u", modifiers: [])
+            Button("Pick  (P)") { Task { await model.flag("photo.pick") } }
+            Button("Reject  (X)") { Task { await model.flag("photo.reject") } }
+            Button("Remove Flag  (U)") { Task { await model.flag("photo.unflag") } }
+        }
+        CommandMenu("Develop") {
+            Button("Auto Tone") { model.devAction?("auto") }.keyboardShortcut("u", modifiers: .command)
+            Button("Black & White  (V)") { model.devAction?("bw") }
+            Button("Reset All") { model.devAction?("reset") }.keyboardShortcut("r", modifiers: [.command, .shift])
+            Divider()
+            Button("Undo") { model.devAction?("undo") }.keyboardShortcut("z", modifiers: .command)
+            Button("Redo") { model.devAction?("redo") }.keyboardShortcut("z", modifiers: [.command, .shift])
+            Divider()
+            Button("Next Photo  (→)") { model.step(1) }
+            Button("Previous Photo  (←)") { model.step(-1) }
+            Button("Open in Develop  (Return)") { if let id = model.selection.first ?? model.activeID { model.openDevelop(id) } }
+            Button("Back to Library  (Esc)") { model.module = "Library" }
         }
         CommandMenu("Go") {
+            Button("Select All") { model.selection = Set(model.ids) }.keyboardShortcut("a", modifiers: .command)
+            Button("Select None") { model.selection = [] }.keyboardShortcut("d", modifiers: .command)
             Button("Library") { model.go("Library") }.keyboardShortcut("1", modifiers: .command)
             Button("Develop") { model.go("Develop") }.keyboardShortcut("2", modifiers: .command)
             Button("Export") { model.go("Export") }.keyboardShortcut("3", modifiers: .command)
@@ -166,7 +190,8 @@ struct CommandPalette: View {
 struct ShortcutsSheet: View {
     @Environment(\.dismiss) private var dismiss
     private let rows: [(String, [(String, String)])] = [
-        ("Navigate", [("Library", "⌘1"), ("Develop", "⌘2"), ("Export", "⌘3"), ("Command palette", "⇧⌘K")]),
+        ("Navigate", [("Library", "⌘1"), ("Develop", "⌘2"), ("Export", "⌘3"), ("Command palette", "⇧⌘K"), ("Next / previous photo", "→ / ←"), ("Open in Develop", "Return"), ("Back to Library", "Esc"), ("Select all / none", "⌘A / ⌘D")]),
+        ("Develop", [("Auto tone", "⌘U"), ("Black & white", "V"), ("Reset all", "⇧⌘R"), ("Undo / redo", "⌘Z / ⇧⌘Z")]),
         ("Library", [("Import photos", "⇧⌘I"), ("Open or new library", "⌘O"), ("Select several", "⌘ click"), ("Open in Develop", "double-click")]),
         ("Culling", [("Rate 1 to 5", "1 – 5"), ("Clear rating", "0"), ("Pick", "P"), ("Reject", "X"), ("Remove flag", "U")]),
         ("Export", [("Export…", "⇧⌘E"), ("Shortcuts", "⌘/")]),
@@ -215,5 +240,45 @@ struct SettingsView: View {
             }.padding(24).tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 480, height: 280)
+    }
+}
+
+// MARK: single-key shortcuts
+
+extension LibraryModel {
+    /// Plain-key shortcuts (rate, flag, tabs, arrows). A local monitor, so typing in the search or name fields is never taken.
+    func installKeys() {
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            guard let self, e.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return e }
+            if NSApp.keyWindow?.firstResponder is NSTextView { return e }   // typing in a field
+            guard NSApp.keyWindow?.attachedSheet == nil else { return e }
+            let handled: Bool = MainActor.assumeIsolated { self.handle(e) }
+            return handled ? nil : e
+        }
+    }
+
+    @MainActor private func handle(_ e: NSEvent) -> Bool {
+        guard module != "Welcome" else { return false }
+        switch e.keyCode {
+        case 123: step(-1); return true            // left
+        case 124: step(1); return true             // right
+        case 36, 76: if let id = selection.first ?? activeID, module == "Library" { openDevelop(id); return true } else { return false }
+        case 53: if module != "Library" { module = "Library"; return true } else { selection = []; return true }
+        default: break
+        }
+        guard let c = e.charactersIgnoringModifiers?.lowercased(), c.count == 1 else { return false }
+        if let n = Int(c), (0...5).contains(n) { Task { await rate(n) }; return true }
+        switch c {
+        case "p": Task { await flag("photo.pick") }
+        case "x": Task { await flag("photo.reject") }
+        case "u": Task { await flag("photo.unflag") }
+        case "v": devAction?("bw")
+        case "e", "c", "m", "h", "l", "y", "i":
+            guard module == "Develop" else { return false }
+            let names = ["e": "Edit", "c": "Crop", "m": "Mask", "h": "Heal", "l": "Looks", "y": "History", "i": "Info"]
+            toolRequest = names[c]
+        default: return false
+        }
+        return true
     }
 }

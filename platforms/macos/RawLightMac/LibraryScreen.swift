@@ -21,6 +21,10 @@ enum MacTheme {
     var activeID: UInt64?
     var libraryName = "Demo library"
     var libraryError: String?
+    /// Develop actions ("auto", "bw", "reset", "undo", "redo") set by the Develop screen for the menu bar.
+    var devAction: ((String) -> Void)?
+    /// Set by the key monitor; the Develop screen applies it to its tool tab.
+    var toolRequest: String?
     var showPalette = false
     var showShortcuts = false
     var importMessage: String?
@@ -214,7 +218,7 @@ private struct Tile: View {
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? MacTheme.accent : .clear, lineWidth: 2))
         .onTapGesture(count: 2) { model.openDevelop(id) }
         .onTapGesture { if NSEvent.modifierFlags.contains(.command) { if selected { model.selection.remove(id) } else { model.selection.insert(id) } } else { model.selection = [id] } }
-        .task(id: model.thumbVersion[id]) { image = await model.engine.thumbnail(id, edge: 360) }
+        .task(id: model.thumbVersion[id]) { image = await model.engine.thumbnail(id, edge: 360, version: model.thumbVersion[id] ?? 0) }
     }
 }
 
