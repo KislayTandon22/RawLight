@@ -14,6 +14,18 @@ final class MacEngine: @unchecked Sendable {
     }
     deinit { if let s = session { rl_session_free(s) } }
 
+    /// Opens (or creates) a persistent library folder; returns an error message, or nil on success.
+    func openLibrary(at dir: URL, seedDemo: Bool = false) async -> String? {
+        await withCheckedContinuation { cont in
+            queue.async {
+                guard let raw = rl_open_library(self.session, dir.path, seedDemo ? 1 : 0) else { return cont.resume(returning: "no reply") }
+                defer { rl_string_free(raw) }
+                let obj = try? JSONSerialization.jsonObject(with: Data(String(cString: raw).utf8)) as? [String: Any]
+                cont.resume(returning: obj?["error"] as? String)
+            }
+        }
+    }
+
     func visibleIDs() async -> [UInt64] {
         await withCheckedContinuation { cont in
             queue.async {

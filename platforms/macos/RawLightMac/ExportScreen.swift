@@ -12,7 +12,11 @@ private let anchors: [[String]] = [["topLeft", "top", "topRight"], ["left", "cen
     var anchor = "bottomRight"
     var size = 0.04
     var opacity = 0.8
-    var inset = 0.03
+    var insetX = 0.03
+    var insetY = 0.03
+    var graphic: URL?
+    var graphicWidth = 0.2
+    var graphicImage: NSImage?
     var white = true
     var shadow = true
     var folder: URL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!.appending(path: "RawLight Exports", directoryHint: .isDirectory)
@@ -21,8 +25,16 @@ private let anchors: [[String]] = [["topLeft", "top", "topRight"], ["left", "cen
     var preview: NSImage?
 
     func watermark() -> [String: Any] {
-        ["text": text, "anchor": anchor, "size": size, "opacity": opacity, "insetX": inset, "insetY": inset,
-         "color": white ? [255, 255, 255] : [0, 0, 0], "shadow": shadow]
+        var w: [String: Any] = ["text": text, "anchor": anchor, "size": size, "opacity": opacity, "insetX": insetX, "insetY": insetY,
+                                "color": white ? [255, 255, 255] : [0, 0, 0], "shadow": shadow]
+        if let g = graphic { w["image"] = g.path; w["imageWidth"] = graphicWidth }
+        return w
+    }
+
+    func chooseGraphic() {
+        let p = NSOpenPanel(); p.allowedContentTypes = [.png, .jpeg]; p.allowsMultipleSelection = false
+        p.message = "Choose a logo or signature (PNG with transparency works best)"
+        if p.runModal() == .OK, let u = p.url { graphic = u; graphicImage = NSImage(contentsOf: u) }
     }
 
     func run(ids: [UInt64], engine: MacEngine) async {
@@ -30,7 +42,7 @@ private let anchors: [[String]] = [["topLeft", "top", "topRight"], ["left", "cen
         defer { working = false }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var p: [String: Any] = ["ids": ids, "format": format, "quality": Int(quality), "longEdge": longEdge, "colorSpace": colorSpace]
-        if useWatermark, !text.isEmpty { p["watermark"] = watermark() }
+        if useWatermark, !text.isEmpty || graphic != nil { p["watermark"] = watermark() }
         let ext = ["jpeg": "jpg", "png": "png", "tiff": "tif", "webp": "webp"][format] ?? "jpg"
         if ids.count == 1 { p["path"] = folder.appending(path: "RawLight-\(ids[0]).\(ext)").path } else { p["dir"] = folder.path }
         do {
@@ -99,10 +111,16 @@ private struct WatermarkOverlay: View {
             let a = ex.anchor
             let h: HorizontalAlignment = a.hasSuffix("Left") || a == "left" ? .leading : a.hasSuffix("Right") || a == "right" ? .trailing : .center
             let v: VerticalAlignment = a.hasPrefix("top") ? .top : a.hasPrefix("bottom") ? .bottom : .center
-            Text(ex.text).font(.system(size: ex.size * short, weight: .semibold))
-                .foregroundStyle((ex.white ? Color.white : Color.black).opacity(ex.opacity))
+            Group {
+                if let img = ex.graphicImage {
+                    Image(nsImage: img).resizable().scaledToFit().frame(width: ex.graphicWidth * g.size.width).opacity(ex.opacity)
+                } else {
+                    Text(ex.text).font(.system(size: ex.size * short, weight: .semibold))
+                        .foregroundStyle((ex.white ? Color.white : Color.black).opacity(ex.opacity))
+                }
+            }
                 .shadow(color: .black.opacity(ex.shadow ? 0.6 : 0), radius: 3)
-                .padding(.horizontal, ex.inset * short).padding(.vertical, ex.inset * short)
+                .padding(.horizontal, ex.insetX * short).padding(.vertical, ex.insetY * short)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Alignment(horizontal: h, vertical: v))
         }
     }
@@ -142,7 +160,14 @@ private struct SettingsPane: View {
                         }
                         row("Size") { Slider(value: $e.size, in: 0.01...0.15).tint(MacTheme.accent); val(e.size) }
                         row("Opacity") { Slider(value: $e.opacity, in: 0.05...1).tint(MacTheme.accent); val(e.opacity) }
-                        row("Margin") { Slider(value: $e.inset, in: 0...0.15).tint(MacTheme.accent); val(e.inset) }
+                        row("Margin H") { Slider(value: $e.insetX, in: 0...0.15).tint(MacTheme.accent); val(e.insetX) }
+                        row("Margin V") { Slider(value: $e.insetY, in: 0...0.15).tint(MacTheme.accent); val(e.insetY) }
+                        row("Graphic") {
+                            Button(e.graphic?.lastPathComponent ?? "Choose logo…") { e.chooseGraphic() }.controlSize(.small)
+                            if e.graphic != nil { Button("Remove") { e.graphic = nil; e.graphicImage = nil }.controlSize(.small) }
+                            Spacer()
+                        }
+                        if e.graphic != nil { row("Logo size") { Slider(value: $e.graphicWidth, in: 0.05...0.6).tint(MacTheme.accent); val(e.graphicWidth) } }
                         row("Colour") { Picker("", selection: $e.white) { Text("White").tag(true); Text("Black").tag(false) }.labelsHidden().pickerStyle(.segmented) }
                         row("Shadow") { Toggle("", isOn: $e.shadow).labelsHidden().toggleStyle(.switch).tint(MacTheme.accent).controlSize(.small); Spacer() }
                     }

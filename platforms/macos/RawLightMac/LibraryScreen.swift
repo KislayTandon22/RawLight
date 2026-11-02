@@ -19,7 +19,22 @@ enum MacTheme {
     /// Bumped when a photo's edits change so its thumbnails are redrawn.
     var thumbVersion: [UInt64: Int] = [:]
     var activeID: UInt64?
+    var libraryName = "Demo library"
+    var libraryError: String?
+    var recents: [String] = UserDefaults.standard.stringArray(forKey: "recentLibraries") ?? []
     func load() async { ids = await engine.visibleIDs() }
+    func openLibrary(_ url: URL) async {
+        if let e = await engine.openLibrary(at: url) { libraryError = e; return }
+        libraryError = nil; libraryName = url.lastPathComponent; selection = []; activeID = nil
+        recents = ([url.path] + recents.filter { $0 != url.path }).prefix(6).map { $0 }
+        UserDefaults.standard.set(recents, forKey: "recentLibraries")
+        await load()
+    }
+    func chooseLibrary() {
+        let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
+        p.prompt = "Open Library"; p.message = "Choose a RawLight library folder, or make a new one"
+        if p.runModal() == .OK, let u = p.url { Task { await openLibrary(u) } }
+    }
     func openDevelop(_ id: UInt64) {
         activeID = id; selection = [id]; module = "Develop"
     }
@@ -96,6 +111,7 @@ private struct Sidebar: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
+                LibrarySwitcher()
                 header("Catalog")
                 row("photo.on.rectangle", "All Photographs", "\(model.ids.count)", selected: true)
                 row("square.stack", "Quick Collection", "0")
@@ -104,7 +120,7 @@ private struct Sidebar: View {
                 row("rectangle.stack", "Portfolio", "12")
                 row("rectangle.stack", "Travel", "48")
                 header("Folders")
-                row("folder", "Demo library", "\(model.ids.count)")
+                row("folder", model.libraryName, "\(model.ids.count)")
                 header("Flags")
                 row("flag", "Picked", "0")
                 row("xmark.circle", "Rejected", "0")
@@ -125,6 +141,37 @@ private struct Sidebar: View {
         }
         .padding(.horizontal, 8).frame(height: 26)
         .background(selected ? Color.white.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private struct LibrarySwitcher: View {
+    @Environment(LibraryModel.self) private var model
+    var body: some View {
+        Menu {
+            Section("Current") { Text(model.libraryName) }
+            if !model.recents.isEmpty {
+                Section("Recent libraries") {
+                    ForEach(model.recents, id: \.self) { path in
+                        Button(URL(fileURLWithPath: path).lastPathComponent) { Task { await model.openLibrary(URL(fileURLWithPath: path)) } }
+                    }
+                }
+            }
+            Divider()
+            Button("Open or New Library…") { model.chooseLibrary() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "externaldrive").foregroundStyle(MacTheme.accent)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("LIBRARY").font(.system(size: 9, weight: .semibold)).foregroundStyle(MacTheme.dim)
+                    Text(model.libraryName).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 10)).foregroundStyle(MacTheme.dim)
+            }
+            .padding(.horizontal, 10).frame(height: 42)
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain).menuIndicator(.hidden)
     }
 }
 

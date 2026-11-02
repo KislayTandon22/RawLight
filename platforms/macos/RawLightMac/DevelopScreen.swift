@@ -5,6 +5,7 @@ import SwiftUI
     var image: NSImage?
     var histogram: [UInt32] = []
     var collapsed: Set<String> = []
+    var hdrOn = false
     private var pending: (() async -> Void)?
     private var busy = false
     var onCommit: ((UInt64) -> Void)?
@@ -41,6 +42,14 @@ import SwiftUI
         }
     }
 
+    /// Runs a one-shot command (Auto, B&W, HDR), then reloads sliders and the render.
+    func quick(_ command: String, _ params: [String: Any] = [:], id: UInt64, engine: MacEngine) async {
+        _ = try? await engine.execute(command, params)
+        controls = await engine.controls()
+        await render(id, engine, draft: false)
+        onCommit?(id)
+    }
+
     func resetAll(id: UInt64, engine: MacEngine) async {
         _ = try? await engine.execute("develop.reset")
         controls = await engine.controls()
@@ -56,8 +65,8 @@ struct DevelopScreen: View {
             DevTopBar()
             HStack(spacing: 6) {
                 LeftDock().frame(width: 262)
-                ToolStrip().frame(width: 38)
                 VStack(spacing: 6) {
+                    ToolBar().frame(height: 40)
                     Stage()
                     Filmstrip()
                 }
@@ -168,19 +177,23 @@ private struct LeftDock: View {
     }
 }
 
-private struct ToolStrip: View {
+private struct ToolBar: View {
     @State private var sel = 0
+    private let names = ["Edit", "Crop", "Mask", "Heal", "Looks", "Picker"]
     var body: some View {
-        VStack(spacing: 4) {
+        HStack(spacing: 4) {
             ForEach(Array(["slider.horizontal.3", "crop", "circle.dashed", "bandage", "wand.and.stars", "eyedropper"].enumerated()), id: \.offset) { i, n in
-                Image(systemName: n).font(.system(size: 14))
-                    .frame(width: 30, height: 30)
-                    .background(sel == i ? MacTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 8))
-                    .foregroundStyle(sel == i ? .white : MacTheme.dim)
-                    .onTapGesture { sel = i }
+                HStack(spacing: 6) {
+                    Image(systemName: n).font(.system(size: 13))
+                    Text(names[i]).font(.system(size: 12, weight: .medium))
+                }
+                .padding(.horizontal, 12).frame(height: 30)
+                .background(sel == i ? MacTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 8))
+                .foregroundStyle(sel == i ? .white : MacTheme.dim)
+                .onTapGesture { sel = i }
             }
             Spacer()
-        }.padding(.vertical, 4).frame(maxHeight: .infinity).glass()
+        }.padding(.horizontal, 5).frame(maxWidth: .infinity).glass()
     }
 }
 
@@ -192,8 +205,19 @@ private struct DevImage: View {
 }
 
 private struct Stage: View {
+    @State private var scale = 0.0
     var body: some View {
         DevImage().padding(10).frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .bottomLeading) {
+                HStack(spacing: 8) {
+                    Image(systemName: "minus.magnifyingglass").font(.system(size: 11))
+                    Slider(value: $scale).frame(width: 120).tint(MacTheme.accent).controlSize(.small)
+                    Image(systemName: "plus.magnifyingglass").font(.system(size: 11))
+                    Text(scale < 0.01 ? "Fit" : "\(Int(100 + scale * 300))%").font(.system(size: 11).monospacedDigit()).frame(width: 36, alignment: .leading)
+                }
+                .foregroundStyle(MacTheme.dim).padding(.horizontal, 12).frame(height: 28)
+                .background(Color.black.opacity(0.45), in: Capsule()).padding(12)
+            }
             .background(LinearGradient(colors: [Color(red: 0.09, green: 0.09, blue: 0.11), Color(red: 0.043, green: 0.043, blue: 0.055)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -227,6 +251,11 @@ private struct RightDock: View {
     var body: some View {
         VStack(spacing: 0) {
             Histogram().frame(height: 96).padding(10)
+            HStack(spacing: 6) {
+                quick("Auto", "wand.and.stars") { await dev.quick("develop.auto", id: $0, engine: lib.engine) }
+                quick("B&W", "circle.lefthalf.filled") { await dev.quick("develop.treatment", id: $0, engine: lib.engine) }
+                quick("HDR", "sun.max") { await dev.quick("develop.hdr", ["enabled": !dev.hdrOn], id: $0, engine: lib.engine); dev.hdrOn.toggle() }
+            }.padding(.horizontal, 10).padding(.bottom, 10)
             Divider().overlay(MacTheme.line)
             ScrollView {
                 VStack(spacing: 0) {
@@ -242,6 +271,12 @@ private struct RightDock: View {
                 }.buttonStyle(.plain)
             }.padding(10)
         }.glass()
+    }
+    private func quick(_ t: String, _ icon: String, _ run: @escaping (UInt64) async -> Void) -> some View {
+        Button { if let id = lib.activeID { Task { await run(id) } } } label: {
+            Label(t, systemImage: icon).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).frame(height: 26)
+                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        }.buttonStyle(.plain)
     }
     private func bar(_ t: String) -> some View {
         Text(t).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).frame(height: 24)
