@@ -15,7 +15,7 @@ enum MacTheme {
     var selection: Set<UInt64> = []
     var thumbSize: Double = 170
     var query = ""
-    var module = "Library"
+    var module = ProcessInfo.processInfo.environment["RAWLIGHT_MODULE"] == nil && ProcessInfo.processInfo.environment["RAWLIGHT_SKIP_WELCOME"] == nil ? "Welcome" : "Library"
     /// Bumped when a photo's edits change so its thumbnails are redrawn.
     var thumbVersion: [UInt64: Int] = [:]
     var activeID: UInt64?
@@ -44,6 +44,7 @@ struct LibraryScreen: View {
     @Environment(LibraryModel.self) private var model
     var body: some View {
         switch model.module {
+        case "Welcome": WelcomeScreen()
         case "Develop": DevelopScreen()
         case "Export": ExportScreen()
         default: library
