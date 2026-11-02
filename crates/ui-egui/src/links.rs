@@ -9,17 +9,17 @@ pub const WEBSITE: &str = "https://getartcraft.com";
 /// This app's page on the ArtCraft website.
 pub const APP_PAGE: &str = "https://getartcraft.com/apps/lightcraft";
 /// This app's source repository.
-pub const GITHUB: &str = "https://github.com/storytold/lightcraft";
+pub const GITHUB: &str = "https://github.com/KislayTandon22/RawLight";
 
 /// (UI command id, menu label, URL) for each link, in Help-menu order.
 /// The user documentation (docs/ in the repository).
 pub const HELP: &str = "https://github.com/storytold/lightcraft/tree/main/docs";
 
 pub const LINKS: &[(&str, &str, &str)] = &[
-    ("app.help", "LightCraft Help", HELP),
+    ("app.help", "RawLight Help", HELP),
     ("app.discord", "Join the ArtCraft Discord…", DISCORD),
-    ("app.website", "LightCraft Website", APP_PAGE),
-    ("app.github", "LightCraft on GitHub", GITHUB),
+    ("app.website", "Original LightCraft Website", APP_PAGE),
+    ("app.github", "RawLight on GitHub", GITHUB),
     ("app.artcraft", "ArtCraft Website", WEBSITE),
     ("app.feedback", "Send Feedback…", FEEDBACK),
 ];
@@ -51,6 +51,6 @@ mod tests {
             assert_eq!(url_of(id), Some(*url));
         }
         assert!(APP_PAGE.ends_with(&format!("/apps/{APP}")));
-        assert!(GITHUB.ends_with(&format!("/storytold/{APP}")));
+        assert!(GITHUB.ends_with("/KislayTandon22/RawLight"));
     }
 }

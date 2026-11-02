@@ -689,7 +689,7 @@ pub fn manage_body(
 }
 
 /// The toast after an import (`preset.import` / `mask.importEffects` result): how many effects,
-/// in how many groups, and the settings they carry that LightCraft can't apply.
+/// in how many groups, and the settings they carry that RawLight can't apply.
 pub fn import_toast(v: &Value) -> String {
     let rows: Vec<&Value> = v["effects"].as_array().or_else(|| v["imported"].as_array()).into_iter().flatten().collect();
     let n = rows.len();

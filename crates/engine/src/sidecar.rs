@@ -7,7 +7,7 @@
 //! A sidecar is written only beside an original that is an existing file at an absolute path;
 //! otherwise the save fails.
 //!
-//! An existing sidecar is never replaced wholesale (issue #92): LightCraft's properties
+//! An existing sidecar is never replaced wholesale (issue #92): RawLight's properties
 //! ([`OWNED`], [`OWNED_IF_STATED`]) are merged into it ([`lightcraft_meta::merge_xmp`]) and
 //! everything else — another editor's `crs:` develop settings, `xmpMM` history, unknown
 //! namespaces — is kept byte for byte. A sidecar that can't be read as XMP is first copied to
@@ -180,7 +180,7 @@ pub fn parse_sidecar(xmp: &str, target: crate::crs::Target) -> std::result::Resu
             .then(|| lightcraft_catalog::keywords::from_file(&m.keywords, &m.hierarchical_keywords)),
         // A sidecar that has `mwg-rs:Regions` at all (even an empty list) was written by an app that
         // knows about regions, so it's authoritative: its list, empty or not, replaces the catalog's.
-        // One without it (most writers, LightCraft's own included, which keeps another app's
+        // One without it (most writers, RawLight's own included, which keeps another app's
         // `mwg-rs:Regions` byte for byte but never writes one) says nothing about regions, and the
         // photo's are kept.
         regions: d.values.contains_key("mwg-rs:Regions").then(|| m.regions.clone()),
@@ -393,8 +393,8 @@ pub fn sidecar_packet_with(p: &Photo, cat: &lightcraft_catalog::Catalog, remove_
     lightcraft_meta::write_xmp_lc(&meta, &lc)
 }
 
-/// The properties LightCraft writes and owns in a sidecar: replaced on every save (removed when
-/// LightCraft has no value, so clearing a field clears it in the file too). All of them are read
+/// The properties RawLight writes and owns in a sidecar: replaced on every save (removed when
+/// RawLight has no value, so clearing a field clears it in the file too). All of them are read
 /// back on import and by Read Metadata from File.
 pub const OWNED: &[&str] = &[
     "xmp:Rating",
@@ -416,8 +416,8 @@ pub const OWNED: &[&str] = &[
     "lc:*",
 ];
 
-/// Properties replaced only when LightCraft has a value (capture time; GPS, which LightCraft
-/// doesn't read from sidecars): otherwise the sidecar's own value stays. Anything else LightCraft
+/// Properties replaced only when RawLight has a value (capture time; GPS, which RawLight
+/// doesn't read from sidecars): otherwise the sidecar's own value stays. Anything else RawLight
 /// writes (`xmp:CreatorTool`) goes only into new sidecars.
 pub const OWNED_IF_STATED: &[&str] = &["exif:DateTimeOriginal", "photoshop:DateCreated", "exif:GPSLatitude", "exif:GPSLongitude"];
 

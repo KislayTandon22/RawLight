@@ -10,7 +10,7 @@ use crate::pro_ui;
 use crate::theme::Tokens;
 
 /// (tab id, label) of the pages, in navigation order. The first five are the design's; the rest
-/// are pages LightCraft has that the design doesn't show.
+/// are pages RawLight has that the design doesn't show.
 pub const PAGES: &[(&str, &str)] = &[
     ("general", "General"),
     ("interface", "Appearance"),

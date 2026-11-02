@@ -1448,7 +1448,7 @@ const OTHER_APP_SIDECAR: &str = r#"<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTc
 </x:xmpmeta>
 <?xpacket end="w"?>"#;
 
-/// A foreign namespace may use a familiar prefix without becoming LightCraft-owned metadata.
+/// A foreign namespace may use a familiar prefix without becoming RawLight-owned metadata.
 #[test]
 fn saving_preserves_foreign_namespace_prefix_collisions() {
     let src = temp_dir("namespace-src");
@@ -1516,7 +1516,7 @@ fn saving_merges_into_another_apps_sidecar() {
     s.execute("develop.set", &json!({"control": "effects.clarity", "value": 0})).unwrap();
     s.execute("photo.readMetadataFromFile", &json!({})).unwrap();
     assert_eq!(s.catalog.photo(id).unwrap().develop, saved);
-    // saving again keeps one LightCraft description and the other app's data
+    // saving again keeps one RawLight description and the other app's data
     s.execute("photo.rate", &json!({"rating": 3})).unwrap();
     s.execute("photo.saveMetadataToFile", &json!({})).unwrap();
     let again = std::fs::read_to_string(src.join("shot.xmp")).unwrap();

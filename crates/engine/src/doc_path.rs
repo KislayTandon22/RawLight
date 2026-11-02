@@ -1,4 +1,4 @@
-//! Paths stored in a file LightCraft reads but the user did not choose path by path, such as the
+//! Paths stored in a file RawLight reads but the user did not choose path by path, such as the
 //! originals a Lightroom catalog lists.
 //!
 //! Such a path reaches the file system only through [`resolve`]: a relative path is taken from the

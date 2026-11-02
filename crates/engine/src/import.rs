@@ -224,7 +224,7 @@ pub enum ImportWarningCode {
     CameraProfile,
     /// Lightroom geometry data was found but its saved transform is not retained.
     UprightGeometry,
-    /// One or more other XMP develop fields have no LightCraft mapping.
+    /// One or more other XMP develop fields have no RawLight mapping.
     UnmappedXmp,
 }
 
@@ -290,7 +290,7 @@ pub fn has_import_look(p: &Photo) -> bool {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ImportDefaults {
-    /// Preset applied to raw files (`None` = the LightCraft default).
+    /// Preset applied to raw files (`None` = the RawLight default).
     pub raw_preset: Option<String>,
     /// Use a camera's own default (below) when the photo's camera has one.
     pub per_camera: bool,
@@ -320,7 +320,7 @@ pub struct ImportDefaults {
 pub struct CameraDefault {
     /// Make + model (`Meta::camera`).
     pub camera: String,
-    /// Preset id; `None` = the LightCraft default for this camera.
+    /// Preset id; `None` = the RawLight default for this camera.
     pub preset: Option<String>,
 }
 

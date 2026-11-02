@@ -1613,7 +1613,7 @@ fn expand_stops_at_the_walk_limits() {
     let _ = std::fs::remove_dir_all(&d);
 }
 
-/// Raw containers LightCraft cannot decode but shows by their embedded JPEG are picked up from a folder
+/// Raw containers RawLight cannot decode but shows by their embedded JPEG are picked up from a folder
 /// (the extensions are in `import::EXTENSIONS`; the files differ so none is a duplicate) and import as preview only.
 #[test]
 fn folder_import_picks_up_undecodable_raw_containers_as_preview_only() {
@@ -2035,7 +2035,7 @@ fn upper_and_mixed_case_extensions_are_found_by_import_browse_and_sidecar_lookup
     std::fs::write(src.join("b.Jpg"), jpeg(2)).unwrap();
     std::fs::write(src.join("c.JPEG"), jpeg(3)).unwrap();
     write_png(&src.join("d.PNG"), 4);
-    // a raw container LightCraft shows by its embedded JPEG (a TIFF whose IFD0 points at one)
+    // a raw container RawLight shows by its embedded JPEG (a TIFF whose IFD0 points at one)
     let nef = {
         let j = jpeg(5);
         let off = 8 + 2 + 24 + 4;
@@ -2206,7 +2206,7 @@ fn presets_apply_the_imported_profile_they_name() {
     let _ = std::fs::remove_dir_all(&src);
 }
 
-/// A raw container LightCraft shows by its embedded JPEG: a TIFF whose IFD0 points at one.
+/// A raw container RawLight shows by its embedded JPEG: a TIFF whose IFD0 points at one.
 fn write_raw(path: &Path) {
     use lightcraft_codecs::{ChromaSubsampling, EncodeImage, EncodeMeta, Samples, encode_jpeg};
     let px: Vec<u8> = (0..48 * 32).flat_map(|i| [(i % 251) as u8, 91, 201]).collect();
@@ -2224,7 +2224,7 @@ fn write_raw(path: &Path) {
     std::fs::write(path, f).unwrap();
 }
 
-/// An edited TIFF of a raw: the same name, a TIFF (not a raw) to LightCraft.
+/// An edited TIFF of a raw: the same name, a TIFF (not a raw) to RawLight.
 fn write_tiff(path: &Path, seed: u8) {
     use lightcraft_codecs::{EncodeImage, EncodeMeta, Samples, TiffCompression, encode_tiff};
     let (w, h) = (48usize, 32usize);

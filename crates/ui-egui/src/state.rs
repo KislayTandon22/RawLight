@@ -375,7 +375,7 @@ pub const RECENT_LIBRARIES: usize = 8;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DesktopLayout {
-    /// The layout LightCraft has always had.
+    /// The layout RawLight has always had.
     #[default]
     Classic,
     /// RawLight's dense keyboard-and-pointer layout, in the iPad app's look.
@@ -388,7 +388,7 @@ pub enum DesktopLayout {
 pub enum AppearanceMode {
     /// Follow the operating system's dark/light setting (dark when it gives no answer).
     Auto,
-    /// The dark theme, whatever the system says (the default: LightCraft's look so far).
+    /// The dark theme, whatever the system says (the default: RawLight's look so far).
     #[default]
     Dark,
     Light,

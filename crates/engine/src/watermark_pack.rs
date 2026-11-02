@@ -53,7 +53,7 @@ pub fn export_json(wm: &Watermark, name: &str) -> Result<String, String> {
 pub fn import_json(json: &str, assets_dir: &Path) -> Result<(String, Watermark), String> {
     let pack: Pack = serde_json::from_str(json).map_err(|e| format!("not a watermark file: {e}"))?;
     if pack.kind != KIND {
-        return Err("not a LightCraft watermark file".into());
+        return Err("not a RawLight watermark file".into());
     }
     if pack.version > VERSION {
         return Err("this watermark file was made by a newer version".into());

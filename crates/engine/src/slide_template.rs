@@ -190,7 +190,7 @@ pub struct Parsed {
 }
 
 /// Read a template document. Refused: more than [`MAX_FILE`] bytes, not JSON, another format, a
-/// version from a newer LightCraft, a bad name, unknown keys and any setting its section's
+/// version from a newer RawLight, a bad name, unknown keys and any setting its section's
 /// validation refuses.
 pub fn parse(bytes: &[u8]) -> Result<Parsed, String> {
     if bytes.len() as u64 > MAX_FILE {
@@ -208,9 +208,7 @@ pub fn parse(bytes: &[u8]) -> Result<Parsed, String> {
     match o.get("version") {
         Some(v) => match v.as_u64() {
             Some(n) if n > VERSION => {
-                return Err(format!(
-                    "made by a newer LightCraft (template version {n}; this one reads version {VERSION}): update LightCraft to use it"
-                ));
+                return Err(format!("made by a newer RawLight (template version {n}; this one reads version {VERSION}): update RawLight to use it"));
             }
             Some(n) if n >= 1 => {}
             _ => return Err(format!("`version` must be a whole number from 1, not {v}")),
@@ -380,7 +378,7 @@ fn read_dir(dir: &Path, out: &mut Listing) {
 fn read_user(file: &str, path: &Path) -> Result<Template, String> {
     let stem = file.get(..file.len().saturating_sub(5)).unwrap_or_default();
     if file_stem(stem).as_deref() != Some(stem) {
-        return Err("the file name isn't one LightCraft makes (letters, digits, spaces, - _ ( ) only); rename the file".into());
+        return Err("the file name isn't one RawLight makes (letters, digits, spaces, - _ ( ) only); rename the file".into());
     }
     let meta = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     if !meta.file_type().is_file() {
@@ -472,7 +470,7 @@ impl Session {
             }));
         }
         if id.starts_with(USER) && user_stem(id).is_none() {
-            return Err(format!("`{id}` isn't a template id (user templates are `user:` and a file name LightCraft made)"));
+            return Err(format!("`{id}` isn't a template id (user templates are `user:` and a file name RawLight made)"));
         }
         self.slide_templates().get(id).cloned().ok_or_else(|| format!("no slideshow template `{id}`"))
     }
@@ -513,7 +511,7 @@ impl Session {
 
     fn templates_dir(&self) -> Result<PathBuf, String> {
         self.slide_templates_dir.clone().ok_or_else(|| {
-            "user templates need a settings folder, and this LightCraft has none (the web build, or LIGHTCRAFT_CONFIG_DIR is set empty)".into()
+            "user templates need a settings folder, and this RawLight has none (the web build, or LIGHTCRAFT_CONFIG_DIR is set empty)".into()
         })
     }
 

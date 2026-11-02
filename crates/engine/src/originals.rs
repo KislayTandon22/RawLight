@@ -1,4 +1,4 @@
-//! Never write over an original: exports, renders and other files LightCraft writes for the user
+//! Never write over an original: exports, renders and other files RawLight writes for the user
 //! must not land on a catalogued photo's own file (or its XMP sidecar), whatever the conflict
 //! setting or exact path asked for. [`OriginalGuard`] is a snapshot of the library's originals
 //! that answers "would writing here replace one?" by file identity (the same file under another
@@ -151,7 +151,7 @@ impl OriginalGuard {
             for (p, what) in self.by_name.get(n).into_iter().flatten() {
                 if same_file(p, target) {
                     return Err(format!(
-                        "{} is {what} in the library: LightCraft never writes over an original (choose another folder or file name)",
+                        "{} is {what} in the library: RawLight never writes over an original (choose another folder or file name)",
                         target.display()
                     ));
                 }
@@ -168,7 +168,7 @@ impl OriginalGuard {
             }
             if same_file(p, target) {
                 return Err(format!(
-                    "{} is {what} in the library: LightCraft never writes over an original (choose another folder or file name)",
+                    "{} is {what} in the library: RawLight never writes over an original (choose another folder or file name)",
                     target.display()
                 ));
             }

@@ -353,7 +353,7 @@ impl LibraryProblem {
     }
 
     /// The window listing the recent libraries, each checked now without writing anything
-    /// ([`unavailable`]): one that is gone, isn't a LightCraft library any more or can't be read
+    /// ([`unavailable`]): one that is gone, isn't a RawLight library any more or can't be read
     /// is greyed out with the reason. The last library opened is selected, or else the first one
     /// that can be opened.
     #[cfg(test)]
@@ -429,7 +429,7 @@ pub enum Unavailable {
     NotAFolder,
     /// The folder can't be listed (the system's reason).
     Unreadable(String),
-    /// The folder holds no LightCraft library any more.
+    /// The folder holds no RawLight library any more.
     NoLibrary,
     /// The library's catalog file can't be opened (the system's reason).
     CatalogUnreadable(String),
@@ -456,7 +456,7 @@ impl Unavailable {
             Unavailable::NotFound => crate::i18n::tr("Not found: moved, renamed or on a disconnected drive").to_string(),
             Unavailable::NotAFolder => crate::i18n::tr("This is a file, not a library folder").to_string(),
             Unavailable::Unreadable(e) => format!("{} {e}", crate::i18n::tr("This folder can't be read:")),
-            Unavailable::NoLibrary => crate::i18n::tr("There is no LightCraft library in this folder any more").to_string(),
+            Unavailable::NoLibrary => crate::i18n::tr("There is no RawLight library in this folder any more").to_string(),
             Unavailable::CatalogUnreadable(e) => format!("{} {e}", crate::i18n::tr("The library's catalog can't be read:")),
             Unavailable::CheckFailed(e) => e.clone(),
             Unavailable::LookupFailed(e) => format!("{} {e}", crate::i18n::tr("This library couldn't be checked:")),
@@ -1005,9 +1005,9 @@ pub fn show(app: &mut LightcraftApp, ctx: &egui::Context, blocked: bool) {
             ui.set_width(440.0);
             ui.spacing_mut().item_spacing.y = 8.0;
             if problem.path.is_empty() {
-                ui.label(RichText::new(crate::i18n::tr("LightCraft couldn't find where to keep your library.")).color(t.text));
+                ui.label(RichText::new(crate::i18n::tr("RawLight couldn't find where to keep your library.")).color(t.text));
             } else {
-                ui.label(RichText::new(crate::i18n::tr("LightCraft couldn't open the library at")).color(t.text_label));
+                ui.label(RichText::new(crate::i18n::tr("RawLight couldn't open the library at")).color(t.text_label));
                 ui.label(RichText::new(&problem.path).font(t.semibold(12.5)).color(t.text));
             }
             ui.add(egui::Label::new(RichText::new(&problem.error).color(t.caution)).wrap());

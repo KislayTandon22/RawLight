@@ -9,7 +9,7 @@ use crate::Session;
 use crate::cmd::recheck;
 use crate::files::tests::cr3_with_preview;
 
-/// A version other than this build's: the flag was set by an older (or newer) LightCraft.
+/// A version other than this build's: the flag was set by an older (or newer) RawLight.
 const OTHER: &str = "0.5.0";
 
 struct Lib {

@@ -312,21 +312,21 @@ pub fn dropped_photos_unreadable(n: usize) -> String {
 /// (issue #260), in the UI language: the error and, when there is one, the log file to look in.
 pub fn startup_failed_message(error: &str, log_file: Option<&str>) -> (String, String) {
     let text = match log_file {
-        Some(path) => tr_format!("LightCraft could not open its window: {e}\n\nThe log file has the details: {path}", e = error, path = path),
-        None => tr_format!("LightCraft could not open its window: {e}", e = error),
+        Some(path) => tr_format!("RawLight could not open its window: {e}\n\nThe log file has the details: {path}", e = error, path = path),
+        None => tr_format!("RawLight could not open its window: {e}", e = error),
     };
-    (tr("LightCraft could not start").to_string(), text)
+    (tr("RawLight could not start").to_string(), text)
 }
 
-/// The title and text of the message box shown when LightCraft stopped while its window was up
+/// The title and text of the message box shown when RawLight stopped while its window was up
 /// (issue #1337: the window's renderer after the graphics driver reset the GPU), in the UI
 /// language: what happened and, when there is one, the log file to look in.
 pub fn stopped_message(error: &str, log_file: Option<&str>) -> (String, String) {
     let text = match log_file {
-        Some(path) => tr_format!("LightCraft stopped unexpectedly: {e}\n\nThe log file has the details: {path}", e = error, path = path),
-        None => tr_format!("LightCraft stopped unexpectedly: {e}", e = error),
+        Some(path) => tr_format!("RawLight stopped unexpectedly: {e}\n\nThe log file has the details: {path}", e = error, path = path),
+        None => tr_format!("RawLight stopped unexpectedly: {e}", e = error),
     };
-    (tr("LightCraft stopped").to_string(), text)
+    (tr("RawLight stopped").to_string(), text)
 }
 
 /// Whether sentence case may upper-case `c`. Georgian has no case: upper-casing Mkhedruli would
@@ -712,7 +712,7 @@ mod tests {
     #[test]
     fn startup_failure_message_names_the_error_and_the_log() {
         let (title, text) = startup_failed_message("no adapter", Some("/home/a/.config/lightcraft/logs/lightcraft.log"));
-        assert_eq!(title, "LightCraft could not start");
+        assert_eq!(title, "RawLight could not start");
         assert!(text.contains("no adapter") && text.ends_with("lightcraft.log"), "{text}");
         assert!(!startup_failed_message("no adapter", None).1.contains("log file"));
     }
@@ -1020,7 +1020,7 @@ mod tests {
         app.ui.left_panel = true;
         let text = painted_text(&ctx, &mut app, Locale::Uk);
         assert!(text.contains(Locale::Uk.tr("My Photos")) && text.contains(Locale::Uk.tr("All Photos")), "{text}");
-        for (command, title) in [("app.about", "About LightCraft"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
+        for (command, title) in [("app.about", "About RawLight"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
             app.ui.dialog = None;
             app.run(command, serde_json::json!({})).unwrap();
             let text = painted_text(&ctx, &mut app, Locale::Uk);
@@ -1047,7 +1047,7 @@ mod tests {
         app.ui.left_panel = true;
         let text = painted_text(&ctx, &mut app, Locale::It);
         assert!(text.contains(Locale::It.tr("My Photos")) && text.contains(Locale::It.tr("All Photos")), "{text}");
-        for (command, title) in [("app.about", "About LightCraft"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
+        for (command, title) in [("app.about", "About RawLight"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
             app.ui.dialog = None;
             app.run(command, serde_json::json!({})).unwrap();
             let text = painted_text(&ctx, &mut app, Locale::It);
@@ -1074,7 +1074,7 @@ mod tests {
         app.ui.left_panel = true;
         let text = painted_text(&ctx, &mut app, Locale::Fi);
         assert!(text.contains(Locale::Fi.tr("My Photos")) && text.contains(Locale::Fi.tr("All Photos")), "{text}");
-        for (command, title) in [("app.about", "About LightCraft"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
+        for (command, title) in [("app.about", "About RawLight"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
             app.ui.dialog = None;
             app.run(command, serde_json::json!({})).unwrap();
             let text = painted_text(&ctx, &mut app, Locale::Fi);
@@ -1188,7 +1188,7 @@ mod tests {
         app.ui.view = crate::state::ViewMode::People;
         let text = painted_text(&ctx, &mut app, Locale::De);
         assert!(text.contains(Locale::De.tr("Named People")), "{text}");
-        for (command, title) in [("app.about", "About LightCraft"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
+        for (command, title) in [("app.about", "About RawLight"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
             app.ui.dialog = None;
             app.run(command, serde_json::json!({})).unwrap();
             let text = painted_text(&ctx, &mut app, Locale::De);
@@ -1366,7 +1366,7 @@ mod tests {
             // replacement-glyph face, which there is Hack, the face that draws Latin.)
             for family in [egui::FontFamily::Proportional, egui::FontFamily::Name(crate::theme::FONT_SEMIBOLD.into())] {
                 let font = egui::FontId::new(13.0, family);
-                assert!("LightCraft".chars().all(|ch| fonts.has_glyph(&font, ch)), "{font:?}");
+                assert!("RawLight".chars().all(|ch| fonts.has_glyph(&font, ch)), "{font:?}");
             }
         });
         let mut app = crate::LightcraftApp::new(lightcraft_engine::Session::with_demo(), Default::default());
@@ -1486,7 +1486,7 @@ mod tests {
         app.ui.left_panel = true;
         let text = painted_text(&ctx, &mut app, Locale::Vi);
         assert!(text.contains(Locale::Vi.tr("My Photos")) && text.contains(Locale::Vi.tr("All Photos")), "{text}");
-        for (command, title) in [("app.about", "About LightCraft"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
+        for (command, title) in [("app.about", "About RawLight"), ("app.shortcuts", "Keyboard Shortcuts"), ("app.settings", "Settings")] {
             app.ui.dialog = None;
             app.run(command, serde_json::json!({})).unwrap();
             let text = painted_text(&ctx, &mut app, Locale::Vi);

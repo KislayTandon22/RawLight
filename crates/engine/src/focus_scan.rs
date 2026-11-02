@@ -6,7 +6,7 @@
 //! kilobytes of each file that hold the focus data ([`lightcraft_meta::focus::read_header`]: about 32 KB of a 75 MB α1
 //! ARW), one file at a time on one worker thread.
 //!
-//! - **Commits** go in batches of [`COMMIT_EVERY`] photos (or every [`COMMIT_AFTER`]), as LightCraft's own bookkeeping
+//! - **Commits** go in batches of [`COMMIT_EVERY`] photos (or every [`COMMIT_AFTER`]), as RawLight's own bookkeeping
 //!   ([`Session::apply_system`]): no undo step, no sidecar write (the focus point is never written to XMP). Only
 //!   `meta.focus` changes, and only on a photo that still has none, still in the library at the same path.
 //! - **"Looked, found nothing"** (manual focus, a centre-only Multi report) is kept beside the library in

@@ -161,7 +161,7 @@ pub fn devices() -> Vec<Device> {
 }
 
 /// [`devices`], but `None` until the first scan lands. The import prompt uses it so a card that was
-/// already in when LightCraft started isn't taken for a new one.
+/// already in when RawLight started isn't taken for a new one.
 pub fn devices_scanned() -> Option<Vec<Device>> {
     global().get_scanned()
 }

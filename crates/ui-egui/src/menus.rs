@@ -247,7 +247,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("file.restoreLibrary", "Restore Library from Backup…", None, "File"),
     ("photo.locate", "Locate Missing File…", None, ""),
     ("dialog.saveMetadataPreset", "Save Metadata Preset…", None, ""),
-    ("app.quit", "Quit LightCraft", Some("Cmd+Q"), "File"),
+    ("app.quit", "Quit RawLight", Some("Cmd+Q"), "File"),
     ("file.importPresets", "Import Profiles & Presets…", None, "File"),
     ("file.exportPresets", "Export Presets…", None, "File"),
     // Masking panel ▸ Effect menu
@@ -266,7 +266,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("app.clearRecentLibraries", "Clear Recent Libraries", None, ""),
     // Settings ▸ Display
     ("app.displayProfile", "Display Profile", None, ""),
-    ("app.about", "About LightCraft", None, "Help"),
+    ("app.about", "About RawLight", None, "Help"),
     ("app.checkForUpdates", "Check for Updates…", None, "Help"),
     ("app.systemInfo", "System Info…", None, "Help"),
     ("app.openLogFolder", "Open Log Folder", None, "Help"),
@@ -274,11 +274,11 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     ("view.frameRate", "Frame Rate", None, "Help>Debug"),
     ("app.whatsNew", "What's New", None, "Help"),
     ("dialog.cull", "Assisted Culling…", None, "Photo"),
-    ("app.help", "LightCraft Help", Some("F1"), "Help"),
+    ("app.help", "RawLight Help", Some("F1"), "Help"),
     ("app.discord", "Join the ArtCraft Discord…", None, "Help"),
     ("app.feedback", "Send Feedback…", None, "Help"),
-    ("app.website", "LightCraft Website", None, "Help"),
-    ("app.github", "LightCraft on GitHub", None, "Help"),
+    ("app.website", "RawLight Website", None, "Help"),
+    ("app.github", "RawLight on GitHub", None, "Help"),
     ("app.artcraft", "ArtCraft Website", None, "Help"),
     ("app.shortcuts", "Keyboard Shortcuts", Some("Cmd+/"), "Help"),
     // Pro desktop layout only (the menu bar hides these in Classic, `menubar::PRO_ONLY`)
@@ -2189,7 +2189,7 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
                     let name = format!("{}.lceffect", p.get("group").and_then(Value::as_str).unwrap_or("Effect Presets"));
                     let req = PickRequest::save(
                         crate::i18n::tr("Export Effect Presets"),
-                        crate::i18n::tr("LightCraft Effect Presets"),
+                        crate::i18n::tr("RawLight Effect Presets"),
                         &["lceffect"],
                         name.clone(),
                     );
@@ -2219,8 +2219,8 @@ pub fn run_ui_command(app: &mut LightcraftApp, id: &str, p: &Value) -> Option<Re
             let path = match p.get("path").and_then(Value::as_str) {
                 Some(x) => Some(x.to_string()),
                 None => {
-                    let name = format!("{}.lcpreset", group.as_deref().unwrap_or("LightCraft Presets"));
-                    let req = PickRequest::save(crate::i18n::tr("Export Presets"), crate::i18n::tr("LightCraft Preset"), &["lcpreset"], name.clone());
+                    let name = format!("{}.lcpreset", group.as_deref().unwrap_or("RawLight Presets"));
+                    let req = PickRequest::save(crate::i18n::tr("Export Presets"), crate::i18n::tr("RawLight Preset"), &["lcpreset"], name.clone());
                     match crate::pick::ask(app, id, p, "path", req, |s| s.save_preset_file.as_mut().map(|f| f(&name).into_iter().collect())) {
                         Picked::Now(v) => v.into_iter().next(),
                         Picked::Later => return Some(Ok(Value::Null)),
@@ -2345,7 +2345,7 @@ pub fn ui_enabled(app: &LightcraftApp, id: &str) -> bool {
         "app.exportPrevious" => app.session.active().is_some() && app.session.last_export.is_some(),
         "dialog.pasteSettings" => app.session.active().is_some() && app.session.clipboard.is_some(),
         "photo.openOriginalInExternal" => {
-            // only a file type LightCraft reads can be handed over (#2135); the extension alone
+            // only a file type RawLight reads can be handed over (#2135); the extension alone
             // decides, so no disk or share is touched while a menu is drawn
             app.services.open_with.is_some()
                 && app.session.active().and_then(|id| app.session.catalog.photo(id)).is_some_and(|p| match &p.source {
@@ -2563,7 +2563,7 @@ fn edit_in_inner(app: &mut LightcraftApp, ctx: &egui::Context, p: &Value, photoc
         if let Some(id) = id {
             app.ui.external_edits.push(*id);
         }
-        // the copy is LightCraft's own render, but it goes through the same gate as any other
+        // the copy is RawLight's own render, but it goes through the same gate as any other
         // path handed to the system opener (#2135)
         match lightcraft_engine::open_path::openable(path, "") {
             Err(e) => failed = Some(e),
@@ -2632,7 +2632,7 @@ fn open_originals(app: &mut LightcraftApp, p: &Value) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut skipped = Vec::new();
     for id in ids {
-        // the path may come from an imported catalog: only a photo file LightCraft reads is
+        // the path may come from an imported catalog: only a photo file RawLight reads is
         // handed to the opener, never a program (#2135)
         match app.session.catalog.photo(id).map(|ph| (ph.file_name.clone(), ph.source.clone())) {
             Some((name, lightcraft_engine::catalog::Source::File { path })) => match lightcraft_engine::open_path::openable(&path, &name) {

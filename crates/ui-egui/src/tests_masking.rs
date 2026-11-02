@@ -1360,7 +1360,7 @@ fn open_original_in_external_editor_hands_over_the_raw_itself() {
 
 /// Issue #2135: a library record whose original is a program (an imported `.lrcat` names the
 /// paths) is never handed to the opener — the launcher is asked for nothing — and the user is
-/// told why. The path LightCraft does hand over is absolute, whatever the record's spelling.
+/// told why. The path RawLight does hand over is absolute, whatever the record's spelling.
 #[test]
 fn open_original_refuses_anything_that_is_not_a_photo_file() {
     use lightcraft_catalog::{Op, Photo, Source};
@@ -1403,7 +1403,7 @@ fn open_original_refuses_anything_that_is_not_a_photo_file() {
     for (id, name) in bad.iter().zip(programs) {
         let r = h.request("engine.execute", json!({"command": "photo.openOriginalInExternal", "params": {"ids": [id.0]}}), T);
         assert_eq!(r["ok"], false, "{name} was opened: {r}");
-        assert!(r.to_string().contains("file types LightCraft reads"), "{name}: {r}");
+        assert!(r.to_string().contains("file types RawLight reads"), "{name}: {r}");
         // the menu item is greyed out for such a record, so it is never offered either
         exec(&mut h, "library.select", json!({"ids": [id.0]}));
         assert!(!crate::menus::ui_enabled(&h.app, "photo.openOriginalInExternal"), "{name} is offered in the menu");

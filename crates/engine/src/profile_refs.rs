@@ -8,7 +8,7 @@
 //! profiles; its other built-in profiles can't be used here and the import says so.
 //!
 //! References are resolved again whenever profiles are imported or deleted, so a pack works in
-//! either order. Only the user's own files are read; no profile content ships with LightCraft.
+//! either order. Only the user's own files are read; no profile content ships with RawLight.
 
 use serde_json::{Value, json};
 

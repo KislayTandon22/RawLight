@@ -177,7 +177,7 @@ impl SaveTarget {
 
     pub fn description(self) -> &'static str {
         match self {
-            Self::Photos => "Saves to Photos in the album LightCraft Exports",
+            Self::Photos => "Saves to Photos in the album RawLight Exports",
             Self::Files => "Saves to Files in the destination folder",
             Self::Share => "Opens the system share sheet",
             Self::Copy => "Copies exported photo to the clipboard",

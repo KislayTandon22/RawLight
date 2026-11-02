@@ -48,7 +48,7 @@ fn meta_of(m: &lightcraft_meta::Metadata) -> (Meta, Option<String>) {
 
 /// Lens corrections embedded in a raw's `OpcodeList3` (`WarpRectilinear`, `WarpRectilinear2`, `FixVignetteRadial`: a DNG's own, or the
 /// raw reader's equivalent of the camera's correction, e.g. Panasonic / Leica RW2 distortion), re-expressed for the
-/// default-cropped, EXIF-oriented image. These are the only "profile" corrections LightCraft applies.
+/// default-cropped, EXIF-oriented image. These are the only "profile" corrections RawLight applies.
 pub fn embedded_lens(raw: &lightcraft_raw::RawInfo) -> Option<lightcraft_develop::EmbeddedLens> {
     use lightcraft_develop::{EmbeddedLens, EmbeddedVignette, EmbeddedWarp, EmbeddedWarpStage, WARP_STAGES};
     use lightcraft_geom::Point;
@@ -186,7 +186,7 @@ pub fn probe_bytes(name: &str, bytes: &[u8]) -> Result<ProbeInfo, String> {
     }
     let fmt = lightcraft_codecs::sniff(bytes).ok_or("unrecognized file format")?;
     if let Some(why) = fmt.not_decodable() {
-        // e.g. "Heif files can't be opened: HEIC/HEIF support isn't included in this build of LightCraft"
+        // e.g. "Heif files can't be opened: HEIC/HEIF support isn't included in this build of RawLight"
         return Err(format!("{fmt:?} files can't be opened: {why}"));
     }
     // headers only (issue #367: decoding the pixels was nearly all of an import's CPU time)
@@ -1151,7 +1151,7 @@ impl crate::Session {
 #[cfg(test)]
 pub(crate) mod tests {
     /// Keywords from a file keep their hierarchy: the paths of `lr:hierarchicalSubject`, not the
-    /// flat names of `dc:subject` that LightCraft's exports (and Lightroom Classic) write besides
+    /// flat names of `dc:subject` that RawLight's exports (and Lightroom Classic) write besides
     /// them; an exported `travel|Italy|Rome` comes back as itself.
     #[test]
     fn a_lens_without_a_name_is_shown_by_its_range() {

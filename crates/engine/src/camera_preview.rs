@@ -863,7 +863,7 @@ pub(crate) fn fit_profile(pairs: &[([f64; 3], [f64; 3])]) -> Option<(Mat3, Optio
 }
 
 /// A raw's lens-correction warp, as its camera applied it to the embedded JPEG: the first `WarpRectilinear` of
-/// `OpcodeList3` (its green plane; the in-file corrections LightCraft reads have no tangential terms). `None` without
+/// `OpcodeList3` (its green plane; the in-file corrections RawLight reads have no tangential terms). `None` without
 /// one, or for a DNG 1.6 `WarpRectilinear2` chain (phone DNGs, which carry colour matrices and are not fitted).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct LensGeometry {

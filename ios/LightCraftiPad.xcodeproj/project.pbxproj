@@ -199,7 +199,7 @@
 					UniformTypeIdentifiers,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
-				PRODUCT_NAME = "LightCraft iPad (fork)";
+				PRODUCT_NAME = "RawLight";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				TARGETED_DEVICE_FAMILY = 2;
@@ -308,7 +308,7 @@
 					UniformTypeIdentifiers,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kislay.lightcraftpad;
-				PRODUCT_NAME = "LightCraft iPad (fork)";
+				PRODUCT_NAME = "RawLight";
 				SDKROOT = iphoneos;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				TARGETED_DEVICE_FAMILY = 2;

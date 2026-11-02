@@ -203,7 +203,7 @@ fn file_names_are_sanitised_and_ids_never_leave_the_folder() {
     for name in ["", "   ", "...", "/", "a\nb", &"y".repeat(81)] {
         err(&mut s, "slideshow.templates.save", json!({"name": name}));
     }
-    // an id can't point outside the folder (or at a file LightCraft wouldn't name)
+    // an id can't point outside the folder (or at a file RawLight wouldn't name)
     std::fs::write(dir.join("victim.json"), b"{}").unwrap();
     for id in ["user:../victim", "user:..", "user:/etc/passwd", "user:a/b", "user:", "user:x.json"] {
         let e = err(&mut s, "slideshow.templates.delete", json!({"id": id}));
@@ -231,7 +231,7 @@ fn bad_files_are_reported_and_skipped() {
         ("binary.json", vec![0xff, 0xfe, 0x00, 0x01], "not UTF-8"),
         ("array.json", b"[1, 2]".to_vec(), "not a JSON object"),
         ("preset.json", br#"{"format": "lightcraft.preset", "version": 1}"#.to_vec(), "format `lightcraft.preset`"),
-        ("newer.json", doc(json!({"version": 2})), "newer LightCraft"),
+        ("newer.json", doc(json!({"version": 2})), "newer RawLight"),
         ("noversion.json", br#"{"format": "lightcraft.slideshowTemplate"}"#.to_vec(), "no `version`"),
         ("badversion.json", doc(json!({"version": -1})), "`version`"),
         ("unknown.json", doc(json!({"music": {}})), "unknown key `music`"),
@@ -248,7 +248,7 @@ fn bad_files_are_reported_and_skipped() {
     }
     std::fs::create_dir_all(folder.join("folder.json")).unwrap();
     std::fs::write(folder.join("notes.txt"), b"ignored").unwrap();
-    // written by hand, not through LightCraft: the folder's time may not have moved since the
+    // written by hand, not through RawLight: the folder's time may not have moved since the
     // save's listing (same clock tick), so the cached listing is dropped as a write would drop it
     s.slide_templates_cache = None;
     let r = run(&mut s, "slideshow.templates.list", json!({}));
@@ -268,7 +268,7 @@ fn bad_files_are_reported_and_skipped() {
     // out-of-range numbers in a hand-edited file are clamped, never applied as they are
     std::fs::write(folder.join("wild.json"), doc(json!({"layout": {"margins": 9, "shadowAngle": 1e300}, "playback": {"slideDuration": 1e9}})))
         .unwrap();
-    // written by hand, not through LightCraft: the folder's time may not have moved since the
+    // written by hand, not through RawLight: the folder's time may not have moved since the
     // listing above (same clock tick), so the cached listing is dropped as a write would drop it
     s.slide_templates_cache = None;
     let t = s.slide_template("user:wild").unwrap();

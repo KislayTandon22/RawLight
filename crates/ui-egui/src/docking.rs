@@ -204,7 +204,7 @@ fn error(error: DockError) -> String {
     error.to_string()
 }
 
-/// The shared checks plus LightCraft's own: saved settings cannot float, hide, share or
+/// The shared checks plus RawLight's own: saved settings cannot float, hide, share or
 /// collapse the photo view, nor send a hidden panel back onto it.
 pub fn validate(workspace: &Workspace) -> Result<(), String> {
     workspace.validate().map_err(error)?;
@@ -400,7 +400,7 @@ fn command_impl(app: &mut crate::LightcraftApp, reset: bool, params: &Value, ren
     let mut workspace = app.ui.docking.clone().unwrap_or_else(|| from_ui(app));
     if reset {
         workspace = default_workspace();
-        // The usual LightCraft starting workspace shows its current tool beside the photo.
+        // The usual RawLight starting workspace shows its current tool beside the photo.
         set_visible(&mut workspace, Panel::Library, false)?;
         set_visible(&mut workspace, Panel::Presets, false)?;
     } else {

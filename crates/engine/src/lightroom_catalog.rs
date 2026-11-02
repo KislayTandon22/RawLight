@@ -640,7 +640,7 @@ fn drop_copies_of(data: &mut CatalogImport, masters: &HashSet<i64>) {
     data.skipped.extend(skipped);
 }
 
-/// Drop the catalog's images whose original is not a file type LightCraft reads, saying so in the
+/// Drop the catalog's images whose original is not a file type RawLight reads, saying so in the
 /// import's warnings.
 ///
 /// The catalog decides these paths, and a record it leaves behind is one click from the system
@@ -677,7 +677,7 @@ pub(crate) fn refuse_non_media(data: &mut CatalogImport) {
         if !refused.contains(&p.source_id) {
             return true;
         }
-        warnings.push(format!("image {}: not imported; {} isn't one of the file types LightCraft reads", p.source_id, p.path));
+        warnings.push(format!("image {}: not imported; {} isn't one of the file types RawLight reads", p.source_id, p.path));
         false
     });
     data.warnings.extend(warnings);
@@ -734,10 +734,10 @@ fn lightroom_orientation(code: &str) -> Option<Orientation> {
     ALL.into_iter().find(|&o| code.chars().eq([corner(o, 0.0, 0.0), corner(o, 1.0, 0.0)]))
 }
 
-/// Lightroom's crop in LightCraft's frame. `crs` gives the crop's top-left (`CropLeft`, `CropTop`)
+/// Lightroom's crop in RawLight's frame. `crs` gives the crop's top-left (`CropLeft`, `CropTop`)
 /// and bottom-right (`CropRight`, `CropBottom`) corners on the stored image (before orientation and
 /// straightening), normalized to its size, plus a straighten angle that turns the other way to
-/// LightCraft's. LightCraft's crop is a rectangle in the oriented image rotated by `angle` about its
+/// RawLight's. RawLight's crop is a rectangle in the oriented image rotated by `angle` about its
 /// centre, normalized to the oriented image's size, so the corners go through the orientation and
 /// then the rotation; `stored_aspect` (width / height of the stored image) matters once the
 /// rectangle turns. On a real catalog this reproduced the frame aspect of all 223 straightened crops
@@ -862,7 +862,7 @@ pub(crate) struct ApplyPrepared<'a> {
 /// (added, missing, failed, warnings and skipped images).
 pub(crate) fn apply_prepared(s: &mut crate::Session, mut data: CatalogImport, context: ApplyPrepared<'_>) -> crate::Result<AppliedImport> {
     let ApplyPrepared { update_existing, files, index, archive_path, missing_sources, undo0 } = context;
-    // nothing but a file type LightCraft reads becomes a record, whichever route got here (#2135)
+    // nothing but a file type RawLight reads becomes a record, whichever route got here (#2135)
     refuse_non_media(&mut data);
     validate(&data).map_err(error)?;
     let mut warnings = data.warnings.clone();
@@ -1178,7 +1178,7 @@ mod tests {
         assert_eq!(r["photos"], 2, "only the real master and its copy: {r}");
         assert!(s.catalog.photos().all(|p| !matches!(&p.source, Source::File { path } if path.ends_with(".exe"))), "the program was catalogued");
         let warnings = r["warnings"].to_string();
-        assert!(warnings.contains("payload.exe") && warnings.contains("file types LightCraft reads"), "{warnings}");
+        assert!(warnings.contains("payload.exe") && warnings.contains("file types RawLight reads"), "{warnings}");
         assert!(warnings.contains("image 4: not imported"), "the virtual copy of the refused original goes with it: {warnings}");
     }
 
@@ -1334,7 +1334,7 @@ mod tests {
         assert_eq!(crop["rect"]["y1"], 1.0);
         assert_eq!(crop["angle"], 0.0);
         assert!(!unknown.iter().any(|k| k.starts_with("CropLeft")), "{unknown:?}");
-        // an angle alone still means a crop (Lightroom's angle turns the other way to LightCraft's)
+        // an angle alone still means a crop (Lightroom's angle turns the other way to RawLight's)
         let (partial, unknown) = mapped_settings("s = { CropAngle = -1.5 }", crate::crs::Target::RawAbsolute, 1.5, Orientation::Normal, 1.5).unwrap();
         assert_eq!(partial["crop"]["geometry"]["angle"], 1.5);
         assert!(!unknown.iter().any(|k| k.starts_with("CropAngle")), "{unknown:?}");
@@ -1386,7 +1386,7 @@ mod tests {
         assert!(partial.get("crop").is_none());
     }
 
-    /// The `crs` corners and angle Lightroom would store for LightCraft crop `g` on a stored image
+    /// The `crs` corners and angle Lightroom would store for RawLight crop `g` on a stored image
     /// of aspect `w` (height 1) shown with orientation `o`.
     fn lightroom_crop(g: CropGeometry, o: Orientation, w: f64) -> String {
         let (ow, oh) = if o.swaps_axes() { (1.0, w) } else { (w, 1.0) };
