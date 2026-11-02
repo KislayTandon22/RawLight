@@ -70,6 +70,13 @@ struct DevelopScreen: View {
         .task(id: lib.activeID) {
             guard let id = lib.activeID else { return }
             await dev.open(id, engine: lib.engine)
+            // Debug aid: RAWLIGHT_EDIT="label=value" drives the same path a slider drag does (draft then commit).
+            if let e = ProcessInfo.processInfo.environment["RAWLIGHT_EDIT"]?.split(separator: "="), e.count == 2, let v = Double(e[1]),
+               let c = dev.controls.first(where: { $0.label == e[0] }) {
+                dev.set(c, v, commit: false, id: id, engine: lib.engine)
+                try? await Task.sleep(for: .seconds(1))
+                dev.set(c, v, commit: true, id: id, engine: lib.engine)
+            }
         }
     }
 }
