@@ -103,7 +103,12 @@ pub unsafe extern "C" fn rl_execute(session: *mut RlSession, id: *const c_char, 
             Err(_) => return reply(json!({"error": "params are not UTF-8"})),
         }
     };
-    let run = || if id == "app.export" { export(&mut session.0, &params).map_err(|e| e.to_string()) } else { session.0.execute(id, &params).map_err(|e| e.to_string()) };
+    let run = || match id {
+        "app.export" => export(&mut session.0, &params).map_err(|e| e.to_string()),
+        "watermark.exportJson" => watermark_export_json(&params),
+        "watermark.importJson" => watermark_import_json(&params),
+        _ => session.0.execute(id, &params).map_err(|e| e.to_string()),
+    };
     match catch_unwind(AssertUnwindSafe(run)) {
         Ok(Ok(v)) => reply(json!({"ok": v})),
         Ok(Err(e)) => reply(json!({"error": e.to_string()})),
@@ -122,6 +127,73 @@ pub unsafe extern "C" fn rl_visible_ids(session: *mut RlSession) -> *mut c_char 
     };
     let ids: Vec<u64> = session.0.visible_cloned().iter().map(|i| i.0).collect();
     reply(json!({"ok": ids}))
+}
+
+/// `watermark.exportJson {watermark, name}`: the text of a portable watermark file (settings and, for a
+/// graphic, the picture itself).
+fn watermark_export_json(p: &Value) -> Result<Value, String> {
+    let wm = watermark_of(p.get("watermark").ok_or("`watermark` is required")?)?;
+    let name = p.get("name").and_then(Value::as_str).unwrap_or("Watermark");
+    lightcraft_engine::watermark_pack::export_json(&wm, name).map(|json| json!({"json": json}))
+}
+
+/// `watermark.importJson {json, dir}`: the watermark in a portable file; a graphic is stored under `dir`.
+/// Replies `{name, watermark}` with the watermark as export params (`app.export` `watermark`).
+fn watermark_import_json(p: &Value) -> Result<Value, String> {
+    let json = p.get("json").and_then(Value::as_str).ok_or("`json` is required")?;
+    let dir = p.get("dir").and_then(Value::as_str).ok_or("`dir` is required")?;
+    let (name, wm) = lightcraft_engine::watermark_pack::import_json(json, std::path::Path::new(dir))?;
+    let mut value = serde_json::to_value(&wm).map_err(|e| e.to_string())?;
+    if let Some(o) = value.as_object_mut() {
+        o.remove("target");
+    }
+    Ok(json!({"name": name, "watermark": value}))
+}
+
+/// A `watermark` object as the engine's [`Watermark`], validated like an export parameter.
+fn watermark_of(v: &Value) -> Result<lightcraft_engine::export::Watermark, String> {
+    let opts = lightcraft_engine::export::ExportOptions::from_params(&json!({"watermark": v})).map_err(|e| e.to_string())?;
+    opts.watermark.ok_or_else(|| "the watermark has no text or graphic".to_string())
+}
+
+/// Like [`rl_render`], with the watermark `watermark_json` (an `app.export` `watermark` object) drawn on it as an
+/// export whose short edge is `export_short_edge` pixels would have it (0: the preview's own size).
+/// Returns null on failure. Release with [`rl_buffer_free`].
+///
+/// # Safety
+/// As [`rl_render`]; `watermark_json` a NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rl_render_watermarked(
+    session: *mut RlSession,
+    id: u64,
+    max_w: u32,
+    max_h: u32,
+    watermark_json: *const c_char,
+    export_short_edge: u32,
+    out_w: *mut u32,
+    out_h: *mut u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    let Some(session) = (unsafe { session.as_mut() }) else { return std::ptr::null_mut() };
+    if watermark_json.is_null() {
+        return std::ptr::null_mut();
+    }
+    let Ok(text) = unsafe { CStr::from_ptr(watermark_json) }.to_str() else { return std::ptr::null_mut() };
+    let Ok(value) = serde_json::from_str::<Value>(text) else { return std::ptr::null_mut() };
+    let Ok(wm) = watermark_of(&value) else { return std::ptr::null_mut() };
+    let r = catch_unwind(AssertUnwindSafe(|| session.0.render_now(lightcraft_catalog::PhotoId(id), max_w as usize, max_h as usize)));
+    let Ok(Ok(rendered)) = r else { return std::ptr::null_mut() };
+    let mut img = rendered.image;
+    if catch_unwind(AssertUnwindSafe(|| lightcraft_engine::export::draw_watermark_preview(&mut img, &wm, export_short_edge as usize))).is_err() {
+        return std::ptr::null_mut();
+    }
+    let bytes: Vec<u8> = img.data.iter().flatten().copied().collect();
+    unsafe {
+        *out_w = img.width as u32;
+        *out_h = img.height as u32;
+        *out_len = bytes.len();
+    }
+    Box::into_raw(bytes.into_boxed_slice()).cast::<u8>()
 }
 
 /// Render photo `id` with its current edits, fitted inside `max_w` x `max_h`, as tightly packed
@@ -421,5 +493,31 @@ mod tests {
         let id = CString::new("x").unwrap();
         let r = unsafe { rl_execute(std::ptr::null_mut(), id.as_ptr(), std::ptr::null()) };
         unsafe { rl_string_free(r) };
+    }
+}
+
+#[cfg(test)]
+mod watermark_tests {
+    use super::*;
+
+    #[test]
+    fn a_watermark_survives_export_and_import() {
+        let wm = json!({"text": "© Sam", "anchor": "topLeft", "borderWidth": 0.01, "padding": 0.02, "backgroundOpacity": 0.5});
+        let out = watermark_export_json(&json!({"watermark": wm, "name": "Studio"})).expect("export");
+        let dir = std::env::temp_dir().join(format!("rl-wm-bridge-{}", std::process::id()));
+        let back = watermark_import_json(&json!({"json": out["json"], "dir": dir.to_string_lossy()})).expect("import");
+        assert_eq!(back["name"], "Studio");
+        assert_eq!(back["watermark"]["text"], "© Sam");
+        assert_eq!(back["watermark"]["anchor"], "topLeft");
+        assert!(back["watermark"].get("target").is_none());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn bad_input_is_an_error_not_a_panic() {
+        assert!(watermark_export_json(&json!({})).is_err());
+        assert!(watermark_export_json(&json!({"watermark": {"size": 9}})).is_err());
+        assert!(watermark_import_json(&json!({"json": "nope", "dir": "/tmp"})).is_err());
+        assert!(watermark_import_json(&json!({"dir": "/tmp"})).is_err());
     }
 }
