@@ -13,7 +13,7 @@ enum MacTheme {
     let engine = MacEngine(demo: true)
     var ids: [UInt64] = []
     var selection: Set<UInt64> = []
-    var thumbSize: Double = 170
+    var thumbSize: Double = UserDefaults.standard.object(forKey: "thumbSize") as? Double ?? 170
     var query = ""
     var module = ProcessInfo.processInfo.environment["RAWLIGHT_MODULE"] == nil && ProcessInfo.processInfo.environment["RAWLIGHT_SKIP_WELCOME"] == nil ? "Welcome" : "Library"
     /// Bumped when a photo's edits change so its thumbnails are redrawn.

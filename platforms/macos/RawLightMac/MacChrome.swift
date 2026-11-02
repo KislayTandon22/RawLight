@@ -131,7 +131,9 @@ struct RawLightCommands: Commands {
             Button("Back to Library  (Esc)") { model.module = "Library" }
         }
         CommandMenu("Go") {
-            Button("Select All") { model.selection = Set(model.ids) }.keyboardShortcut("a", modifiers: .command)
+            Button("Select All") {
+                if NSApp.keyWindow?.firstResponder is NSTextView { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) } else { model.selection = Set(model.ids) }
+            }.keyboardShortcut("a", modifiers: .command)
             Button("Select None") { model.selection = [] }.keyboardShortcut("d", modifiers: .command)
             Button("Library") { model.go("Library") }.keyboardShortcut("1", modifiers: .command)
             Button("Develop") { model.go("Develop") }.keyboardShortcut("2", modifiers: .command)
@@ -251,7 +253,8 @@ extension LibraryModel {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
             guard let self, e.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return e }
             if NSApp.keyWindow?.firstResponder is NSTextView { return e }   // typing in a field
-            guard NSApp.keyWindow?.attachedSheet == nil else { return e }
+            if NSApp.keyWindow?.firstResponder is NSControl { return e }    // a focused slider, picker or button keeps its own keys
+            guard NSApp.keyWindow?.sheetParent == nil else { return e }     // the key window is a sheet (palette, shortcuts)
             let handled: Bool = MainActor.assumeIsolated { self.handle(e) }
             return handled ? nil : e
         }

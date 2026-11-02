@@ -30,7 +30,8 @@ struct ToolPanel: View {
                 if let m = dev.message { Text(m).font(.system(size: 11)).foregroundStyle(MacTheme.accent) }
             }.padding(12)
         }
-        .task(id: dev.tool) { if dev.tool == "Info" { await loadInfo() } }
+        .task(id: "\(dev.tool)-\(lib.activeID ?? 0)") { if dev.tool == "Info" { await loadInfo() } }
+        .onChange(of: lib.activeID) { _, _ in angle = 0; maskValues = [:] }
     }
 
     private var id: UInt64? { lib.activeID }

@@ -15,6 +15,7 @@ import SwiftUI
     var healMode = "heal"
     var healSize = 0.06
     private var pending: (() async -> Void)?
+    private var pendingCommit = false
     private var busy = false
     var onCommit: ((UInt64) -> Void)?
 
@@ -25,6 +26,7 @@ import SwiftUI
     }
 
     func open(_ id: UInt64, engine: MacEngine) async {
+        lastPreset = nil; hdrOn = false; message = nil
         _ = try? await engine.execute("library.select", ["ids": [id], "active": id])
         async let ctl = engine.controls()
         await render(id, engine, draft: true)   // quick first picture
@@ -66,6 +68,8 @@ import SwiftUI
     /// Latest value wins while a render is in flight.
     func set(_ c: MacControl, _ value: Double, commit: Bool, id: UInt64, engine: MacEngine) {
         if let i = controls.firstIndex(where: { $0.id == c.id }) { controls[i].value = value }
+        let commit = commit || pendingCommit   // a queued final value must not be downgraded to a draft
+        pendingCommit = commit
         pending = { [weak self] in
             _ = try? await engine.execute("develop.set", ["control": c.id, "value": value])
             await self?.render(id, engine, draft: !commit)
@@ -74,16 +78,17 @@ import SwiftUI
         guard !busy else { return }
         busy = true
         Task {
-            while let w = pending { pending = nil; await w() }
+            while let w = pending { pending = nil; pendingCommit = false; await w() }
             busy = false
         }
     }
 
     /// Runs a one-shot command (Auto, B&W, HDR), then reloads sliders and the render.
     func quick(_ command: String, _ params: [String: Any] = [:], id: UInt64, engine: MacEngine) async {
-        _ = try? await engine.execute(command, params)
+        do { _ = try await engine.execute(command, params); message = nil } catch { message = error.localizedDescription }
         controls = await engine.controls()
         await render(id, engine, draft: false)
+        await reloadLists(engine)
         onCommit?(id)
     }
 

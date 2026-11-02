@@ -2,9 +2,9 @@ import SwiftUI
 
 @Observable @MainActor final class ExportModel {
     var format = "jpeg"
-    var quality = 90.0
-    var longEdge = 3000
-    var colorSpace = "srgb"
+    var quality = UserDefaults.standard.object(forKey: "exportQuality") as? Double ?? 90.0
+    var longEdge = UserDefaults.standard.object(forKey: "exportEdge") as? Int ?? 3000
+    var colorSpace = UserDefaults.standard.string(forKey: "exportSpace") ?? "srgb"
     var useWatermark = true
     var wm = Watermark()
     var savedName: String?
@@ -18,7 +18,8 @@ import SwiftUI
     let store = WatermarkStore.shared
 
     /// Short edge the exported file will have; margins in pixels are measured against it (2000 when exporting full size).
-    var shortEdge: Int { longEdge == 0 ? 0 : longEdge * 2 / 3 }
+    var aspect: Double { guard let b = base, b.size.width > 0, b.size.height > 0 else { return 2.0 / 3.0 }; return Double(min(b.size.width, b.size.height) / max(b.size.width, b.size.height)) }
+    var shortEdge: Int { longEdge == 0 ? 0 : Int(Double(longEdge) * aspect) }
     var referenceShort: Double { shortEdge > 0 ? Double(shortEdge) : 2000 }
 
     func chooseGraphic() {
@@ -99,7 +100,9 @@ struct ExportScreen: View {
         .environment(ex)
         .task(id: ids.first) {
             guard let id = ids.first else { return }
-            ex.base = await lib.engine.render(id, maxEdge: 1400)?.image
+            let img = await lib.engine.render(id, maxEdge: 1400)?.image
+            guard !Task.isCancelled, ids.first == id else { return }
+            ex.base = img
             ex.preview = ex.base
             await ex.refreshPreview(id: id, engine: lib.engine)
         }
