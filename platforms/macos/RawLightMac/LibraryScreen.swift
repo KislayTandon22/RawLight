@@ -21,6 +21,9 @@ enum MacTheme {
     var activeID: UInt64?
     var libraryName = "Demo library"
     var libraryError: String?
+    var showPalette = false
+    var showShortcuts = false
+    var importMessage: String?
     var recents: [String] = UserDefaults.standard.stringArray(forKey: "recentLibraries") ?? []
     func load() async { ids = await engine.visibleIDs() }
     func openLibrary(_ url: URL) async {
@@ -43,12 +46,17 @@ enum MacTheme {
 struct LibraryScreen: View {
     @Environment(LibraryModel.self) private var model
     var body: some View {
-        switch model.module {
-        case "Welcome": WelcomeScreen()
-        case "Develop": DevelopScreen()
-        case "Export": ExportScreen()
-        default: library
+        @Bindable var m = model
+        Group {
+            switch model.module {
+            case "Welcome": WelcomeScreen()
+            case "Develop": DevelopScreen()
+            case "Export": ExportScreen()
+            default: library
+            }
         }
+        .sheet(isPresented: $m.showPalette) { CommandPalette() }
+        .sheet(isPresented: $m.showShortcuts) { ShortcutsSheet() }
     }
     private var library: some View {
         VStack(spacing: 0) {
@@ -58,10 +66,14 @@ struct LibraryScreen: View {
                 Sidebar().frame(width: 230)
                 Divider().overlay(MacTheme.line)
                 Grid()
+                Divider().overlay(MacTheme.line)
+                RightPanel().frame(width: 280)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider().overlay(MacTheme.line)
             StatusBar()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MacTheme.bg)
     }
 }
@@ -100,7 +112,7 @@ private struct TopBar: View {
             }
             .padding(.horizontal, 10).frame(width: 260, height: 28)
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-            Button { } label: { Label("Import", systemImage: "square.and.arrow.down") }
+            Button { Task { await model.importPhotos() } } label: { Label("Import", systemImage: "square.and.arrow.down") }
                 .buttonStyle(.borderedProminent).tint(MacTheme.accent).controlSize(.regular)
         }
         .padding(.horizontal, 14).frame(height: 48).background(MacTheme.bar)
@@ -184,6 +196,7 @@ private struct Grid: View {
                 ForEach(model.ids, id: \.self) { id in Tile(id: id) }
             }.padding(12)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MacTheme.bg)
     }
 }
@@ -210,7 +223,7 @@ private struct StatusBar: View {
     var body: some View {
         @Bindable var m = model
         HStack(spacing: 12) {
-            Text("\(model.ids.count) photos · \(model.selection.count) selected").font(.system(size: 11)).foregroundStyle(MacTheme.dim)
+            Text(model.importMessage ?? "\(model.ids.count) photos · \(model.selection.count) selected").font(.system(size: 11)).foregroundStyle(MacTheme.dim)
             Spacer()
             Image(systemName: "square.grid.3x3").font(.system(size: 11)).foregroundStyle(MacTheme.dim)
             Slider(value: $m.thumbSize, in: 90...320).frame(width: 140).tint(MacTheme.accent).controlSize(.small)

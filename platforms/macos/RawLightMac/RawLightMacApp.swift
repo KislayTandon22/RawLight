@@ -24,5 +24,7 @@ struct RawLightMacApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)
+        .commands { RawLightCommands(model: model) }
+        Settings { SettingsView().preferredColorScheme(.dark) }
     }
 }
