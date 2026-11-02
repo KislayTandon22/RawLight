@@ -198,16 +198,9 @@ struct WatermarkEditor: View {
         if !Task.isCancelled { preview = img }
     }
 
-    /// Keep a copy of the chosen graphic inside the app so the watermark still works after the picker's access ends.
     private func useLogo(_ url: URL) {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let dir = WatermarkStore.directory.appending(path: "logos", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let dest = dir.appending(path: "\(UUID().uuidString).\(url.pathExtension.lowercased() == "png" ? "png" : "jpg")")
         do {
-            try FileManager.default.copyItem(at: url, to: dest)
-            watermark.imagePath = dest.path
+            watermark.imagePath = try WatermarkStore.copyLogo(from: url)
             message = nil
         } catch { message = "Couldn't open that picture: \(error.localizedDescription)" }
     }

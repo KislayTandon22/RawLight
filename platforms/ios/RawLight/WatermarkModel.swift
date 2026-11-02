@@ -125,6 +125,18 @@ final class WatermarkStore {
 
     init() { reload() }
 
+    /// Keep a copy of a picture the user chose (a logo) inside the app, so the watermark still works after the picker's access ends.
+    /// Returns the copy's path.
+    static func copyLogo(from url: URL) throws -> String {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let dir = directory.appending(path: "logos", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = dir.appending(path: "\(UUID().uuidString).\(url.pathExtension.lowercased() == "png" ? "png" : "jpg")")
+        try FileManager.default.copyItem(at: url, to: dest)
+        return dest.path
+    }
+
     func reload() {
         let files = (try? FileManager.default.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: nil)) ?? []
         names = files.filter { $0.pathExtension == "json" }.map { $0.deletingPathExtension().lastPathComponent }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ExportSheet: View {
     @Environment(AppModel.self) private var model
@@ -17,6 +18,7 @@ struct ExportSheet: View {
     @State private var editingWatermark = false
     @State private var savedWatermarks = WatermarkStore.shared
     @State private var watermarkName: String?
+    @State private var pickingLogo = false
 
     private let sizes: [(String, Int)] = [("1600", 1600), ("3000", 3000), ("Full", 0)]
 
@@ -61,6 +63,21 @@ struct ExportSheet: View {
                         .buttonStyle(.bordered).tint(Theme.accent)
                 }
             }
+            if watermarkOn {
+                Picker("Style", selection: Binding(get: { watermark.isGraphic }, set: { graphic in
+                    if graphic { pickingLogo = true } else { watermark.imagePath = "" }
+                })) { Text("Text").tag(false); Text("Graphic").tag(true) }.pickerStyle(.segmented)
+                if watermark.isGraphic {
+                    HStack {
+                        Text(URL(fileURLWithPath: watermark.imagePath).lastPathComponent).lineLimit(1).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Choose picture…") { pickingLogo = true }.tint(Theme.accent)
+                    }
+                } else {
+                    TextField("© Your name", text: $watermark.text)
+                        .padding(10).background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
             if watermarkOn && !watermark.hasContent {
                 Text("Add text or a graphic, or the watermark is left off.").font(.footnote).foregroundStyle(.secondary)
             }
@@ -77,6 +94,11 @@ struct ExportSheet: View {
         .presentationBackground(.ultraThinMaterial)
         .presentationCornerRadius(28)
         .onChange(of: watermarkOn) { _, on in if on && !watermark.hasContent { editingWatermark = true } }
+        .fileImporter(isPresented: $pickingLogo, allowedContentTypes: [.png, .jpeg]) { result in
+            if case .success(let url) = result {
+                do { watermark.imagePath = try WatermarkStore.copyLogo(from: url); error = nil } catch { self.error = error.localizedDescription }
+            }
+        }
         .sheet(isPresented: $editingWatermark) {
             WatermarkEditor(watermark: $watermark, photoID: ids.first, exportShortEdge: longEdge == 0 ? 0 : longEdge * 2 / 3)
         }
