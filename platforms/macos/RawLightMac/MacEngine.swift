@@ -43,6 +43,56 @@ final class MacEngine: @unchecked Sendable {
         return img
     }
 
+    @discardableResult
+    func execute(_ id: String, _ params: [String: Any] = [:]) async throws -> Any {
+        try await withCheckedThrowingContinuation { cont in
+            queue.async {
+                cont.resume(with: Result {
+                    let data = try JSONSerialization.data(withJSONObject: params)
+                    guard let raw = rl_execute(self.session, id, String(decoding: data, as: UTF8.self)) else { throw MacEngineError.message("no reply") }
+                    defer { rl_string_free(raw) }
+                    let obj = try JSONSerialization.jsonObject(with: Data(String(cString: raw).utf8), options: [.fragmentsAllowed])
+                    guard let dict = obj as? [String: Any] else { throw MacEngineError.message("bad reply") }
+                    if let e = dict["error"] as? String { throw MacEngineError.message(e) }
+                    return dict["ok"] ?? NSNull()
+                })
+            }
+        }
+    }
+
+    /// kind: 0 full, 2 draft (fast, while a slider moves).
+    func render(_ id: UInt64, maxEdge: Int, kind: Int32 = 0) async -> (image: NSImage, histogram: [UInt32])? {
+        let job: OpaquePointer? = await withCheckedContinuation { cont in
+            queue.async { cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind)) }
+        }
+        guard let job else { return nil }
+        let out: (NSImage, [UInt32])? = await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInteractive).async {
+                var w: UInt32 = 0, h: UInt32 = 0, len: UInt = 0
+                var hist = [UInt32](repeating: 0, count: 1024)
+                guard let p = rl_job_run(job, &w, &h, &len, &hist) else { return cont.resume(returning: nil) }
+                let data = Data(bytes: p, count: Int(len))
+                rl_buffer_free(p, len)
+                guard let img = Self.image(rgba: data, width: Int(w), height: Int(h)) else { return cont.resume(returning: nil) }
+                cont.resume(returning: (img, hist))
+            }
+        }
+        queue.async { rl_job_finish(self.session, job) }
+        return out
+    }
+
+    func controls() async -> [MacControl] {
+        guard let arr = try? await execute("develop.controls") as? [[String: Any]] else { return [] }
+        return arr.compactMap { d in
+            guard let id = d["id"] as? String, let label = d["label"] as? String, let section = d["section"] as? String,
+                  let mn = (d["min"] as? NSNumber)?.doubleValue, let mx = (d["max"] as? NSNumber)?.doubleValue,
+                  let df = (d["default"] as? NSNumber)?.doubleValue, let v = (d["value"] as? NSNumber)?.doubleValue else { return nil }
+            return MacControl(id: id, label: label, section: section, min: mn, max: mx, def: df, value: v,
+                              decimals: (d["decimals"] as? NSNumber)?.intValue ?? 0,
+                              track: (d["track"] as? [String: Any])?["kind"] as? String ?? "plain")
+        }
+    }
+
     private static func image(rgba: Data, width: Int, height: Int) -> NSImage? {
         guard let provider = CGDataProvider(data: rgba as CFData), let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
@@ -51,4 +101,18 @@ final class MacEngine: @unchecked Sendable {
                                intent: .defaultIntent) else { return nil }
         return NSImage(cgImage: cg, size: NSSize(width: width, height: height))
     }
+}
+
+struct MacControl: Identifiable, Hashable {
+    let id: String, label: String, section: String
+    let min: Double, max: Double, def: Double
+    var value: Double
+    let decimals: Int
+    let track: String
+    var centered: Bool { min < 0 && max > 0 }
+}
+
+enum MacEngineError: Error, LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case .message(let m) = self { return m }; return nil }
 }

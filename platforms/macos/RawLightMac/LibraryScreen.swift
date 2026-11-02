@@ -15,12 +15,20 @@ enum MacTheme {
     var selection: Set<UInt64> = []
     var thumbSize: Double = 170
     var query = ""
+    var module = "Library"
+    var activeID: UInt64?
     func load() async { ids = await engine.visibleIDs() }
+    func openDevelop(_ id: UInt64) {
+        activeID = id; selection = [id]; module = "Develop"
+    }
 }
 
 struct LibraryScreen: View {
     @Environment(LibraryModel.self) private var model
     var body: some View {
+        if model.module == "Develop" { DevelopScreen() } else { library }
+    }
+    private var library: some View {
         VStack(spacing: 0) {
             TopBar()
             Divider().overlay(MacTheme.line)
@@ -36,21 +44,33 @@ struct LibraryScreen: View {
     }
 }
 
+struct ModuleSwitch: View {
+    @Environment(LibraryModel.self) private var model
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(["Library", "Develop", "Export"], id: \.self) { t in
+                let on = model.module == t
+                Button {
+                    if t == "Develop", model.activeID == nil, let f = model.ids.first { model.openDevelop(f) }
+                    else if t != "Export" { model.module = t }
+                } label: {
+                    Text(t).font(.system(size: 13, weight: .medium)).padding(.horizontal, 14).frame(height: 26)
+                        .background(on ? MacTheme.accent : .clear, in: Capsule())
+                        .foregroundStyle(on ? .white : MacTheme.dim)
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(3).background(Color.white.opacity(0.06), in: Capsule())
+    }
+}
+
 private struct TopBar: View {
     @Environment(LibraryModel.self) private var model
     var body: some View {
         @Bindable var m = model
         HStack(spacing: 14) {
             Spacer().frame(width: 64)
-            HStack(spacing: 4) {
-                ForEach(["Library", "Develop", "Export"], id: \.self) { t in
-                    Text(t).font(.system(size: 13, weight: .medium))
-                        .padding(.horizontal, 14).frame(height: 26)
-                        .background(t == "Library" ? MacTheme.accent : .clear, in: Capsule())
-                        .foregroundStyle(t == "Library" ? .white : MacTheme.dim)
-                }
-            }
-            .padding(3).background(Color.white.opacity(0.06), in: Capsule())
+            ModuleSwitch()
             Spacer()
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(MacTheme.dim)
@@ -125,6 +145,7 @@ private struct Tile: View {
             .overlay { if let image { Image(nsImage: image).resizable().scaledToFill() } }
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? MacTheme.accent : .clear, lineWidth: 2))
+        .onTapGesture(count: 2) { model.openDevelop(id) }
         .onTapGesture { if NSEvent.modifierFlags.contains(.command) { if selected { model.selection.remove(id) } else { model.selection.insert(id) } } else { model.selection = [id] } }
         .task { image = await model.engine.thumbnail(id, edge: 360) }
     }
