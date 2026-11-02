@@ -7,6 +7,7 @@ import SwiftUI
     var collapsed: Set<String> = []
     private var pending: (() async -> Void)?
     private var busy = false
+    var onCommit: ((UInt64) -> Void)?
 
     func sections() -> [String] {
         var seen: [String] = []
@@ -30,6 +31,7 @@ import SwiftUI
         pending = { [weak self] in
             _ = try? await engine.execute("develop.set", ["control": c.id, "value": value])
             await self?.render(id, engine, draft: !commit)
+            if commit { self?.onCommit?(id) }
         }
         guard !busy else { return }
         busy = true
@@ -67,6 +69,7 @@ struct DevelopScreen: View {
         }
         .background(MacTheme.bg)
         .environment(dev)
+        .onAppear { dev.onCommit = { lib.thumbVersion[$0, default: 0] += 1 } }
         .task(id: lib.activeID) {
             guard let id = lib.activeID else { return }
             await dev.open(id, engine: lib.engine)
@@ -214,7 +217,7 @@ private struct FilmThumb: View {
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(lib.activeID == id ? MacTheme.accent : .clear, lineWidth: 2))
             .onTapGesture { lib.activeID = id; lib.selection = [id] }
-            .task { image = await lib.engine.thumbnail(id, edge: 160) }
+            .task(id: lib.thumbVersion[id]) { image = await lib.engine.thumbnail(id, edge: 160) }
     }
 }
 

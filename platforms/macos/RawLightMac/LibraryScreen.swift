@@ -16,6 +16,8 @@ enum MacTheme {
     var thumbSize: Double = 170
     var query = ""
     var module = "Library"
+    /// Bumped when a photo's edits change so its thumbnails are redrawn.
+    var thumbVersion: [UInt64: Int] = [:]
     var activeID: UInt64?
     func load() async { ids = await engine.visibleIDs() }
     func openDevelop(_ id: UInt64) {
@@ -26,7 +28,11 @@ enum MacTheme {
 struct LibraryScreen: View {
     @Environment(LibraryModel.self) private var model
     var body: some View {
-        if model.module == "Develop" { DevelopScreen() } else { library }
+        switch model.module {
+        case "Develop": DevelopScreen()
+        case "Export": ExportScreen()
+        default: library
+        }
     }
     private var library: some View {
         VStack(spacing: 0) {
@@ -52,7 +58,7 @@ struct ModuleSwitch: View {
                 let on = model.module == t
                 Button {
                     if t == "Develop", model.activeID == nil, let f = model.ids.first { model.openDevelop(f) }
-                    else if t != "Export" { model.module = t }
+                    else { model.module = t }
                 } label: {
                     Text(t).font(.system(size: 13, weight: .medium)).padding(.horizontal, 14).frame(height: 26)
                         .background(on ? MacTheme.accent : .clear, in: Capsule())
@@ -147,7 +153,7 @@ private struct Tile: View {
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? MacTheme.accent : .clear, lineWidth: 2))
         .onTapGesture(count: 2) { model.openDevelop(id) }
         .onTapGesture { if NSEvent.modifierFlags.contains(.command) { if selected { model.selection.remove(id) } else { model.selection.insert(id) } } else { model.selection = [id] } }
-        .task { image = await model.engine.thumbnail(id, edge: 360) }
+        .task(id: model.thumbVersion[id]) { image = await model.engine.thumbnail(id, edge: 360) }
     }
 }
 
