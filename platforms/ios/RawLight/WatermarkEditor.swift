@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct WatermarkEditor: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var usePixels = false
     @Binding var watermark: Watermark
     let photoID: UInt64?
     /// The short edge the export will have, so the preview scales the watermark as the file will.
@@ -115,8 +116,9 @@ struct WatermarkEditor: View {
             }
             .fixedSize()
             VStack(spacing: 10) {
-                slider("Across", $watermark.insetX, 0...0.4, percent: true, enabled: ![.top, .center, .bottom].contains(watermark.anchor))
-                slider("Down", $watermark.insetY, 0...0.4, percent: true, enabled: ![.left, .center, .right].contains(watermark.anchor))
+                Picker("Units", selection: $usePixels) { Text("%").tag(false); Text("px").tag(true) }.pickerStyle(.segmented)
+                marginRow("Across", $watermark.insetX, enabled: ![.top, .center, .bottom].contains(watermark.anchor))
+                marginRow("Down", $watermark.insetY, enabled: ![.left, .center, .right].contains(watermark.anchor))
                 Picker("Rotate", selection: $watermark.rotation) {
                     ForEach([0, 90, 180, 270], id: \.self) { Text("\($0)°").tag($0) }
                 }.pickerStyle(.segmented)
@@ -176,6 +178,28 @@ struct WatermarkEditor: View {
                 }
             }
             .tint(Theme.accent)
+        }
+    }
+
+    /// Margins are stored as a fraction of the short edge; pixels are shown against the export size
+    /// (2000 px short edge when exporting at full size, where the real size is not known here).
+    private var referenceShortEdge: Double { exportShortEdge > 0 ? Double(exportShortEdge) : 2000 }
+
+    @ViewBuilder
+    private func marginRow(_ title: String, _ value: Binding<Double>, enabled: Bool) -> some View {
+        if usePixels {
+            let ref = referenceShortEdge
+            HStack {
+                Text(title).frame(width: 64, alignment: .leading).foregroundStyle(enabled ? .primary : .secondary)
+                Slider(value: Binding(get: { value.wrappedValue * ref }, set: { value.wrappedValue = min(0.4, max(0, $0 / ref)) }),
+                       in: 0...(0.4 * ref)).tint(Theme.accent).disabled(!enabled)
+                TextField("px", value: Binding(get: { (value.wrappedValue * ref).rounded() },
+                                               set: { value.wrappedValue = min(0.4, max(0, $0 / ref)) }), format: .number)
+                    .keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 56).disabled(!enabled)
+                Text("px").font(.footnote).foregroundStyle(.secondary)
+            }
+        } else {
+            slider(title, value, 0...0.4, percent: true, enabled: enabled)
         }
     }
 

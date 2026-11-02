@@ -93,7 +93,6 @@ struct ExportSheet: View {
         .presentationDetents([.medium, .large])
         .presentationBackground(.ultraThinMaterial)
         .presentationCornerRadius(28)
-        .onChange(of: watermarkOn) { _, on in if on && !watermark.hasContent { editingWatermark = true } }
         .fileImporter(isPresented: $pickingLogo, allowedContentTypes: [.png, .jpeg]) { result in
             if case .success(let url) = result {
                 do { watermark.imagePath = try WatermarkStore.copyLogo(from: url); error = nil } catch { self.error = error.localizedDescription }
