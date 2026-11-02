@@ -229,6 +229,9 @@ fn name_link(app: &mut LightcraftApp, ui: &mut egui::Ui, c: &Contributor, names:
 /// About ▸ Contributors: a name toggle, a sort, and the list as a grab bag or a table.
 pub fn contributors_ui(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
+    // the one place the engine's origin is credited
+    ui.label(crate::i18n::tr("RawLight is built on the open-source LightCraft engine by the ArtCraft Team and contributors."));
+    ui.add_space(6.0);
     let id = egui::Id::unique("credits_view");
     let mut v = ui.data_mut(|d| d.get_temp::<View>(id)).unwrap_or_default();
     ui.horizontal_wrapped(|ui| {
