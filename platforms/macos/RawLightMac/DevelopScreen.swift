@@ -295,7 +295,7 @@ private struct SliderRow: View {
         let edited = abs(control.value - control.def) > 1e-9
         HStack(spacing: 8) {
             Text(control.label).font(.system(size: 11.5, weight: edited ? .medium : .regular))
-                .foregroundStyle(edited ? .white : Color(white: 0.71)).frame(width: 78, alignment: .leading).lineLimit(1)
+                .foregroundStyle(edited ? .white : Color(white: 0.71)).frame(width: 96, alignment: .leading).lineLimit(1)
                 .onTapGesture(count: 2) { push(control.def, true) }
             Track(control: control, edited: edited) { v, commit in push(v, commit) }.frame(height: 24)
             Text(String(format: "%.\(control.decimals)f", control.value).replacingOccurrences(of: "-", with: "\u{2212}"))
