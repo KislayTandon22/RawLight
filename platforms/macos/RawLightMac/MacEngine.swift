@@ -89,6 +89,8 @@ final class MacEngine: @unchecked Sendable {
         guard let job else { return nil }
         let out: (NSImage, [UInt32])? = await withCheckedContinuation { cont in
             DispatchQueue.global(qos: .userInteractive).async {
+                let t0 = DispatchTime.now()
+                defer { if ProcessInfo.processInfo.environment["RAWLIGHT_TIMING"] != nil { NSLog("[RawLight] render %d px kind %d: %.0f ms", maxEdge, kind, Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds) / 1e6) } }
                 var w: UInt32 = 0, h: UInt32 = 0, len: UInt = 0
                 var hist = [UInt32](repeating: 0, count: 1024)
                 guard let p = rl_job_run(job, &w, &h, &len, &hist) else { return cont.resume(returning: nil) }
@@ -100,6 +102,37 @@ final class MacEngine: @unchecked Sendable {
         }
         queue.async { rl_job_finish(self.session, job) }
         return out
+    }
+
+    /// A preview of `id` with the watermark drawn by the engine, exactly as export does.
+    func renderWatermarked(_ id: UInt64, maxEdge: Int, watermark: [String: Any], exportShortEdge: Int) async -> NSImage? {
+        guard let data = try? JSONSerialization.data(withJSONObject: watermark) else { return nil }
+        let json = String(decoding: data, as: UTF8.self)
+        return await withCheckedContinuation { cont in
+            queue.async {
+                var w: UInt32 = 0, h: UInt32 = 0, len: UInt = 0
+                guard let p = rl_render_watermarked(self.session, id, UInt32(maxEdge), UInt32(maxEdge), json, UInt32(max(exportShortEdge, 0)), &w, &h, &len) else {
+                    return cont.resume(returning: nil)
+                }
+                let bytes = Data(bytes: p, count: Int(len))
+                rl_buffer_free(p, len)
+                cont.resume(returning: Self.image(rgba: bytes, width: Int(w), height: Int(h)))
+            }
+        }
+    }
+
+    /// The text of a portable watermark file: the settings and, for a graphic, the picture itself.
+    func watermarkFile(_ watermark: [String: Any], name: String) async throws -> String {
+        let r = try await execute("watermark.exportJson", ["watermark": watermark, "name": name]) as? [String: Any]
+        guard let json = r?["json"] as? String else { throw MacEngineError.message("bad reply") }
+        return json
+    }
+
+    /// The watermark in a portable file; a graphic is stored under `dir`.
+    func watermarkFromFile(_ json: String, dir: URL) async throws -> (name: String, watermark: [String: Any]) {
+        let r = try await execute("watermark.importJson", ["json": json, "dir": dir.path]) as? [String: Any]
+        guard let wm = r?["watermark"] as? [String: Any] else { throw MacEngineError.message("bad reply") }
+        return (r?["name"] as? String ?? "", wm)
     }
 
     func controls() async -> [MacControl] {

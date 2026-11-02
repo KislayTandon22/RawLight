@@ -60,7 +60,7 @@ import SwiftUI
     }
 
     func render(_ id: UInt64, _ engine: MacEngine, draft: Bool) async {
-        if let r = await engine.render(id, maxEdge: draft ? 1100 : 2200, kind: draft ? 2 : 0) { image = r.image; histogram = r.histogram }
+        if let r = await engine.render(id, maxEdge: draft ? 900 : 1600, kind: draft ? 2 : 0) { image = r.image; histogram = r.histogram }
     }
 
     /// Latest value wins while a render is in flight.
@@ -203,7 +203,7 @@ private struct LeftDock: View {
         ScrollView {
             VStack(spacing: 6) {
                 card("Navigator") {
-                    DevImage().frame(height: 130).clipShape(RoundedRectangle(cornerRadius: 6)).padding(10)
+                    NavThumb().frame(height: 130).clipShape(RoundedRectangle(cornerRadius: 6)).padding(10)
                 }
                 card("Presets") {
                     VStack(alignment: .leading, spacing: 0) {
@@ -273,6 +273,19 @@ private struct DevImage: View {
                     }
                 }
         } else { ProgressView().controlSize(.small) }
+    }
+}
+
+/// The Navigator picture: a small cached thumbnail, so each slider render redraws one large image, not two.
+private struct NavThumb: View {
+    @Environment(LibraryModel.self) private var lib
+    @State private var image: NSImage?
+    var body: some View {
+        Group { if let image { Image(nsImage: image).resizable().scaledToFit() } else { Color.clear } }
+            .task(id: "\(lib.activeID ?? 0)-\(lib.activeID.flatMap { lib.thumbVersion[$0] } ?? 0)") {
+                guard let id = lib.activeID else { return }
+                image = await lib.engine.thumbnail(id, edge: 360, version: lib.thumbVersion[id] ?? 0)
+            }
     }
 }
 

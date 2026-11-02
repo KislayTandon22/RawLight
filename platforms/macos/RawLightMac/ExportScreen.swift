@@ -1,40 +1,60 @@
 import SwiftUI
 
-private let anchors: [[String]] = [["topLeft", "top", "topRight"], ["left", "center", "right"], ["bottomLeft", "bottom", "bottomRight"]]
-
 @Observable @MainActor final class ExportModel {
     var format = "jpeg"
     var quality = 90.0
     var longEdge = 3000
     var colorSpace = "srgb"
     var useWatermark = true
-    var text = "© RawLight"
-    var anchor = "bottomRight"
-    var size = 0.04
-    var opacity = 0.8
-    var insetX = 0.03
-    var insetY = 0.03
-    var graphic: URL?
-    var graphicWidth = 0.2
-    var graphicImage: NSImage?
-    var white = true
-    var shadow = true
+    var wm = Watermark()
+    var savedName: String?
+    var saveName = ""
+    var usePixels = false
     var folder: URL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!.appending(path: "RawLight Exports", directoryHint: .isDirectory)
     var working = false
     var message: String?
     var preview: NSImage?
+    var base: NSImage?
+    let store = WatermarkStore.shared
 
-    func watermark() -> [String: Any] {
-        var w: [String: Any] = ["text": text, "anchor": anchor, "size": size, "opacity": opacity, "insetX": insetX, "insetY": insetY,
-                                "color": white ? [255, 255, 255] : [0, 0, 0], "shadow": shadow]
-        if let g = graphic { w["image"] = g.path; w["imageWidth"] = graphicWidth }
-        return w
-    }
+    /// Short edge the exported file will have; margins in pixels are measured against it (2000 when exporting full size).
+    var shortEdge: Int { longEdge == 0 ? 0 : longEdge * 2 / 3 }
+    var referenceShort: Double { shortEdge > 0 ? Double(shortEdge) : 2000 }
 
     func chooseGraphic() {
         let p = NSOpenPanel(); p.allowedContentTypes = [.png, .jpeg]; p.allowsMultipleSelection = false
         p.message = "Choose a logo or signature (PNG with transparency works best)"
-        if p.runModal() == .OK, let u = p.url { graphic = u; graphicImage = NSImage(contentsOf: u) }
+        if p.runModal() == .OK, let u = p.url {
+            do { wm.imagePath = try WatermarkStore.copyLogo(from: u); message = nil } catch { message = error.localizedDescription }
+        }
+    }
+
+    func refreshPreview(id: UInt64?, engine: MacEngine) async {
+        guard useWatermark, wm.hasContent, let id else { preview = base; return }
+        try? await Task.sleep(for: .milliseconds(120))
+        if Task.isCancelled { return }
+        let img = await engine.renderWatermarked(id, maxEdge: 1400, watermark: wm.params, exportShortEdge: shortEdge)
+        if !Task.isCancelled { preview = img ?? base }
+    }
+
+    func saveCurrent(engine: MacEngine) async {
+        do { try await store.save(wm, as: saveName, engine: engine); savedName = saveName; message = "Saved watermark “\(saveName)”"; saveName = "" }
+        catch { message = error.localizedDescription }
+    }
+    func useSaved(_ name: String, engine: MacEngine) async {
+        do { wm = try await store.load(name, engine: engine); savedName = name; useWatermark = true; message = nil } catch { message = error.localizedDescription }
+    }
+    func importFile(engine: MacEngine) async {
+        let p = NSOpenPanel(); p.allowedContentTypes = [.json]; p.message = "Choose a RawLight watermark file"
+        guard p.runModal() == .OK, let u = p.url else { return }
+        do { let r = try await store.importFile(u, engine: engine); wm = r.watermark; savedName = r.name; useWatermark = true; message = "Imported “\(r.name)”" }
+        catch { message = error.localizedDescription }
+    }
+    func exportFile(engine: MacEngine) async {
+        let p = NSSavePanel(); p.allowedContentTypes = [.json]; p.nameFieldStringValue = "\(savedName ?? "watermark").json"
+        guard p.runModal() == .OK, let u = p.url else { return }
+        do { try await engine.watermarkFile(wm.params, name: savedName ?? "Watermark").write(to: u, atomically: true, encoding: .utf8); message = "Exported \(u.lastPathComponent)" }
+        catch { message = error.localizedDescription }
     }
 
     func run(ids: [UInt64], engine: MacEngine) async {
@@ -42,7 +62,7 @@ private let anchors: [[String]] = [["topLeft", "top", "topRight"], ["left", "cen
         defer { working = false }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var p: [String: Any] = ["ids": ids, "format": format, "quality": Int(quality), "longEdge": longEdge, "colorSpace": colorSpace]
-        if useWatermark, !text.isEmpty || graphic != nil { p["watermark"] = watermark() }
+        if useWatermark, wm.hasContent { p["watermark"] = wm.params }
         let ext = ["jpeg": "jpg", "png": "png", "tiff": "tif", "webp": "webp"][format] ?? "jpg"
         if ids.count == 1 { p["path"] = folder.appending(path: "RawLight-\(ids[0]).\(ext)").path } else { p["dir"] = folder.path }
         do {
@@ -79,8 +99,11 @@ struct ExportScreen: View {
         .environment(ex)
         .task(id: ids.first) {
             guard let id = ids.first else { return }
-            ex.preview = await lib.engine.render(id, maxEdge: 1800)?.image
+            ex.base = await lib.engine.render(id, maxEdge: 1400)?.image
+            ex.preview = ex.base
+            await ex.refreshPreview(id: id, engine: lib.engine)
         }
+        .task(id: "\(ex.wm.params.description)\(ex.useWatermark)\(ex.longEdge)") { await ex.refreshPreview(id: ids.first, engine: lib.engine) }
     }
 }
 
@@ -92,37 +115,12 @@ private struct PreviewPane: View {
             if let img = ex.preview {
                 let ar = img.size.width / max(img.size.height, 1)
                 Image(nsImage: img).resizable().scaledToFit()
-                    .overlay { if ex.useWatermark { WatermarkOverlay() } }
                     .aspectRatio(ar, contentMode: .fit)
                     .padding(24)
             } else { ProgressView() }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// Approximates the engine's watermark placement so the preview moves as the settings do.
-private struct WatermarkOverlay: View {
-    @Environment(ExportModel.self) private var ex
-    var body: some View {
-        GeometryReader { g in
-            let short = min(g.size.width, g.size.height)
-            let a = ex.anchor
-            let h: HorizontalAlignment = a.hasSuffix("Left") || a == "left" ? .leading : a.hasSuffix("Right") || a == "right" ? .trailing : .center
-            let v: VerticalAlignment = a.hasPrefix("top") ? .top : a.hasPrefix("bottom") ? .bottom : .center
-            Group {
-                if let img = ex.graphicImage {
-                    Image(nsImage: img).resizable().scaledToFit().frame(width: ex.graphicWidth * g.size.width).opacity(ex.opacity)
-                } else {
-                    Text(ex.text).font(.system(size: ex.size * short, weight: .semibold))
-                        .foregroundStyle((ex.white ? Color.white : Color.black).opacity(ex.opacity))
-                }
-            }
-                .shadow(color: .black.opacity(ex.shadow ? 0.6 : 0), radius: 3)
-                .padding(.horizontal, ex.insetX * short).padding(.vertical, ex.insetY * short)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Alignment(horizontal: h, vertical: v))
-        }
     }
 }
 
@@ -143,34 +141,7 @@ private struct SettingsPane: View {
                     row("Long edge") { Picker("", selection: $e.longEdge) { Text("1600").tag(1600); Text("3000").tag(3000); Text("Full").tag(0) }.labelsHidden().pickerStyle(.segmented) }
                     row("Colour") { Picker("", selection: $e.colorSpace) { Text("sRGB").tag("srgb"); Text("P3").tag("displayP3"); Text("Adobe").tag("adobeRgb") }.labelsHidden().pickerStyle(.segmented) }
                     head("Watermark") { Toggle("", isOn: $e.useWatermark).labelsHidden().toggleStyle(.switch).tint(MacTheme.accent).controlSize(.small) }
-                    if e.useWatermark {
-                        row("Text") { TextField("", text: $e.text).textFieldStyle(.roundedBorder) }
-                        row("Position") {
-                            VStack(spacing: 3) {
-                                ForEach(anchors, id: \.self) { r in
-                                    HStack(spacing: 3) {
-                                        ForEach(r, id: \.self) { a in
-                                            RoundedRectangle(cornerRadius: 4).fill(e.anchor == a ? MacTheme.accent : Color.white.opacity(0.09))
-                                                .frame(width: 34, height: 22).onTapGesture { e.anchor = a }
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer()
-                        }
-                        row("Size") { Slider(value: $e.size, in: 0.01...0.15).tint(MacTheme.accent); val(e.size) }
-                        row("Opacity") { Slider(value: $e.opacity, in: 0.05...1).tint(MacTheme.accent); val(e.opacity) }
-                        row("Margin H") { Slider(value: $e.insetX, in: 0...0.15).tint(MacTheme.accent); val(e.insetX) }
-                        row("Margin V") { Slider(value: $e.insetY, in: 0...0.15).tint(MacTheme.accent); val(e.insetY) }
-                        row("Graphic") {
-                            Button(e.graphic?.lastPathComponent ?? "Choose logo…") { e.chooseGraphic() }.controlSize(.small)
-                            if e.graphic != nil { Button("Remove") { e.graphic = nil; e.graphicImage = nil }.controlSize(.small) }
-                            Spacer()
-                        }
-                        if e.graphic != nil { row("Logo size") { Slider(value: $e.graphicWidth, in: 0.05...0.6).tint(MacTheme.accent); val(e.graphicWidth) } }
-                        row("Colour") { Picker("", selection: $e.white) { Text("White").tag(true); Text("Black").tag(false) }.labelsHidden().pickerStyle(.segmented) }
-                        row("Shadow") { Toggle("", isOn: $e.shadow).labelsHidden().toggleStyle(.switch).tint(MacTheme.accent).controlSize(.small); Spacer() }
-                    }
+                    if e.useWatermark { watermarkSection($e) }
                 }.padding(.bottom, 8)
             }
             Divider().overlay(MacTheme.line)
@@ -181,6 +152,89 @@ private struct SettingsPane: View {
         }
         .background(Color(white: 0.157).opacity(0.86), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.07)))
+    }
+    @ViewBuilder private func watermarkSection(_ e: Bindable<ExportModel>) -> some View {
+        let m = e.wrappedValue
+        row("Saved") {
+            Menu {
+                if m.store.names.isEmpty { Text("No saved watermarks yet") }
+                ForEach(m.store.names, id: \.self) { n in
+                    Button(n) { Task { await m.useSaved(n, engine: lib.engine) } }
+                }
+                if !m.store.names.isEmpty {
+                    Divider()
+                    Menu("Delete") { ForEach(m.store.names, id: \.self) { n in Button(n, role: .destructive) { m.store.delete(n); if m.savedName == n { m.savedName = nil } } } }
+                }
+            } label: { Text(m.savedName ?? "Choose…").lineLimit(1) }.controlSize(.small)
+            Spacer()
+        }
+        row("Style") {
+            Picker("", selection: Binding(get: { m.wm.isGraphic }, set: { g in if g { m.chooseGraphic() } else { m.wm.imagePath = "" } })) {
+                Text("Text").tag(false); Text("Graphic").tag(true)
+            }.labelsHidden().pickerStyle(.segmented)
+        }
+        if m.wm.isGraphic {
+            row("Picture") {
+                Text(URL(fileURLWithPath: m.wm.imagePath).lastPathComponent).lineLimit(1).font(.system(size: 11)).foregroundStyle(MacTheme.dim)
+                Spacer(); Button("Choose…") { m.chooseGraphic() }.controlSize(.small)
+            }
+            row("Logo size") { Slider(value: e.wm.imageWidth, in: 0.05...0.6).tint(MacTheme.accent); val(m.wm.imageWidth) }
+        } else {
+            row("Text") { TextField("© Your name", text: e.wm.text).textFieldStyle(.roundedBorder) }
+            row("Size") { Slider(value: e.wm.size, in: 0.01...0.15).tint(MacTheme.accent); val(m.wm.size) }
+            row("Colour") { ColorPicker("", selection: e.wm.color, supportsOpacity: false).labelsHidden(); Toggle("Shadow", isOn: e.wm.shadow).toggleStyle(.switch).controlSize(.small).tint(MacTheme.accent); Spacer() }
+            row("Vertical") { Toggle("", isOn: e.wm.vertical).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(MacTheme.accent); Spacer() }
+        }
+        row("Position") {
+            let cols = Array(repeating: GridItem(.fixed(34), spacing: 3), count: 3)
+            LazyVGrid(columns: cols, spacing: 3) {
+                ForEach(Watermark.Anchor.allCases) { a in
+                    Button { m.wm.anchor = a } label: {
+                        Image(systemName: a.symbol).font(.system(size: a == .center ? 6 : 10, weight: .semibold)).frame(width: 34, height: 22)
+                            .background(m.wm.anchor == a ? MacTheme.accent : Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 4))
+                    }.buttonStyle(.plain).help(a.label)
+                }
+            }.fixedSize()
+            Spacer()
+        }
+        row("Margins") { Picker("", selection: e.usePixels) { Text("%").tag(false); Text("px").tag(true) }.labelsHidden().pickerStyle(.segmented).frame(width: 90); Spacer() }
+        margin("Across", e.wm.insetX, enabled: ![.top, .center, .bottom].contains(m.wm.anchor), m)
+        margin("Down", e.wm.insetY, enabled: ![.left, .center, .right].contains(m.wm.anchor), m)
+        row("Rotate") { Picker("", selection: e.wm.rotation) { ForEach([0, 90, 180, 270], id: \.self) { Text("\($0)°").tag($0) } }.labelsHidden().pickerStyle(.segmented) }
+        row("Opacity") { Slider(value: e.wm.opacity, in: 0.05...1).tint(MacTheme.accent); val(m.wm.opacity) }
+        head("Frame")
+        row("Border") { Slider(value: e.wm.borderWidth, in: 0...0.05).tint(MacTheme.accent); val(m.wm.borderWidth) }
+        if m.wm.borderWidth > 0 { row("Border col.") { ColorPicker("", selection: e.wm.borderColor, supportsOpacity: false).labelsHidden(); Spacer() } }
+        row("Box") { Slider(value: e.wm.backgroundOpacity, in: 0...1).tint(MacTheme.accent); val(m.wm.backgroundOpacity) }
+        if m.wm.backgroundOpacity > 0 { row("Box colour") { ColorPicker("", selection: e.wm.backgroundColor, supportsOpacity: false).labelsHidden(); Spacer() } }
+        if m.wm.borderWidth > 0 || m.wm.backgroundOpacity > 0 {
+            row("Padding") { Slider(value: e.wm.padding, in: 0...0.1).tint(MacTheme.accent); val(m.wm.padding) }
+            row("Corners") { Slider(value: e.wm.radius, in: 0...0.05).tint(MacTheme.accent); val(m.wm.radius) }
+        }
+        head("Save and share")
+        row("Name") {
+            TextField("Name", text: e.saveName).textFieldStyle(.roundedBorder)
+            Button("Save") { Task { await m.saveCurrent(engine: lib.engine) } }.controlSize(.small).disabled(!m.wm.hasContent || m.saveName.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        row("File") {
+            Button("Import…") { Task { await m.importFile(engine: lib.engine) } }.controlSize(.small)
+            Button("Export…") { Task { await m.exportFile(engine: lib.engine) } }.controlSize(.small).disabled(!m.wm.hasContent)
+            Spacer()
+        }
+    }
+    @ViewBuilder private func margin(_ t: String, _ v: Binding<Double>, enabled: Bool, _ m: ExportModel) -> some View {
+        let ref = m.referenceShort
+        row(t) {
+            if m.usePixels {
+                Slider(value: Binding(get: { v.wrappedValue * ref }, set: { v.wrappedValue = min(0.4, max(0, $0 / ref)) }), in: 0...(0.4 * ref)).tint(MacTheme.accent)
+                TextField("", value: Binding(get: { (v.wrappedValue * ref).rounded() }, set: { v.wrappedValue = min(0.4, max(0, $0 / ref)) }), format: .number)
+                    .textFieldStyle(.roundedBorder).frame(width: 54)
+                Text("px").font(.system(size: 11)).foregroundStyle(MacTheme.dim)
+            } else {
+                Slider(value: v, in: 0...0.4).tint(MacTheme.accent)
+                Text(String(format: "%.1f%%", v.wrappedValue * 100)).font(.system(size: 11).monospacedDigit()).frame(width: 46, alignment: .trailing)
+            }
+        }.disabled(!enabled).opacity(enabled ? 1 : 0.45)
     }
     private func head<T: View>(_ t: String, @ViewBuilder trailing: () -> T = { EmptyView() }) -> some View {
         HStack { Text(t.uppercased()).font(.system(size: 11, weight: .bold)).tracking(0.6).foregroundStyle(MacTheme.dim); Spacer(); trailing() }

@@ -109,7 +109,11 @@ struct ToolPanel: View {
                 Text(String(format: "%.0f%%", d.healSize * 100)).font(.system(size: 11).monospacedDigit()).foregroundStyle(MacTheme.dim).frame(width: 36)
             }
             Text("Click a blemish on the photo to \(d.healMode == "heal" ? "heal" : "clone over") it.").font(.system(size: 12)).foregroundStyle(MacTheme.dim)
-            chip("Remove all spots", "trash") { go("spot.clear") }
+            LazyVGrid(columns: two, spacing: 6) {
+                chip("Find dust", "sparkles") { go("spot.findDust") }
+                chip("Find blemishes", "face.smiling") { go("spot.findBlemishes") }
+                chip("Delete selected", "trash") { go("spot.delete") }
+            }
         }
     }
 
