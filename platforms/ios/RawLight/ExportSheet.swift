@@ -45,7 +45,7 @@ struct ExportSheet: View {
                     .pickerStyle(.segmented)
             }
             HStack {
-                Toggle("Watermark", isOn: $watermarkOn).tint(Theme.accent)
+                Toggle("Watermark", isOn: $watermarkOn).tint(Theme.accent).layoutPriority(1)
                 Menu {
                     if savedWatermarks.names.isEmpty {
                         Text("No saved watermarks yet")
@@ -56,10 +56,13 @@ struct ExportSheet: View {
                             }
                         }
                     }
-                } label: { Label(watermarkName ?? "Saved", systemImage: "tray.full") }
-                    .buttonStyle(.bordered).tint(Theme.accent)
+                } label: {
+                    Label(watermarkName ?? "Saved", systemImage: "tray.full")
+                        .lineLimit(1).truncationMode(.tail).frame(width: 128)
+                }
+                    .buttonStyle(.bordered).tint(Theme.accent).fixedSize()
                 Button { editingWatermark = true } label: { Label(watermark.hasContent ? "Edit" : "Set up", systemImage: "slider.horizontal.3") }
-                    .buttonStyle(.bordered).tint(Theme.accent).disabled(!watermarkOn)
+                    .buttonStyle(.bordered).tint(Theme.accent).disabled(!watermarkOn).fixedSize()
             }
             .transaction { $0.animation = nil }
             if watermarkOn {
