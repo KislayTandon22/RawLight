@@ -58,11 +58,10 @@ struct ExportSheet: View {
                     }
                 } label: { Label(watermarkName ?? "Saved", systemImage: "tray.full") }
                     .buttonStyle(.bordered).tint(Theme.accent)
-                if watermarkOn {
-                    Button { editingWatermark = true } label: { Label(watermark.hasContent ? "Edit" : "Set up", systemImage: "slider.horizontal.3") }
-                        .buttonStyle(.bordered).tint(Theme.accent)
-                }
+                Button { editingWatermark = true } label: { Label(watermark.hasContent ? "Edit" : "Set up", systemImage: "slider.horizontal.3") }
+                    .buttonStyle(.bordered).tint(Theme.accent).disabled(!watermarkOn)
             }
+            .transaction { $0.animation = nil }
             if watermarkOn {
                 Picker("Style", selection: Binding(get: { watermark.isGraphic }, set: { graphic in
                     if graphic { pickingLogo = true } else { watermark.imagePath = "" }
