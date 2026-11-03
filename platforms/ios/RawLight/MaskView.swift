@@ -182,6 +182,7 @@ struct MaskOverlay: View {
         samples = []
         guard s.count > 1 else { return }
         let id = m.id, base = brushSize, er = erase
+        let edgeAware = UserDefaults.standard.object(forKey: "brushEdgeAware") as? Bool ?? true
         var pieces: [(pts: [[Double]], size: Double)] = []
         var i = 0
         while i < s.count - 1 {
@@ -193,7 +194,7 @@ struct MaskOverlay: View {
         Task {
             // one undo step for the whole stroke
             _ = try? await engine.execute("develop.beginInteraction", ["label": "Brush"])
-            for piece in pieces { _ = try? await engine.execute("mask.brushStroke", ["id": id, "points": piece.pts, "size": piece.size, "erase": er]) }
+            for piece in pieces { _ = try? await engine.execute("mask.brushStroke", ["id": id, "points": piece.pts, "size": piece.size, "erase": er, "autoMask": edgeAware]) }
             _ = try? await engine.execute("develop.endInteraction")
             onChange()
         }
@@ -232,6 +233,7 @@ struct MaskPanel: View {
     let photoID: UInt64
     @Binding var brushSize: Double
     @Binding var erase: Bool
+    @AppStorage("brushEdgeAware") private var edgeAware = true
     @Binding var objectPick: Bool
     @Binding var objectExclude: Bool
     @Binding var showMask: Bool
@@ -306,6 +308,7 @@ struct MaskPanel: View {
                         HStack { Text("Brush size").font(.subheadline); Spacer(); Text(String(format: "%.0f%%", brushSize * 100)).foregroundStyle(.secondary) }
                         Slider(value: $brushSize, in: 0.005...0.15).tint(Theme.accent)
                         Toggle("Erase", isOn: $erase).tint(Theme.accent)
+                        Toggle("Follow edges", isOn: $edgeAware).tint(Theme.accent)
                         Toggle("Pencil only", isOn: $pencilOnly).tint(Theme.accent)
                         Text("Press harder for a bigger brush. Double-tap the Pencil to switch erase. Two-finger tap undoes, three-finger tap redoes.")
                             .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)

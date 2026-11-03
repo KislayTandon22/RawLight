@@ -13,6 +13,7 @@
 		17C6878B1CD7DAE0175AFD72 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188A661C8121EDA12A429069 /* EditorView.swift */; };
 		1B9D62DBAB2A7F77BA3F1B5C /* CustomSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 920F6F245BCB82FDCCB54E3D /* CustomSegmenter.swift */; };
 		28B0448BDE83D82EC638EE1A /* VisionSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */; };
+		2B33640263264370ED0676DF /* rawnind.onnx in Resources */ = {isa = PBXBuildFile; fileRef = D1432822B16B28567ADFF20C /* rawnind.onnx */; };
 		2BD75BF7D1644A848EEE2CBB /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D206DF744DE049ABECA7CEDA /* LibraryView.swift */; };
 		2CE64B5C03DBCC13CDD2DF27 /* WatermarkEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB6A6B69F2D2CE6D8600DE7 /* WatermarkEditor.swift */; };
 		31706586C5570C3DD9D03174 /* RegionGrow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6819299CDC16F1CDE6499E5E /* RegionGrow.swift */; };
@@ -99,6 +100,7 @@
 		C3EC374FB396C8F10DFF54E6 /* PencilCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PencilCanvas.swift; sourceTree = "<group>"; };
 		C9F4DB53F553D83A0202BEAC /* AppleDenoise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDenoise.swift; sourceTree = "<group>"; };
 		CB1E46860D465391ACFBEF6F /* RawLight.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RawLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1432822B16B28567ADFF20C /* rawnind.onnx */ = {isa = PBXFileReference; path = rawnind.onnx; sourceTree = "<group>"; };
 		D206DF744DE049ABECA7CEDA /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		D3B77BAF42055C39AE246659 /* mobile_sam_encoder.mlpackage */ = {isa = PBXFileReference; path = mobile_sam_encoder.mlpackage; sourceTree = "<group>"; };
 		D742C2F30391CF2108E6DCA3 /* VisionSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionSegmenter.swift; sourceTree = "<group>"; };
@@ -202,6 +204,7 @@
 		D1B21934F22DC7163CA9734B /* Faces */ = {
 			isa = PBXGroup;
 			children = (
+				D1432822B16B28567ADFF20C /* rawnind.onnx */,
 				AE52464061F3DC081C48C6A9 /* sface.onnx */,
 				9F7B2375FC21B827B7827195 /* yunet.onnx */,
 			);
@@ -295,6 +298,7 @@
 				9CEF4857CA516620EFE20293 /* Assets.xcassets in Resources */,
 				8E1E0FD790D3AA0EDC9448C2 /* PrivacyInfo.xcprivacy in Resources */,
 				BB338ADF5B39F607E7EF3F27 /* mobile_sam_prompt_encoder_weights.json in Resources */,
+				2B33640263264370ED0676DF /* rawnind.onnx in Resources */,
 				0657DFCB0504D15F12079E1F /* sface.onnx in Resources */,
 				87C2F4896E7DD560BE07C8D8 /* yunet.onnx in Resources */,
 			);
