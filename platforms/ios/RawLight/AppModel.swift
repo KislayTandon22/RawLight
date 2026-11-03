@@ -388,6 +388,13 @@ final class AppModel {
 
     /// Starts the download (the caller has shown the terms and the user accepted) and follows it until it is installed.
     func downloadDenoiseModel() async {
+        // the model ships inside the app: installing it needs no download, only the accepted terms
+        if let url = Bundle.main.url(forResource: "rawnind", withExtension: "onnx") {
+            denoiseDownloadError = nil
+            do { _ = try await engine.execute("denoise.models.install", ["path": url.path, "acknowledged": true]) }
+            catch { denoiseDownloadError = error.localizedDescription }
+            return
+        }
         guard denoiseDownload == nil, let list = try? await engine.execute("denoise.models.list", [:]) as? [String: Any],
               let id = (list["models"] as? [[String: Any]] ?? []).first(where: { ($0["known"] as? Bool) == true && $0["downloadHost"] != nil })?["id"] as? String else { return }
         denoiseDownloadError = nil

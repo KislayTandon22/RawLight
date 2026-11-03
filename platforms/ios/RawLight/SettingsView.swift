@@ -112,7 +112,7 @@ struct SettingsView: View {
                                 else { Button("Use") { Task { await selectModel(m["id"] as? String) } }.buttonStyle(.bordered).tint(Theme.accent) }
                             } else if (m["known"] as? Bool) == true {
                                 if let dl = model.denoiseDownload { ProgressView(value: dl.total > 0 ? Double(dl.bytes) / Double(dl.total) : nil).frame(width: 90).tint(Theme.accent) }
-                                else { Button("Download") { Task { await askModelDownload() } }.buttonStyle(.borderedProminent).tint(Theme.accent) }
+                                else { Button(Bundle.main.url(forResource: "rawnind", withExtension: "onnx") != nil ? "Install" : "Download") { Task { await askModelDownload() } }.buttonStyle(.borderedProminent).tint(Theme.accent) }
                             }
                         }
                         .swipeActions { if installed { Button("Remove", role: .destructive) { Task { await removeModel(m["id"] as? String) } } } }
@@ -121,7 +121,7 @@ struct SettingsView: View {
                         Button("Switch AI denoise off") { Task { await selectModel(nil) } }
                     }
                 } header: { Text("AI denoise model") } footer: {
-                    Text("RawNIND (GPL-3.0) is not part of the app: it is downloaded only when you ask, after you see its licence. Swipe a model to remove it. To add another .onnx model, use Edit › Detail › Add a denoise model. Everything runs on this device and nothing is uploaded.")
+                    Text("RawNIND (GPL-3.0) comes with the app but stays off until you accept its licence. Swipe a model to remove it. To add another .onnx model, use Edit › Detail › Add a denoise model. Everything runs on this device and nothing is uploaded.")
                 }
                 Section("About") {
                     LabeledContent("RawLight", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
@@ -142,7 +142,7 @@ struct SettingsView: View {
             .onChange(of: model.denoiseDownload == nil) { _, _ in Task { await loadModels() } }
             .alert(terms?.title ?? "", isPresented: Binding(get: { terms != nil }, set: { if !$0 { terms = nil } })) {
                 Button("Cancel", role: .cancel) {}
-                Button("Accept and download") { Task { await model.downloadDenoiseModel() } }
+                Button("Accept and install") { Task { await model.downloadDenoiseModel(); await loadModels() } }
             } message: { Text(terms?.terms ?? "") }
         }
         .presentationBackground(.ultraThinMaterial).presentationCornerRadius(28)

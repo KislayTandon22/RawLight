@@ -219,7 +219,8 @@ struct EditorView: View {
                     if objectPick && mode == .mask {
                         Color.clear.contentShape(Rectangle())
                             .gesture(SpatialTapGesture().onEnded { tapObject(at: $0.location, in: rect) })
-                        objectMarkers(in: rect)
+                            .scaleEffect(scale).offset(offset)
+                        objectMarkers(in: rect).scaleEffect(scale).offset(offset)
                     }
                     if let hud {
                         Text(hud).font(.title3.weight(.semibold)).padding(.horizontal, 18).frame(height: 46).panelBackground(in: Capsule())
@@ -231,6 +232,7 @@ struct EditorView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 10).allowsHitTesting(false)
                     }
                     if objectPick && mode == .mask && ObjectPicker.shared.lasso {
+                      Group {
                         PencilCanvas(pencilOnly: UserDefaults.standard.bool(forKey: "pencilOnly"),
                                      onBegan: { lassoStroke = [$0.point] },
                                      onMoved: { lassoStroke.append(contentsOf: $0.map(\.point)) },
@@ -253,6 +255,7 @@ struct EditorView: View {
                             }
                             if let tip = tail.last { ctx.fill(Path(ellipseIn: CGRect(x: tip.x - 6, y: tip.y - 6, width: 12, height: 12)), with: .color(.white)) }
                         }.allowsHitTesting(false)
+                      }.scaleEffect(scale).offset(offset)
                     }
                     if picking {
                         Color.clear.contentShape(Rectangle())
@@ -262,7 +265,7 @@ struct EditorView: View {
                     if mode == .crop { CropOverlay(engine: model.engine, imageRect: rect) { live.run { await render(draft: true) } }.transition(.opacity) }
                     if mode == .heal { HealOverlay(engine: model.engine, imageRect: rect, tool: healTool, spotMode: spotMode, spotSize: spotSize, pet: pet) { live.run { await render(draft: true) } }.transition(.opacity) }
                     if mode == .mask { MaskOverlay(engine: model.engine, imageRect: rect, brushSize: brushSize, erase: erase, pencilOnly: UserDefaults.standard.bool(forKey: "pencilOnly"),
-                        onUndo: { Task { await command("edit.undo") } }, onRedo: { Task { await command("edit.redo") } }, onPencilTap: { erase.toggle() }) { live.run { await render(draft: true) } }.transition(.opacity) }
+                        onUndo: { Task { await command("edit.undo") } }, onRedo: { Task { await command("edit.redo") } }, onPencilTap: { erase.toggle() }) { live.run { await render(draft: true) } }.scaleEffect(scale).offset(offset).transition(.opacity) }
                 } else {
                     // Opening a large raw takes a moment: show its thumbnail under a progress badge instead of a black screen.
                     ZStack {
@@ -276,6 +279,13 @@ struct EditorView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
+            // Mask mode: pinch to zoom for precise work. One finger pans only while tapping objects (a finger draws brush, lasso and handles).
+            .simultaneousGesture(MagnifyGesture().onChanged { if mode == .mask { scale = min(max($0.magnification * baseScale, 1), 8) } }
+                .onEnded { _ in if mode == .mask { baseScale = scale; if scale == 1 { offset = .zero; baseOffset = .zero } } })
+            .simultaneousGesture(DragGesture(minimumDistance: 12).onChanged {
+                if mode == .mask, objectPick, !ObjectPicker.shared.lasso, scale > 1 { offset = CGSize(width: baseOffset.width + $0.translation.width, height: baseOffset.height + $0.translation.height) }
+            }.onEnded { _ in if mode == .mask { baseOffset = offset } })
+            .onTapGesture(count: 2) { if mode == .mask, scale > 1 { withAnimation(.snappy) { scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero } } }
         }
     }
 
