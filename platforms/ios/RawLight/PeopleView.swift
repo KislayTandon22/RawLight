@@ -64,7 +64,7 @@ struct PeopleView: View {
     private var modelsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Face models").font(.headline)
-            Text("Faces are found and matched on this device. The models are not bundled; each one is an optional download you accept first.").font(.footnote).foregroundStyle(.secondary)
+            Text("Faces are found and matched on this device. The two small models come with the app and install without a download once you accept their terms; larger ones are optional downloads.").font(.footnote).foregroundStyle(.secondary)
             ForEach(models) { m in
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -75,7 +75,7 @@ struct PeopleView: View {
                     Spacer()
                     if m.installed { Label("Installed", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accentSoft) }
                     else if let p = progress[m.id] { ProgressView(value: p).frame(width: 70).tint(Theme.accent) }
-                    else { Button("Download") { pendingDownload = m }.buttonStyle(.borderedProminent).tint(Theme.accent) }
+                    else { Button(Self.bundled(m.id) != nil ? "Install" : "Download") { pendingDownload = m }.buttonStyle(.borderedProminent).tint(Theme.accent) }
                 }
                 .padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
@@ -91,7 +91,7 @@ struct PeopleView: View {
             Button {
                 pendingDownload = nil
                 Task { await download(m) }
-            } label: { Text("I accept, download").font(.headline).frame(maxWidth: .infinity).frame(height: 50).background(Theme.accent, in: Capsule()).foregroundStyle(.white) }
+            } label: { Text(Self.bundled(m.id) != nil ? "I accept, install" : "I accept, download").font(.headline).frame(maxWidth: .infinity).frame(height: 50).background(Theme.accent, in: Capsule()).foregroundStyle(.white) }
             Button("Cancel") { pendingDownload = nil }.frame(maxWidth: .infinity)
         }
         .padding(20)
@@ -213,7 +213,18 @@ struct PeopleView: View {
         return Face(photo: ph, index: i, view: r, suggestion: (d["suggestion"] as? [String: Any])?["name"] as? String)
     }
 
+    /// The model file shipped inside the app, if there is one for this id.
+    static func bundled(_ id: String) -> URL? {
+        let file = ["yunet-2023mar": "yunet", "sface-2021dec": "sface"][id]
+        return file.flatMap { Bundle.main.url(forResource: $0, withExtension: "onnx") }
+    }
+
     private func download(_ m: FaceModel) async {
+        if let url = Self.bundled(m.id) {
+            do { _ = try await model.engine.execute("faces.models.install", ["path": url.path, "acknowledged": true, "activate": !m.role.lowercased().contains("detect")]); message = nil }
+            catch { message = error.localizedDescription }
+            await refresh(); return
+        }
         do { _ = try await model.engine.execute("faces.models.download", ["id": m.id, "acknowledged": true]); progress[m.id] = 0; message = nil }
         catch { message = error.localizedDescription; return }
         await pollDownloads()
