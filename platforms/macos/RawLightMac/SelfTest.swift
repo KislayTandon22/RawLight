@@ -21,6 +21,8 @@ import Foundation
             }
         }
 
+        // face models go to a throwaway folder so the test never touches the real settings
+        setenv("LIGHTCRAFT_FACE_MODELS", FileManager.default.temporaryDirectory.appending(path: "rawlight-faces-\(UUID().uuidString)").path, 1)
         let model = LibraryModel()
         let e = model.engine
         let tmp = FileManager.default.temporaryDirectory.appending(path: "rawlight-selftest-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -32,6 +34,13 @@ import Foundation
             let raws = ((try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []).sorted()
                 .filter { ["arw", "cr2", "cr3", "nef", "dng", "raf"].contains(($0 as NSString).pathExtension.lowercased()) }.prefix(6).map { folder + "/" + $0 }
             await step("Import: \(raws.count) real RAW files") { _ = try await e.execute("library.import", ["paths": Array(raws), "mode": "copy"]); return nil }
+        }
+        for id in ["yunet-2023mar", "sface-2021dec"] {
+            await step("Faces: bundled \(id) installs offline") {
+                guard let url = FacesSettings.bundled(id) else { return "not inside the app" }
+                _ = try await e.execute("faces.models.install", ["path": url.path, "acknowledged": true, "activate": id.hasPrefix("sface")])
+                return nil
+            }
         }
         await model.load()
         log(model.ids.count > 0, "Library: photos load", "\(model.ids.count) photos")

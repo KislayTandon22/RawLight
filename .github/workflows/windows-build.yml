@@ -49,6 +49,18 @@ jobs:
         run: |
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/lightcraft.exe" dist/
+          # the two small face models ship beside the app (pinned commit, checked against the SHA-256 the engine expects);
+          # install them from Settings > Faces after accepting their terms
+          New-Item -ItemType Directory dist/models | Out-Null
+          $base = "https://github.com/opencv/opencv_zoo/raw/25f423d0e04c31a17254620e58febd7386da523b/models"
+          $files = @(
+            @("$base/face_detection_yunet/face_detection_yunet_2023mar.onnx", "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"),
+            @("$base/face_recognition_sface/face_recognition_sface_2021dec.onnx", "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"))
+          foreach ($f in $files) {
+            $out = "dist/models/" + ($f[0] -split "/")[-1]
+            Invoke-WebRequest $f[0] -OutFile $out
+            if ((Get-FileHash $out -Algorithm SHA256).Hash.ToLower() -ne $f[1]) { throw "hash mismatch for $out" }
+          }
           Compress-Archive -Path dist/* -DestinationPath "RawLight-windows-${{ matrix.arch }}.zip"
       - uses: actions/upload-artifact@v4
         with:

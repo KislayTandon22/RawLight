@@ -244,6 +244,7 @@ struct SettingsView: View {
                 Picker("Long edge", selection: $edge) { Text("1600").tag(1600); Text("3000").tag(3000); Text("Full").tag(0) }.pickerStyle(.segmented)
                 Picker("Colour space", selection: $space) { Text("sRGB").tag("srgb"); Text("Display P3").tag("displayP3"); Text("Adobe RGB").tag("adobeRgb") }.pickerStyle(.segmented)
             }.padding(20).tabItem { Label("Export", systemImage: "square.and.arrow.up") }
+            FacesSettings().tabItem { Label("Faces", systemImage: "face.smiling") }
             VStack(spacing: 8) {
                 Text("RawLight").font(.title.weight(.semibold))
                 Text("Version 1.0.0").foregroundStyle(.secondary)
@@ -251,7 +252,7 @@ struct SettingsView: View {
                 Text("Built on the LightCraft engine by the ArtCraft Team and contributors.").multilineTextAlignment(.center).font(.footnote).foregroundStyle(.secondary)
             }.padding(24).tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 480, height: 330)
+        .frame(width: 480, height: 360)
     }
 }
 
