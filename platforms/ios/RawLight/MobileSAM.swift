@@ -50,7 +50,7 @@ final class MobileSAM {
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        guard available, let encoder, let decoder, let weights, w > 0, h > 0, !clicks.isEmpty else { return false }
+        guard available, let encoder, w > 0, h > 0, !clicks.isEmpty else { return false }
         do {
             if key != cacheKey || embeddings == nil {
                 guard let input = image(rgb: rgb, w: w, h: h) else { return false }
@@ -59,16 +59,35 @@ final class MobileSAM {
                 cacheKey = key
             }
             guard let embeddings else { return false }
-            let pts = Array(clicks.suffix(maxPoints))
-            let sparse = try sparseEmbeddings(pts, weights: weights, w: w, h: h)
-            let dense = try denseEmbeddings(weights)
-            let result = try decoder.prediction(from: try MLDictionaryFeatureProvider(dictionary: [
-                "image_embeddings": embeddings, "sparse_embeddings": sparse, "dense_embeddings": dense]))
-            guard let masks = result.featureValue(for: "masks")?.multiArrayValue,
-                  let iou = result.featureValue(for: "iou_predictions")?.multiArrayValue else { return false }
-            sample(masks, index: pick(masks, iou, single: pts.count == 1), w: w, h: h, into: out, side: side)
+            // Every Include tap selects its own object or part and the results are joined, so a tap on another part adds it;
+            // every Exclude tap selects the part under it and cuts it out. (Handing all taps to SAM as one prompt makes it
+            // guess one object, which is why extra taps barely changed the mask.)
+            let tmp = UnsafeMutablePointer<Float>.allocate(capacity: side * side)
+            defer { tmp.deallocate() }
+            out.update(repeating: -8, count: side * side)
+            for c in clicks.filter({ $0.2 }).suffix(maxPoints) {
+                try decode(embeddings, [c], single: true, w: w, h: h, into: tmp, side: side)
+                for i in 0..<(side * side) where tmp[i] > out[i] { out[i] = tmp[i] }
+            }
+            for c in clicks.filter({ !$0.2 }).suffix(maxPoints) {
+                try decode(embeddings, [(c.0, c.1, true)], single: false, w: w, h: h, into: tmp, side: side)
+                for i in 0..<(side * side) where tmp[i] > 0 { out[i] = -8 }
+            }
             return true
         } catch { return false }
+    }
+
+    /// One decoder pass for `pts`, written as logits into `out`.
+    private func decode(_ embeddings: MLMultiArray, _ pts: [(Float, Float, Bool)], single: Bool, w: Int, h: Int,
+                        into out: UnsafeMutablePointer<Float>, side: Int) throws {
+        guard let decoder, let weights else { throw NSError(domain: "MobileSAM", code: 1) }
+        let sparse = try sparseEmbeddings(pts, weights: weights, w: w, h: h)
+        let dense = try denseEmbeddings(weights)
+        let result = try decoder.prediction(from: try MLDictionaryFeatureProvider(dictionary: [
+            "image_embeddings": embeddings, "sparse_embeddings": sparse, "dense_embeddings": dense]))
+        guard let masks = result.featureValue(for: "masks")?.multiArrayValue,
+              let iou = result.featureValue(for: "iou_predictions")?.multiArrayValue else { throw NSError(domain: "MobileSAM", code: 2) }
+        sample(masks, index: pick(masks, iou, single: single), w: w, h: h, into: out, side: side)
     }
 
     // MARK: input
