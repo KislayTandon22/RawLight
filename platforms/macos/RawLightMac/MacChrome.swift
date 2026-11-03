@@ -12,7 +12,7 @@ extension LibraryModel {
         guard p.runModal() == .OK else { return }
         importMessage = "Importing \(p.urls.count) item\(p.urls.count == 1 ? "" : "s")…"
         do {
-            _ = try await engine.execute("library.import", ["paths": p.urls.map(\.path), "mode": "copy"])
+            _ = try await engine.execute("library.import", ["paths": p.urls.map(\.path), "mode": UserDefaults.standard.object(forKey: "keepInPlace") as? Bool ?? true ? "add" : "copy"])
             await load()
             importMessage = "Import finished · \(ids.count) photos"
         } catch { importMessage = "Import failed: \(error.localizedDescription)" }
@@ -230,10 +230,13 @@ struct SettingsView: View {
     @AppStorage("exportQuality") private var quality = 90.0
     @AppStorage("exportEdge") private var edge = 3000
     @AppStorage("exportSpace") private var space = "srgb"
+    @AppStorage("keepInPlace") private var keepInPlace = true
     var body: some View {
         TabView {
             Form {
                 Slider(value: $thumbSize, in: 90...320) { Text("Grid thumbnail size") }
+                Toggle("Keep photos where they are when importing", isOn: $keepInPlace)
+                Text(keepInPlace ? "The library points at your files; nothing is copied. Keep external drives connected to edit those photos." : "Photos are copied into the library folder.").font(.footnote).foregroundStyle(.secondary)
                 Text("Accent colour follows the RawLight red theme.").font(.footnote).foregroundStyle(.secondary)
             }.padding(20).tabItem { Label("General", systemImage: "gearshape") }
             Form {
@@ -248,7 +251,7 @@ struct SettingsView: View {
                 Text("Built on the LightCraft engine by the ArtCraft Team and contributors.").multilineTextAlignment(.center).font(.footnote).foregroundStyle(.secondary)
             }.padding(24).tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 480, height: 280)
+        .frame(width: 480, height: 330)
     }
 }
 
