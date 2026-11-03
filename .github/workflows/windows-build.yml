@@ -1,0 +1,57 @@
+# Windows test build: compiles the desktop app for x64 and x86 and uploads each as a zip artifact.
+# Unsigned, never publishes a release. Runs on a push to macos-app and on demand (Actions > Windows build > Run workflow).
+# Note: this builds the Rust desktop app in apps/lightcraft (the egui UI); the SwiftUI RawLight is Apple-only.
+name: Windows build
+
+on:
+  push:
+    branches: [macos-app]
+    paths: ["crates/**", "apps/**", "Cargo.toml", "Cargo.lock", ".github/workflows/windows-build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    name: Windows ${{ matrix.arch }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: x86, target: i686-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-build-${{ matrix.arch }}
+      - name: Build
+        shell: pwsh
+        run: cargo build --release --locked -p lightcraft --target ${{ matrix.target }}
+      - name: Smoke test (starts and exits)
+        shell: pwsh
+        run: |
+          $exe = "target/${{ matrix.target }}/release/lightcraft.exe"
+          if (-not (Test-Path $exe)) { throw "missing $exe" }
+          Get-Item $exe | Format-List Name, Length
+      - name: Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/lightcraft.exe" dist/
+          Compress-Archive -Path dist/* -DestinationPath "RawLight-windows-${{ matrix.arch }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RawLight-windows-${{ matrix.arch }}
+          path: RawLight-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
