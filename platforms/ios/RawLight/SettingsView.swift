@@ -36,6 +36,9 @@ struct SettingsView: View {
                     Button("Optimise library") { Task { await optimise() } }
                 }
                 Section {
+                    Toggle("Keep photos where they are", isOn: Binding(get: { model.keepInPlace }, set: { model.keepInPlace = $0 })).tint(Theme.accent)
+                } header: { Text("Import") } footer: { Text("Photos picked in Files, including those on an external drive, are not copied onto the iPad; the library points at them. Keep the drive connected to edit them. Photos from the Photos app are always copied.") }
+                Section {
                     Toggle("Write edits to XMP sidecars", isOn: $autoWrite).tint(Theme.accent)
                         .onChange(of: autoWrite) { _, v in Task { _ = try? await model.engine.execute("library.xmpPreferences", ["autoWrite": v]) } }
                 } header: { Text("Metadata") } footer: { Text("Saves a small .xmp file next to each original so other apps can read your edits.") }

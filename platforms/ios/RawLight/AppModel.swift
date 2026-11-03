@@ -93,6 +93,35 @@ final class AppModel {
         sources = Array(sources.prefix(8))
         if let d = try? JSONEncoder().encode(sources) { UserDefaults.standard.set(d, forKey: "importSources") }
     }
+    // MARK: photos left where they are (external drives, Files folders)
+
+    /// When on, photos picked in Files stay where they are and the library only points at them, so nothing is copied onto the iPad.
+    var keepInPlace: Bool {
+        get { UserDefaults.standard.object(forKey: "keepInPlace") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "keepInPlace") }
+    }
+    /// Locations the library points at; access to each is held open while the app runs.
+    private var heldScopes: [URL] = []
+
+    private func hold(_ url: URL) {
+        guard !heldScopes.contains(where: { $0.path == url.path }), url.startAccessingSecurityScopedResource() else { return }
+        heldScopes.append(url)
+        guard let data = try? url.bookmarkData() else { return }
+        var all = UserDefaults.standard.array(forKey: "referenceBookmarks") as? [Data] ?? []
+        if !all.contains(data) { all.append(data); UserDefaults.standard.set(all, forKey: "referenceBookmarks") }
+    }
+    /// Reopens access to every location the library points at, before the library is read.
+    private func restoreReferenceAccess() {
+        var fresh: [Data] = []
+        for data in UserDefaults.standard.array(forKey: "referenceBookmarks") as? [Data] ?? [] {
+            var stale = false
+            guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { fresh.append(data); continue }  // drive not connected: keep it for next time
+            if url.startAccessingSecurityScopedResource() { heldScopes.append(url) }
+            fresh.append(stale ? ((try? url.bookmarkData()) ?? data) : data)
+        }
+        UserDefaults.standard.set(fresh, forKey: "referenceBookmarks")
+    }
+
     func forgetSources() { sources = []; UserDefaults.standard.removeObject(forKey: "importSources") }
 
     /// Imports again from a remembered folder; files already in the library are skipped by the engine.
@@ -104,9 +133,10 @@ final class AppModel {
         importing = true
         defer { importing = false }
         guard url.startAccessingSecurityScopedResource() else { importMessage = "No access to \(s.name)"; return }
-        defer { url.stopAccessingSecurityScopedResource() }
         if stale { remember(url) }
-        await runImport([url.path])
+        defer { url.stopAccessingSecurityScopedResource() }
+        if keepInPlace { hold(url) }   // hold() takes its own access, which stays open
+        await runImport([url.path], inPlace: keepInPlace)
     }
 
     func scanLibraries() {
@@ -124,6 +154,7 @@ final class AppModel {
         started = true
         defer { openingLibrary = false }
         loadSources()
+        restoreReferenceAccess()
         scanLibraries()
         // UI tests start from a fresh demo library every run
         if DebugEnv.vars["RAWLIGHT_FRESH"] != nil { await createLibrary(name: "UITest", demo: true); return }
@@ -295,19 +326,22 @@ final class AppModel {
         defer { importing = false }
         var scoped: [URL] = []
         for u in urls where u.startAccessingSecurityScopedResource() { scoped.append(u); remember(u) }
-        defer { scoped.forEach { $0.stopAccessingSecurityScopedResource() } }
         guard !scoped.isEmpty else { importMessage = "No access to the selected items"; return }
-        // HEIC has no decoder in the engine: convert those to JPEG first and import the JPEGs too
+        let keep = keepInPlace
+        if keep { for u in scoped { hold(u) } }   // access stays open: the library reads these files from where they are
+        defer { scoped.forEach { $0.stopAccessingSecurityScopedResource() } }
+        // HEIC has no decoder in the engine: convert those to JPEG first; the JPEGs are temporary, so they are always copied in
         let stage = FileManager.default.temporaryDirectory.appending(path: "Heic-\(UUID().uuidString)", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: stage) }
         let converted = scoped.flatMap { HEICConverter.convertAll(under: $0, into: stage) }
-        await runImport(scoped.map(\.path) + converted.map(\.path))
+        await runImport(scoped.map(\.path), inPlace: keep)
+        if !converted.isEmpty { await runImport(converted.map(\.path), inPlace: false) }
     }
 
-    private func runImport(_ paths: [String]) async {
+    private func runImport(_ paths: [String], inPlace: Bool = false) async {
         do {
-            let r = try await engine.execute("library.import", ["paths": paths, "mode": "copy"])
+            let r = try await engine.execute("library.import", ["paths": paths, "mode": inPlace ? "add" : "copy"])
             await load()
             let n = ((r as? [String: Any])?["imported"] as? NSNumber)?.intValue ?? 0
             importMessage = "Imported \(n) photo\(n == 1 ? "" : "s")"
