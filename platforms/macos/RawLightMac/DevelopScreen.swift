@@ -141,6 +141,7 @@ struct DevelopScreen: View {
         .task(id: lib.activeID) {
             guard let id = lib.activeID else { return }
             await dev.open(id, engine: lib.engine)
+            lib.prefetchNeighbours(of: id)
             // Debug aid: RAWLIGHT_EDIT="label=value" drives the same path a slider drag does (draft then commit).
             if let e = ProcessInfo.processInfo.environment["RAWLIGHT_EDIT"]?.split(separator: "="), e.count == 2, let v = Double(e[1]),
                let c = dev.controls.first(where: { $0.label == e[0] }) {

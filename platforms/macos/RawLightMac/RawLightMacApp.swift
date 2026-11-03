@@ -18,6 +18,10 @@ struct RawLightMacApp: App {
                 .frame(minWidth: 1000, minHeight: 640)
                 .task {
                     model.installKeys()
+                    if let folder = ProcessInfo.processInfo.environment["RAWLIGHT_SCRIPT"] {
+                        await ScriptRun.run(folder: folder, logPath: ProcessInfo.processInfo.environment["RAWLIGHT_SCRIPT_LOG"] ?? "/tmp/rawlight-script.txt", model: model)
+                        return
+                    }
                     await model.load()
                     // Start the GPU pipeline now, so the first Develop picture is not the one that pays for it.
                     if let f = model.ids.first { Task.detached(priority: .utility) { _ = await model.engine.render(f, maxEdge: 64, kind: 2) } }

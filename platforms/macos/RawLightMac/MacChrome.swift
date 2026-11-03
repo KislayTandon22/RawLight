@@ -39,6 +39,13 @@ extension LibraryModel {
         selection = [ids[n]]
         if module == "Develop" { activeID = ids[n] } else { activeID = ids[n] }
     }
+    /// Decode the photos either side of `id` at low priority, so stepping to them does not pay the RAW decode (about 350 ms each).
+    func prefetchNeighbours(of id: UInt64) {
+        guard let i = ids.firstIndex(of: id) else { return }
+        let near = [i + 1, i - 1, i + 2].filter { ids.indices.contains($0) }.map { ids[$0] }
+        let engine = engine
+        Task.detached(priority: .utility) { for n in near { _ = await engine.render(n, maxEdge: 900, kind: 2) } }
+    }
     func refreshThumbs() { for id in targetIDs { thumbVersion[id, default: 0] += 1 } }
     func go(_ module: String) {
         if module == "Develop", activeID == nil, let f = ids.first { openDevelop(f) } else { self.module = module }
