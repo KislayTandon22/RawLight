@@ -22,6 +22,7 @@ import Foundation
         }
 
         // face models go to a throwaway folder so the test never touches the real settings
+        setenv("LIGHTCRAFT_DENOISE_MODELS", FileManager.default.temporaryDirectory.appending(path: "rawlight-denoise-\(UUID().uuidString)").path, 1)
         setenv("LIGHTCRAFT_FACE_MODELS", FileManager.default.temporaryDirectory.appending(path: "rawlight-faces-\(UUID().uuidString)").path, 1)
         let model = LibraryModel()
         let e = model.engine
@@ -41,6 +42,13 @@ import Foundation
                 _ = try await e.execute("faces.models.install", ["path": url.path, "acknowledged": true, "activate": id.hasPrefix("sface")])
                 return nil
             }
+        }
+        await step("Denoise: bundled RawNIND installs offline") {
+            guard let url = DenoiseSettings.bundled else { return "not inside the app" }
+            _ = try await e.execute("denoise.models.install", ["path": url.path, "acknowledged": true])
+            let l = try await e.execute("denoise.models.list") as? [String: Any]
+            let ok = ((l?["models"] as? [[String: Any]]) ?? []).contains { ($0["id"] as? String) == "rawnind-bayer" && ($0["installed"] as? Bool) == true }
+            return ok ? nil : "installed but not listed"
         }
         await model.load()
         log(model.ids.count > 0, "Library: photos load", "\(model.ids.count) photos")

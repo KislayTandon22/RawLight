@@ -244,6 +244,7 @@ struct SettingsView: View {
                 Picker("Long edge", selection: $edge) { Text("1600").tag(1600); Text("3000").tag(3000); Text("Full").tag(0) }.pickerStyle(.segmented)
                 Picker("Colour space", selection: $space) { Text("sRGB").tag("srgb"); Text("Display P3").tag("displayP3"); Text("Adobe RGB").tag("adobeRgb") }.pickerStyle(.segmented)
             }.padding(20).tabItem { Label("Export", systemImage: "square.and.arrow.up") }
+            DenoiseSettings().tabItem { Label("AI Denoise", systemImage: "wand.and.sparkles") }
             FacesSettings().tabItem { Label("Faces", systemImage: "face.smiling") }
             VStack(spacing: 8) {
                 Text("RawLight").font(.title.weight(.semibold))
