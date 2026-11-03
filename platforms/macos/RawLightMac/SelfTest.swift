@@ -26,8 +26,15 @@ import Foundation
         let tmp = FileManager.default.temporaryDirectory.appending(path: "rawlight-selftest-\(UUID().uuidString)", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
 
+        // RAWLIGHT_SELFTEST_RAWS=/folder runs every check on real RAW files in a fresh library instead of the demo photos.
+        if let folder = ProcessInfo.processInfo.environment["RAWLIGHT_SELFTEST_RAWS"] {
+            await model.openLibrary(tmp.appending(path: "lib"))
+            let raws = ((try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []).sorted()
+                .filter { ["arw", "cr2", "cr3", "nef", "dng", "raf"].contains(($0 as NSString).pathExtension.lowercased()) }.prefix(6).map { folder + "/" + $0 }
+            await step("Import: \(raws.count) real RAW files") { _ = try await e.execute("library.import", ["paths": Array(raws), "mode": "copy"]); return nil }
+        }
         await model.load()
-        log(model.ids.count > 0, "Library: demo photos load", "\(model.ids.count) photos")
+        log(model.ids.count > 0, "Library: photos load", "\(model.ids.count) photos")
         guard let first = model.ids.first else { return finish(lines, failed, report) }
 
         // navigation
@@ -161,7 +168,7 @@ import Foundation
         let many = ExportModel(); many.folder = tmp.appending(path: "many", directoryHint: .isDirectory); many.longEdge = 1600
         await many.run(ids: Array(model.ids.prefix(5)), engine: e)
         let manyFiles = (try? FileManager.default.contentsOfDirectory(atPath: many.folder.path)) ?? []
-        log(manyFiles.count == 5, "Export: five photos at once", "\(manyFiles.count) files")
+        log(manyFiles.count == min(5, model.ids.count), "Export: five photos at once", "\(manyFiles.count) files")
         for (name, tweak) in [("border and box", { (w: inout Watermark) in w.borderWidth = 0.01; w.backgroundOpacity = 0.5; w.padding = 0.01; w.radius = 0.01 }),
                               ("every anchor", { (w: inout Watermark) in w.anchor = .topLeft }),
                               ("vertical text, rotated", { (w: inout Watermark) in w.vertical = true; w.rotation = 90 })] as [(String, (inout Watermark) -> Void)] {
