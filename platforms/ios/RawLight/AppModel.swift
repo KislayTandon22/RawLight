@@ -133,9 +133,8 @@ final class AppModel {
     func temporaryBytes() -> Int {
         var total = 0
         for dir in temporaryFolders() {
-            for case let f as URL in FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey]) ?? NSDirectoryEnumerator() {
-                total += (try? f.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-            }
+            guard let walk = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey]) else { continue }
+            for case let f as URL in walk { total += (try? f.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0 }
         }
         return total
     }
