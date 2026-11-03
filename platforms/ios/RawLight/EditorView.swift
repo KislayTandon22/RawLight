@@ -378,6 +378,8 @@ struct EditorView: View {
             do {
                 var cmds = 0
                 var rest = points[...]
+                // a later tap always extends the mask the first tap made: ask the engine which one that is if the editor lost track
+                if objectMask == nil, picker.taps.contains(where: { !$0.exclude }) { objectMask = await model.engine.masks().active }
                 if objectMask == nil, !objectExclude, let r = try await model.engine.execute("mask.add", ["kind": "object", "points": points.map { [$0.0, $0.1] }]) as? [String: Any] {
                     objectMask = (r["activeMask"] as? NSNumber)?.intValue
                     rest = []; cmds = 1
@@ -385,9 +387,10 @@ struct EditorView: View {
                 if let id = objectMask {
                     for p in rest { _ = try await model.engine.execute("mask.objectPoint", ["x": p.0, "y": p.1, "exclude": objectExclude, "id": id]); cmds += 1 }
                 }
+                SegmenterReadout.mask = objectMask.map(String.init) ?? "none"
                 for (i, p) in points.enumerated() { picker.taps.append(.init(x: p.0, y: p.1, exclude: objectExclude, group: group, cmds: i == 0 ? cmds : 0, lasso: lasso)) }
             } catch {
-                picker.error = lasso ? "Couldn't find an object in that loop. Draw closer around it." : "Couldn't pick an object there. Try the middle of it, or tap again."
+                picker.error = (lasso ? "Couldn't find an object in that loop. Draw closer around it." : "Couldn't pick an object there. Try the middle of it, or tap again.") + " (\(error.localizedDescription))"
             }
             NotificationCenter.default.post(name: .masksChanged, object: nil)
             NotificationCenter.default.post(name: .photoOpened, object: nil)   // the mask list reloads too

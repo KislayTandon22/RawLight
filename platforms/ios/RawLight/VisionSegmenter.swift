@@ -179,6 +179,7 @@ private func visionSegmentEntry(
 enum SegmenterReadout {
     nonisolated(unsafe) static var text = ""
     nonisolated(unsafe) static var path = "Vision"
+    nonisolated(unsafe) static var mask = ""
 }
 
 /// Hand the engine the Vision segmenter (call once at launch).
