@@ -11,6 +11,12 @@ import SwiftUI
     var saveName = ""
     var usePixels = false
     var folder: URL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!.appending(path: "RawLight Exports", directoryHint: .isDirectory)
+    /// How files are named: tokens such as {name} {seq} {date} {camera} {rating}; {seq:4} pads to four digits.
+    var naming = UserDefaults.standard.string(forKey: "exportNaming") ?? "{name}"
+    var startNumber = 1
+    /// A folder made inside the chosen one for this export; {date} becomes today's date.
+    var subfolder = ""
+    var conflict = "unique"
     var working = false
     var message: String?
     var preview: NSImage?
@@ -58,18 +64,46 @@ import SwiftUI
         catch { message = error.localizedDescription }
     }
 
+    func chooseFolder() {
+        let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true
+        p.prompt = "Choose"; p.message = "Choose or create the folder the exported files are saved in"; p.directoryURL = folder
+        if p.runModal() == .OK, let u = p.url { folder = u }
+    }
+
+    /// The subfolder name with {date} filled in, and anything that could leave the chosen folder removed.
+    var resolvedSubfolder: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        return subfolder.replacingOccurrences(of: "{date}", with: f.string(from: Date()))
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:")).joined(separator: "-").trimmingCharacters(in: .whitespaces)
+    }
+    /// What the naming rule gives for a photo called IMG_0042.CR2 at position `n`, so the rule can be checked before exporting.
+    func example(_ n: Int) -> String {
+        var out = naming.isEmpty ? "{name}" : naming
+        let d = DateFormatter(); d.dateFormat = "yyyyMMdd"
+        let num = n + startNumber - 1
+        func seq(_ digits: Int) -> String { String(format: "%0\(digits)d", num) }
+        for (tok, val) in [("{name}", "IMG_0042"), ("{num}", "0042"), ("{date}", d.string(from: Date())), ("{ext}", "CR2"), ("{rating}", "0")] { out = out.replacingOccurrences(of: tok, with: val) }
+        if let r = out.range(of: "\\{seq:(\\d+)\\}", options: .regularExpression) {
+            out.replaceSubrange(r, with: seq(Int(out[r].dropFirst(5).dropLast()) ?? 3))
+        }
+        out = out.replacingOccurrences(of: "{seq}", with: seq(3)).replacingOccurrences(of: "{n}", with: seq(3))
+        return out + "." + ["jpeg": "jpg", "png": "png", "tiff": "tif", "webp": "webp"][format, default: "jpg"]
+    }
+
     func run(ids: [UInt64], engine: MacEngine) async {
         working = true; message = nil
         defer { working = false }
+        UserDefaults.standard.set(naming, forKey: "exportNaming")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var p: [String: Any] = ["ids": ids, "format": format, "quality": Int(quality), "longEdge": longEdge, "colorSpace": colorSpace]
+        var p: [String: Any] = ["ids": ids, "format": format, "quality": Int(quality), "longEdge": longEdge, "colorSpace": colorSpace,
+                                "naming": naming, "startNumber": max(startNumber, 1), "conflict": conflict, "dir": folder.path]
+        if !resolvedSubfolder.isEmpty { p["subfolder"] = resolvedSubfolder }
         if useWatermark, wm.hasContent { p["watermark"] = wm.params }
-        let ext = ["jpeg": "jpg", "png": "png", "tiff": "tif", "webp": "webp"][format] ?? "jpg"
-        if ids.count == 1 { p["path"] = folder.appending(path: "RawLight-\(ids[0]).\(ext)").path } else { p["dir"] = folder.path }
         do {
             let r = try await engine.execute("app.export", p)
             let files = ((r as? [String: Any])?["files"] as? [[String: Any]]) ?? []
-            message = files.isEmpty ? "Nothing was exported" : "Exported \(files.count) file\(files.count == 1 ? "" : "s") to \(folder.path)"
+            let into = resolvedSubfolder.isEmpty ? folder.path : folder.appending(path: resolvedSubfolder).path
+            message = files.isEmpty ? "Nothing was exported" : "Exported \(files.count) file\(files.count == 1 ? "" : "s") to \(into)"
         } catch { message = error.localizedDescription }
     }
 }
@@ -143,6 +177,25 @@ private struct SettingsPane: View {
                     }
                     row("Long edge") { Picker("", selection: $e.longEdge) { Text("1600").tag(1600); Text("3000").tag(3000); Text("Full").tag(0) }.labelsHidden().pickerStyle(.segmented) }
                     row("Colour") { Picker("", selection: $e.colorSpace) { Text("sRGB").tag("srgb"); Text("P3").tag("displayP3"); Text("Adobe").tag("adobeRgb") }.labelsHidden().pickerStyle(.segmented) }
+                    head("Files")
+                    row("Folder") {
+                        Text(ex.folder.lastPathComponent).lineLimit(1).truncationMode(.middle).font(.system(size: 11.5))
+                        Spacer(); Button("Choose…") { ex.chooseFolder() }.controlSize(.small)
+                    }
+                    row("Subfolder") { TextField("optional, e.g. Kyoto {date}", text: $e.subfolder).textFieldStyle(.roundedBorder).controlSize(.small) }
+                    row("Name") { TextField("{name}", text: $e.naming).textFieldStyle(.roundedBorder).controlSize(.small) }
+                    HStack(spacing: 4) {
+                        ForEach(["{name}", "{seq}", "{date}", "{camera}", "{rating}"], id: \.self) { t in
+                            Button(t) { e.naming += t }.buttonStyle(.plain).font(.system(size: 10.5)).padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(Color.white.opacity(0.1), in: Capsule())
+                        }
+                    }.padding(.horizontal, 14).padding(.leading, 72)
+                    row("Start at") {
+                        Stepper(value: $e.startNumber, in: 1...99999) { Text("\(e.startNumber)").monospacedDigit() }.controlSize(.small)
+                        Spacer()
+                        Picker("", selection: $e.conflict) { Text("Keep both").tag("unique"); Text("Replace").tag("overwrite"); Text("Skip").tag("skip") }.labelsHidden().controlSize(.small).frame(width: 96)
+                    }
+                    Text("e.g. \(ex.example(1)), \(ex.example(2))").font(.system(size: 10.5)).foregroundStyle(MacTheme.dim).padding(.horizontal, 14).padding(.leading, 72)
                     head("Watermark") { Toggle("", isOn: $e.useWatermark).labelsHidden().toggleStyle(.switch).tint(MacTheme.accent).controlSize(.small) }
                     if e.useWatermark { watermarkSection($e) }
                 }.padding(.bottom, 8)

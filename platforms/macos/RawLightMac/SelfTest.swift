@@ -169,6 +169,16 @@ import Foundation
         await many.run(ids: Array(model.ids.prefix(5)), engine: e)
         let manyFiles = (try? FileManager.default.contentsOfDirectory(atPath: many.folder.path)) ?? []
         log(manyFiles.count == min(5, model.ids.count), "Export: five photos at once", "\(manyFiles.count) files")
+        let named = ExportModel(); named.folder = tmp.appending(path: "named", directoryHint: .isDirectory); named.longEdge = 1600
+        named.naming = "Trip-{seq:4}"; named.startNumber = 7; named.subfolder = "Day 1/{date}"
+        await named.run(ids: Array(model.ids.prefix(3)), engine: e)
+        let dayDir = named.folder.appending(path: named.resolvedSubfolder)
+        let namedFiles = ((try? FileManager.default.contentsOfDirectory(atPath: dayDir.path)) ?? []).sorted()
+        log(namedFiles == (7..<(7 + min(3, model.ids.count))).map { String(format: "Trip-%04d.jpg", $0) }, "Export: naming rule, start number and subfolder", namedFiles.joined(separator: ", "))
+        log(named.resolvedSubfolder.contains("/") == false, "Export: subfolder cannot leave the chosen folder", named.resolvedSubfolder)
+        await named.run(ids: Array(model.ids.prefix(3)), engine: e)
+        let again = (try? FileManager.default.contentsOfDirectory(atPath: dayDir.path)) ?? []
+        log(again.count == 2 * min(3, model.ids.count), "Export: same names again keeps both files", "\(again.count) files")
         for (name, tweak) in [("border and box", { (w: inout Watermark) in w.borderWidth = 0.01; w.backgroundOpacity = 0.5; w.padding = 0.01; w.radius = 0.01 }),
                               ("every anchor", { (w: inout Watermark) in w.anchor = .topLeft }),
                               ("vertical text, rotated", { (w: inout Watermark) in w.vertical = true; w.rotation = 90 })] as [(String, (inout Watermark) -> Void)] {
