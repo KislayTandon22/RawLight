@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var photos = 0
     @State private var albums = 0
     @State private var cacheBytes = 0
+    @State private var tempBytes = 0
     @State private var cacheMb = 0
     @State private var autoWrite = false
     @State private var creator = ""
@@ -35,6 +36,10 @@ struct SettingsView: View {
                         .onChange(of: cacheMb) { _, v in Task { _ = try? await model.engine.execute("library.preferences", ["cacheMb": v]) } }
                     Button("Optimise library") { Task { await optimise() } }
                 }
+                Section {
+                    LabeledContent("Temporary files", value: ByteCountFormatter.string(fromByteCount: Int64(tempBytes), countStyle: .file))
+                    Button("Clear temporary files") { model.clearTemporaryFiles(); tempBytes = model.temporaryBytes() }.disabled(tempBytes == 0)
+                } header: { Text("Storage") } footer: { Text("Leftover export and conversion files. Your photos and edits are not touched. These are also cleared each time the app opens.") }
                 Section {
                     Toggle("Keep photos where they are", isOn: Binding(get: { model.keepInPlace }, set: { model.keepInPlace = $0 })).tint(Theme.accent)
                 } header: { Text("Import") } footer: { Text("Photos picked in Files, including those on an external drive, are not copied onto the iPad; the library points at them. Keep the drive connected to edit them. Photos from the Photos app are always copied.") }
@@ -146,6 +151,7 @@ struct SettingsView: View {
     private func load() async {
         if let i = try? await model.engine.execute("library.info") as? [String: Any] {
             photos = i["photos"] as? Int ?? 0; albums = i["albums"] as? Int ?? 0
+            tempBytes = model.temporaryBytes()
             cacheBytes = (((i["cache"] as? [String: Any])?["disk"] as? [String: Any])?["bytes"] as? Int) ?? 0
         }
         if let p = try? await model.engine.execute("library.preferences") as? [String: Any] {

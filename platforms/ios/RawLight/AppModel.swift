@@ -122,6 +122,21 @@ final class AppModel {
         UserDefaults.standard.set(fresh, forKey: "referenceBookmarks")
     }
 
+    // MARK: temporary files (export copies, HEIC conversions)
+
+    private func temporaryFolders() -> [URL] {
+        let tmp = FileManager.default.temporaryDirectory
+        let all = (try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? []
+        return all.filter { $0.lastPathComponent.hasPrefix("RawLight-Export-") || $0.lastPathComponent.hasPrefix("Heic-") }
+    }
+    /// Bytes held by leftover export and conversion folders.
+    func temporaryBytes() -> Int {
+        temporaryFolders().reduce(0) { total, dir in
+            total + ((FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey])?.compactMap { ($0 as? URL)?.resourceValues(forKeys: [.fileSizeKey]).fileSize }.reduce(0, +)) ?? 0)
+        }
+    }
+    func clearTemporaryFiles() { temporaryFolders().forEach { try? FileManager.default.removeItem(at: $0) } }
+
     func forgetSources() { sources = []; UserDefaults.standard.removeObject(forKey: "importSources") }
 
     /// Imports again from a remembered folder; files already in the library are skipped by the engine.
@@ -153,6 +168,7 @@ final class AppModel {
         guard !started else { return }
         started = true
         defer { openingLibrary = false }
+        clearTemporaryFiles()   // nothing in these folders is needed after the share sheet has closed
         loadSources()
         restoreReferenceAccess()
         scanLibraries()
