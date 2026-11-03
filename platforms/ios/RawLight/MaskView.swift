@@ -359,6 +359,7 @@ struct MaskPanel: View {
                 }.buttonStyle(.plain)
             }
             if let e = picker.error { Text(e).font(.footnote).foregroundStyle(Theme.accentSoft) }
+            if !picker.taps.isEmpty, !SegmenterReadout.text.isEmpty { Text(SegmenterReadout.text).font(.caption2).foregroundStyle(.secondary) }
         }
         .padding(12).fieldBackground(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }

@@ -21,7 +21,8 @@ private final class VisionSegmenter {
             return CustomSegmenter.shared.run(role, rgb: rgb, w: w, h: h, out: out, side: side) ? 1 : -6
         }
         // taps (Object tool): MobileSAM follows the tapped thing, so a bird held by a person is just the bird
-        if clicks.contains(where: { $0.2 }), UserDefaults.standard.string(forKey: "segmenter") != "vision", MobileSAM.shared.segment(rgb: rgb, w: w, h: h, key: key, clicks: clicks, out: out, side: side) { return 1 }
+        if clicks.contains(where: { $0.2 }), UserDefaults.standard.string(forKey: "segmenter") != "vision", MobileSAM.shared.segment(rgb: rgb, w: w, h: h, key: key, clicks: clicks, out: out, side: side) { SegmenterReadout.path = "MobileSAM"; return 1 }
+        SegmenterReadout.path = "Vision"
         lock.lock(); defer { lock.unlock() }
         var visionFailed = false
         if key != self.key || handler == nil {
@@ -166,7 +167,18 @@ private func visionSegmentEntry(
     guard let rgb, let out, w > 0, h > 0, side > 0 else { return -1 }
     var list: [(Float, Float, Bool)] = []
     if let clicks { for i in 0..<Int(max(0, n)) { list.append((clicks[i * 3], clicks[i * 3 + 1], clicks[i * 3 + 2] > 0.5)) } }
-    return visionSegmenter.segment(rgb: rgb, w: Int(w), h: Int(h), key: key, clicks: list, out: out, side: Int(side))
+    let r = visionSegmenter.segment(rgb: rgb, w: Int(w), h: Int(h), key: key, clicks: list, out: out, side: Int(side))
+    let n = Int(side) * Int(side)
+    var on = 0
+    for i in 0..<n where out[i] > 0 { on += 1 }
+    SegmenterReadout.text = "\(SegmenterReadout.path) · \(list.count) tap\(list.count == 1 ? "" : "s") · \(on * 100 / max(n, 1))% selected"
+    return r
+}
+
+/// What the last Object tap ran on, shown under the Include / Exclude buttons.
+enum SegmenterReadout {
+    nonisolated(unsafe) static var text = ""
+    nonisolated(unsafe) static var path = "Vision"
 }
 
 /// Hand the engine the Vision segmenter (call once at launch).
