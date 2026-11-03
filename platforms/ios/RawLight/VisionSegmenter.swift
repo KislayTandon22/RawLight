@@ -16,6 +16,11 @@ private final class VisionSegmenter {
 
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Int32 {
+        // a word from the Describe list: the tile puts a marker in the point whose y says which word
+        if let marker = clicks.first(where: { $0.0 < 0.0001 }), let i = TextMask.index(ofMarker: marker.1) {
+            SegmenterReadout.path = "Describe"
+            return TextMask.shared.run(index: i, rgb: rgb, w: w, h: h, key: key, out: out, side: side)
+        }
         // Sky or Background with the user's own model: the tile sends a marker point instead of a real tap
         if let marker = clicks.first(where: { $0.0 < 0.0001 }), let role = CustomSegmenter.Role.allCases.first(where: { abs($0.marker - marker.1) < 0.000004 }) {
             return CustomSegmenter.shared.run(role, rgb: rgb, w: w, h: h, out: out, side: side) ? 1 : -6

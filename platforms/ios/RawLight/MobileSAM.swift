@@ -50,15 +50,9 @@ final class MobileSAM {
     func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, clicks: [(Float, Float, Bool)],
                  out: UnsafeMutablePointer<Float>, side: Int) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        guard available, let encoder, w > 0, h > 0, !clicks.isEmpty else { return false }
+        guard available, w > 0, h > 0, !clicks.isEmpty else { return false }
         do {
-            if key != cacheKey || embeddings == nil {
-                guard let input = image(rgb: rgb, w: w, h: h) else { return false }
-                let r = try encoder.prediction(from: try MLDictionaryFeatureProvider(dictionary: ["image": input]))
-                embeddings = r.featureValue(for: "image_embeddings")?.multiArrayValue
-                cacheKey = key
-            }
-            guard let embeddings else { return false }
+            guard let embeddings = try embed(rgb: rgb, w: w, h: h, key: key) else { return false }
             // All taps go to SAM as one prompt (it refines one object best that way). A tap the joint mask still left out
             // (another object or part) gets its own selection, joined on, so an Include tap always adds what it points at.
             let tmp = UnsafeMutablePointer<Float>.allocate(capacity: side * side)
@@ -69,6 +63,56 @@ final class MobileSAM {
                 let ix = min(side - 1, max(0, Int(c.0 * Float(side)))), iy = min(side - 1, max(0, Int(c.1 * Float(side))))
                 guard out[iy * side + ix] <= 0 else { continue }
                 try decode(embeddings, [c], single: true, w: w, h: h, into: tmp, side: side)
+                for i in 0..<(side * side) where tmp[i] > out[i] { out[i] = tmp[i] }
+            }
+            return true
+        } catch { return false }
+    }
+
+    /// The image embeddings for the photo, encoded once per key.
+    private func embed(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64) throws -> MLMultiArray? {
+        guard let encoder else { return nil }
+        if key != cacheKey || embeddings == nil {
+            guard let input = image(rgb: rgb, w: w, h: h) else { return nil }
+            let r = try encoder.prediction(from: try MLDictionaryFeatureProvider(dictionary: ["image": input]))
+            embeddings = r.featureValue(for: "image_embeddings")?.multiArrayValue
+            cacheKey = key
+        }
+        return embeddings
+    }
+
+    /// Cuts out what each box (x0, y0, x1, y1 as fractions of the photo) contains and joins the results: `side × side` logits.
+    func segment(rgb: UnsafePointer<UInt8>, w: Int, h: Int, key: UInt64, boxes: [(Float, Float, Float, Float)],
+                 out: UnsafeMutablePointer<Float>, side: Int) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard available, let decoder, let weights, w > 0, h > 0, !boxes.isEmpty else { return false }
+        do {
+            guard let embeddings = try embed(rgb: rgb, w: w, h: h, key: key) else { return false }
+            let tmp = UnsafeMutablePointer<Float>.allocate(capacity: side * side)
+            defer { tmp.deallocate() }
+            out.update(repeating: -8, count: side * side)
+            for b in boxes {
+                // a box is two corner tokens (top-left, bottom-right) and no padding token
+                let arr = try MLMultiArray(shape: [1, 2, embedDim as NSNumber], dataType: .float32)
+                let p = arr.dataPointer.bindMemory(to: Float32.self, capacity: arr.count)
+                let half = embedDim / 2
+                for (i, c) in [(b.0, b.1), (b.2, b.3)].enumerated() {
+                    let mx = c.0 * Float(w) * scale + 0.5, my = c.1 * Float(h) * scale + 0.5
+                    let sx = 2 * (mx / Float(size)) - 1, sy = 2 * (my / Float(size)) - 1
+                    let label = weights.points[2 + i]
+                    for j in 0..<half {
+                        let angle = (sx * weights.gaussian[j] + sy * weights.gaussian[half + j]) * 2 * .pi
+                        p[i * embedDim + j] = sin(angle) + label[j]
+                        p[i * embedDim + half + j] = cos(angle) + label[half + j]
+                    }
+                }
+                let result = try decoder.prediction(from: try MLDictionaryFeatureProvider(dictionary: [
+                    "image_embeddings": embeddings, "sparse_embeddings": arr, "dense_embeddings": try denseEmbeddings(weights)]))
+                guard let masks = result.featureValue(for: "masks")?.multiArrayValue,
+                      let iou = result.featureValue(for: "iou_predictions")?.multiArrayValue else { return false }
+                var best = 0
+                for k in 1..<max(1, min(masks.shape.count > 1 ? masks.shape[1].intValue : 1, iou.count)) where iou[k].floatValue > iou[best].floatValue { best = k }
+                sample(masks, index: best, w: w, h: h, into: tmp, side: side)
                 for i in 0..<(side * side) where tmp[i] > out[i] { out[i] = tmp[i] }
             }
             return true

@@ -235,6 +235,7 @@ struct MaskPanel: View {
     @Binding var brushSize: Double
     @Binding var erase: Bool
     @AppStorage("brushEdgeAware") private var edgeAware = true
+    @State private var describing = false
     @Binding var objectPick: Bool
     @Binding var objectExclude: Bool
     @Binding var showMask: Bool
@@ -324,6 +325,9 @@ struct MaskPanel: View {
         }
         .task(id: photoID) { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .photoOpened)) { _ in Task { await reload() } }
+        .sheet(isPresented: $describing) {
+            DescribeSheet { index, name in add(["kind": "object", "points": [TextMask.point(for: index)], "label": name]) }
+        }
     }
 
     private var objectCard: some View {
@@ -367,7 +371,7 @@ struct MaskPanel: View {
 
     /// One-tap mask types, AI first. Replaces the "Add mask" menu so nothing is hidden.
     private var typeTabs: some View {
-        let types: [(symbol: String, title: String, full: String, run: () -> Void)] = [
+        var types: [(symbol: String, title: String, full: String, run: () -> Void)] = [
             ("person.crop.square", "Subject", "Subject", { add(["kind": "subject"]) }),
             ("cloud.sun", "Sky", "Sky", { customOrBuiltIn(.sky, ["kind": "sky"]) }),
             ("rectangle.dashed", "Background", "Background", { customOrBuiltIn(.background, ["kind": "background"]) }),
@@ -379,6 +383,7 @@ struct MaskPanel: View {
             ("circle.lefthalf.filled", "Luminance", "Luminance range", { add(["kind": "luminanceRange"]) }),
             ("eyedropper", "Colour", "Colour range", { add(["kind": "colorRange"]) }),
         ]
+        if TextMask.shared.available { types.insert(("text.magnifyingglass", "Word", "Mask by word", { describing = true }), at: 3) }
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 8) {
                 ForEach(types, id: \.full) { t in
                     Button(action: t.run) {
