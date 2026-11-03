@@ -59,19 +59,17 @@ final class MobileSAM {
                 cacheKey = key
             }
             guard let embeddings else { return false }
-            // Every Include tap selects its own object or part and the results are joined, so a tap on another part adds it;
-            // every Exclude tap selects the part under it and cuts it out. (Handing all taps to SAM as one prompt makes it
-            // guess one object, which is why extra taps barely changed the mask.)
+            // All taps go to SAM as one prompt (it refines one object best that way). A tap the joint mask still left out
+            // (another object or part) gets its own selection, joined on, so an Include tap always adds what it points at.
             let tmp = UnsafeMutablePointer<Float>.allocate(capacity: side * side)
             defer { tmp.deallocate() }
-            out.update(repeating: -8, count: side * side)
-            for c in clicks.filter({ $0.2 }).suffix(maxPoints) {
+            let pts = Array(clicks.suffix(maxPoints))
+            try decode(embeddings, pts, single: pts.count == 1, w: w, h: h, into: out, side: side)
+            for c in pts where c.2 {
+                let ix = min(side - 1, max(0, Int(c.0 * Float(side)))), iy = min(side - 1, max(0, Int(c.1 * Float(side))))
+                guard out[iy * side + ix] <= 0 else { continue }
                 try decode(embeddings, [c], single: true, w: w, h: h, into: tmp, side: side)
                 for i in 0..<(side * side) where tmp[i] > out[i] { out[i] = tmp[i] }
-            }
-            for c in clicks.filter({ !$0.2 }).suffix(maxPoints) {
-                try decode(embeddings, [(c.0, c.1, true)], single: false, w: w, h: h, into: tmp, side: side)
-                for i in 0..<(side * side) where tmp[i] > 0 { out[i] = -8 }
             }
             return true
         } catch { return false }
