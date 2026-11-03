@@ -105,7 +105,8 @@ struct MaskOverlay: View {
                              onEnded: { finishBrush(m) },
                              onCancelled: { samples = [] },
                              onUndo: onUndo, onRedo: onRedo, onPencilTap: onPencilTap)
-            } else if let m = mask {
+            } else if let m = mask, m.kind != "object" {
+                // an Object mask has no handles; this layer would sit over the Object tool and swallow every tap after the first
                 Color.clear.contentShape(Rectangle())
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { v in handle(m, v) }
