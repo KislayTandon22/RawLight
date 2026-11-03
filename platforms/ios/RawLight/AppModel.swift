@@ -131,9 +131,13 @@ final class AppModel {
     }
     /// Bytes held by leftover export and conversion folders.
     func temporaryBytes() -> Int {
-        temporaryFolders().reduce(0) { total, dir in
-            total + ((FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey])?.compactMap { ($0 as? URL)?.resourceValues(forKeys: [.fileSizeKey]).fileSize }.reduce(0, +)) ?? 0)
+        var total = 0
+        for dir in temporaryFolders() {
+            for case let f as URL in FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey]) ?? NSDirectoryEnumerator() {
+                total += (try? f.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            }
         }
+        return total
     }
     func clearTemporaryFiles() { temporaryFolders().forEach { try? FileManager.default.removeItem(at: $0) } }
 
