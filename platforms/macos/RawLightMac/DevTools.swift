@@ -67,34 +67,86 @@ struct ToolPanel: View {
 
     // MARK: mask
 
+    private func maskGo(_ cmd: String, _ p: [String: Any] = [:]) {
+        guard let id else { return }
+        Task { await dev.run(cmd, p, id: id, engine: lib.engine); await dev.afterMaskChange(id, lib.engine) }
+    }
+
     private var mask: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var mk = dev.mk
+        return VStack(alignment: .leading, spacing: 12) {
             title("Add a mask")
             LazyVGrid(columns: two, spacing: 6) {
-                chip("Radial", "circle.dashed") { go("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }
-                chip("Linear", "rectangle.split.1x2") { go("mask.add", ["kind": "linear"]) }
-                chip("Subject", "person.crop.square") { go("mask.add", ["kind": "subject"]) }
-                chip("Sky", "cloud") { go("mask.add", ["kind": "sky"]) }
-                chip("Background", "photo") { go("mask.add", ["kind": "background"]) }
-                chip("Brush", "paintbrush") { go("mask.add", ["kind": "brush"]) }
+                chip("Object (tap)", "hand.tap") { dev.startObjectTool(); if let id { Task { await dev.render(id, lib.engine, draft: true) } } }
+                chip("By word…", "text.magnifyingglass") { mk.wordSheet = true }
+                chip("Subject", "person.crop.square") { dev.stopObjectTool(); maskGo("mask.add", ["kind": "subject"]) }
+                chip("Sky", "cloud") { dev.stopObjectTool(); maskGo("mask.add", ["kind": "sky"]) }
+                chip("Background", "photo") { dev.stopObjectTool(); maskGo("mask.add", ["kind": "background"]) }
+                chip("Brush", "paintbrush") { dev.stopObjectTool(); maskGo("mask.add", ["kind": "brush"]) }
+                chip("Radial", "circle.dashed") { dev.stopObjectTool(); maskGo("mask.add", ["kind": "radial", "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50]) }
+                chip("Linear", "rectangle.split.1x2") { dev.stopObjectTool(); maskGo("mask.add", ["kind": "linear", "start": [0.5, 0.3], "end": [0.5, 0.7]]) }
             }
+            if mk.objectPick { objectCard }
+            if !mk.objectPick, mk.activeItem?.kind == "brush" { brushCard }
+            if let e = mk.error { Text(e).font(.system(size: 11)).foregroundStyle(MacTheme.accent) }
+            Toggle("Show the mask in red", isOn: $mk.showMask).toggleStyle(.switch).controlSize(.small).font(.system(size: 12))
+                .onChange(of: mk.showMask) { _, _ in if let id { Task { await dev.render(id, lib.engine, draft: false) } } }
             title("Adjust the selected mask")
             ForEach(maskSliders, id: \.0) { s in
                 HStack {
                     Text(s.1).font(.system(size: 12)).frame(width: 78, alignment: .leading)
                     Slider(value: Binding(get: { maskValues[s.0] ?? 0 }, set: { maskValues[s.0] = $0 }), in: s.2) { editing in
-                        if !editing { go("mask.adjust", ["values": [s.0: maskValues[s.0] ?? 0]]) }
+                        if !editing { maskGo("mask.adjust", ["values": [s.0: maskValues[s.0] ?? 0]]) }
                     }.tint(MacTheme.accent)
                     Text(String(format: "%.1f", maskValues[s.0] ?? 0)).font(.system(size: 11).monospacedDigit()).foregroundStyle(MacTheme.dim).frame(width: 34)
                 }
             }
             LazyVGrid(columns: two, spacing: 6) {
-                chip("Invert", "circle.lefthalf.filled") { go("mask.invert") }
-                chip("Duplicate", "plus.square.on.square") { go("mask.duplicate") }
-                chip("Delete", "trash") { go("mask.delete") }
-                chip("Delete all", "trash.slash") { go("mask.deleteAll") }
+                chip("Invert", "circle.lefthalf.filled") { maskGo("mask.invert") }
+                chip("Duplicate", "plus.square.on.square") { maskGo("mask.duplicate") }
+                chip("Delete", "trash") { maskGo("mask.delete") }
+                chip("Delete all", "trash.slash") { dev.stopObjectTool(); maskGo("mask.deleteAll") }
             }
         }
+        .task(id: "\(dev.tool)-\(lib.activeID ?? 0)") {
+            guard dev.tool == "Mask", let id else { return }
+            await dev.refreshMasks(lib.engine); await dev.render(id, lib.engine, draft: false)
+        }
+        .onDisappear { if let id { dev.stopObjectTool(); Task { await dev.render(id, lib.engine, draft: false) } } }
+        .sheet(isPresented: $mk.wordSheet) {
+            WordSheet { index, name in if let id { Task { await dev.maskByWord(index, name, id: id, engine: lib.engine) } } }
+        }
+    }
+
+    private var objectCard: some View {
+        @Bindable var mk = dev.mk
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(mk.taps.isEmpty ? "Click the object you want to edit" : "Click more to add or cut away parts").font(.system(size: 12, weight: .semibold))
+            Picker("", selection: $mk.exclude) { Text("Include").tag(false); Text("Exclude").tag(true) }.pickerStyle(.segmented).labelsHidden()
+            HStack(spacing: 6) {
+                chip("Undo", "arrow.uturn.backward") { if let id { Task { await dev.undoObjectTap(id: id, engine: lib.engine) } } }
+                chip("Start over", "xmark") { if let id { Task { await dev.clearObject(id: id, engine: lib.engine) } } }
+                chip("Done", "checkmark") { dev.stopObjectTool() }
+            }
+            if mk.busy { ProgressView().controlSize(.small) }
+            if !mk.taps.isEmpty, !mk.readout.isEmpty { Text(mk.readout).font(.system(size: 10)).foregroundStyle(MacTheme.dim) }
+        }
+        .padding(10).background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var brushCard: some View {
+        @Bindable var mk = dev.mk
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Drag on the photo to paint").font(.system(size: 12, weight: .semibold))
+            HStack {
+                Text("Size").font(.system(size: 12)).frame(width: 40, alignment: .leading)
+                Slider(value: $mk.brushSize, in: 0.005...0.15).tint(MacTheme.accent)
+                Text(String(format: "%.0f%%", mk.brushSize * 100)).font(.system(size: 11).monospacedDigit()).foregroundStyle(MacTheme.dim).frame(width: 36)
+            }
+            Toggle("Erase", isOn: $mk.erase).toggleStyle(.switch).controlSize(.small).font(.system(size: 12))
+            Toggle("Follow edges", isOn: $mk.edgeAware).toggleStyle(.switch).controlSize(.small).font(.system(size: 12))
+        }
+        .padding(10).background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: heal

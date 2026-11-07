@@ -82,9 +82,15 @@ final class MacEngine: @unchecked Sendable {
     }
 
     /// kind: 0 full, 2 draft (fast, while a slider moves).
-    func render(_ id: UInt64, maxEdge: Int, kind: Int32 = 0) async -> (image: NSImage, histogram: [UInt32])? {
+    func render(_ id: UInt64, maxEdge: Int, kind: Int32 = 0, overlayMask: Int? = nil) async -> (image: NSImage, histogram: [UInt32])? {
         let job: OpaquePointer? = await withCheckedContinuation { cont in
-            queue.async { cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind)) }
+            queue.async {
+                if let m = overlayMask {
+                    cont.resume(returning: rl_job_new_mask_overlay_rgb(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind, UInt32(m), 230, 70, 80))
+                } else {
+                    cont.resume(returning: rl_job_new(self.session, id, UInt32(maxEdge), UInt32(maxEdge), kind))
+                }
+            }
         }
         guard let job else { return nil }
         let out: (NSImage, [UInt32])? = await withCheckedContinuation { cont in
@@ -135,6 +141,18 @@ final class MacEngine: @unchecked Sendable {
         return (r?["name"] as? String ?? "", wm)
     }
 
+    /// The masks of the open photo and the selected one.
+    func masks() async -> (items: [MacMask], active: Int?) {
+        let d = (try? await execute("develop.get") as? [String: Any]) ?? [:]
+        let items: [MacMask] = ((d["masks"] as? [[String: Any]]) ?? []).compactMap { m in
+            guard let id = (m["id"] as? NSNumber)?.intValue else { return nil }
+            let shape = ((m["components"] as? [[String: Any]])?.first?["shape"] as? [String: Any]) ?? [:]
+            return MacMask(id: id, name: m["name"] as? String ?? "Mask", kind: shape["kind"] as? String ?? "brush", shape: shape)
+        }
+        let st = try? await execute("library.state") as? [String: Any]
+        return (items, (st?["activeMask"] as? NSNumber)?.intValue)
+    }
+
     func controls() async -> [MacControl] {
         guard let arr = try? await execute("develop.controls") as? [[String: Any]] else { return [] }
         return arr.compactMap { d in
@@ -155,6 +173,11 @@ final class MacEngine: @unchecked Sendable {
                                intent: .defaultIntent) else { return nil }
         return NSImage(cgImage: cg, size: NSSize(width: width, height: height))
     }
+}
+
+struct MacMask: Identifiable {
+    let id: Int, name: String, kind: String
+    let shape: [String: Any]
 }
 
 struct MacControl: Identifiable, Hashable {

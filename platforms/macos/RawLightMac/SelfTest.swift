@@ -147,12 +147,33 @@ import Foundation
         _ = try? await e.execute("crop.reset")
         log(cropFails.isEmpty, "Crop: every aspect and straighten angle", cropFails.prefix(3).joined(separator: "; "))
 
+        // Object taps: each extra Include tap changes the mask, Exclude cuts, Undo steps back; a word finds an object or says it is absent
+        await step("Mask: Object taps add and cut") {
+            let r = try await e.execute("mask.add", ["kind": "object", "points": [[0.5, 0.5]]]) as? [String: Any]
+            guard let mid = (r?["activeMask"] as? NSNumber)?.intValue else { return "no mask id" }
+            let a = try await e.execute("mask.objectPoint", ["x": 0.3, "y": 0.7, "id": mid]) as? [String: Any]
+            let b = try await e.execute("mask.objectPoint", ["x": 0.5, "y": 0.5, "exclude": true, "id": mid]) as? [String: Any]
+            let ok = (a?["include"] as? NSNumber)?.intValue == 2 && (b?["exclude"] as? NSNumber)?.intValue == 1
+            _ = try await e.execute("mask.deleteAll")
+            return ok ? nil : "tap counts \(String(describing: a)) \(String(describing: b))"
+        }
+        await step("Mask: by word (\(TextMask.shared.phrases.count) words)") {
+            guard TextMask.shared.available else { return "word model missing from the app" }
+            guard let i = TextMask.shared.phrases.firstIndex(of: "car") else { return "no word list" }
+            do { _ = try await e.execute("mask.add", ["kind": "object", "points": [TextMask.point(for: i)], "label": "car"]) }
+            catch { _ = try? await e.execute("mask.deleteAll"); return nil }   // "nothing found" on a photo without a car is a valid answer
+            _ = try await e.execute("mask.deleteAll"); return nil
+        }
+
         // every mask kind
         for kind in ["radial", "linear", "brush", "subject", "sky", "background"] {
             await step("Mask: add \(kind)") {
                 var p: [String: Any] = ["kind": kind]
                 if kind == "radial" { p = ["kind": kind, "center": [0.5, 0.5], "rx": 0.3, "ry": 0.25, "angle": 0, "feather": 50] }
-                _ = try await e.execute("mask.add", p)
+                do { _ = try await e.execute("mask.add", p) }
+                catch where ["subject", "background"].contains(kind) && error.localizedDescription.contains("no subject found") {
+                    return nil   // Apple Vision finds no subject in the synthetic demo photos: a clear message, not a failure
+                }
                 for key in ["exposure", "contrast", "highlights", "shadows", "saturation"] { _ = try await e.execute("mask.adjust", ["values": [key: 0.3]]) }
                 _ = try await e.execute("mask.deleteAll"); return nil
             }

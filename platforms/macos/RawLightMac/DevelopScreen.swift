@@ -14,6 +14,7 @@ import SwiftUI
     var lastPreset: String?
     var healMode = "heal"
     var healSize = 0.06
+    var mk = MaskState()
     private var pending: (() async -> Void)?
     private var pendingCommit = false
     private var busy = false
@@ -62,7 +63,8 @@ import SwiftUI
     }
 
     func render(_ id: UInt64, _ engine: MacEngine, draft: Bool) async {
-        if let r = await engine.render(id, maxEdge: draft ? 900 : 1600, kind: draft ? 2 : 0) { image = r.image; histogram = r.histogram }
+        let overlay = tool == "Mask" && mk.showMask ? (mk.active ?? 0) : nil
+        if let r = await engine.render(id, maxEdge: draft ? 900 : 1600, kind: draft ? 2 : 0, overlayMask: overlay) { image = r.image; histogram = r.histogram }
     }
 
     /// Latest value wins while a render is in flight.
@@ -268,6 +270,7 @@ private struct DevImage: View {
         if let img = dev.image {
             Image(nsImage: img).resizable().scaledToFit()
                 .overlay {
+                    if dev.tool == "Mask" { MaskCanvas() }
                     if dev.tool == "Heal" {
                         GeometryReader { g in
                             Color.clear.contentShape(Rectangle())
@@ -296,20 +299,35 @@ private struct NavThumb: View {
 }
 
 private struct Stage: View {
-    @State private var scale = 0.0
+    @Environment(DevelopModel.self) private var dev
+    @State private var scale = 0.0           // 0 = fit, 1 = 400 %
+    @State private var baseScale = 0.0
+    @State private var offset = CGSize.zero
+    @State private var baseOffset = CGSize.zero
+    private var factor: Double { 1 + scale * 3 }
+    /// One finger pans unless it is drawing (brush, handles, heal); hold Option to pan anyway.
+    private var drawing: Bool { dev.tool == "Heal" || (dev.tool == "Mask" && !dev.mk.objectPick && dev.mk.activeItem != nil) }
     var body: some View {
-        DevImage().padding(10).frame(maxWidth: .infinity, maxHeight: .infinity)
+        DevImage().scaleEffect(factor).offset(offset).padding(10).frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+            .contentShape(Rectangle())
+            .simultaneousGesture(MagnifyGesture().onChanged { scale = min(max(baseScale + ($0.magnification - 1), 0), 1) }
+                .onEnded { _ in baseScale = scale; if scale < 0.01 { offset = .zero; baseOffset = .zero } })
+            .simultaneousGesture(DragGesture(minimumDistance: 6).onChanged { v in
+                guard scale > 0.01, !drawing || NSEvent.modifierFlags.contains(.option) else { return }
+                offset = CGSize(width: baseOffset.width + v.translation.width, height: baseOffset.height + v.translation.height)
+            }.onEnded { _ in baseOffset = offset })
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 8) {
                     Image(systemName: "minus.magnifyingglass").font(.system(size: 11))
-                    Slider(value: $scale).frame(width: 120).tint(MacTheme.accent).controlSize(.small)
+                    Slider(value: Binding(get: { scale }, set: { scale = $0; baseScale = $0; if $0 < 0.01 { offset = .zero; baseOffset = .zero } })).frame(width: 120).tint(MacTheme.accent).controlSize(.small)
                     Image(systemName: "plus.magnifyingglass").font(.system(size: 11))
-                    Text(scale < 0.01 ? "Fit" : "\(Int(100 + scale * 300))%").font(.system(size: 11).monospacedDigit()).frame(width: 36, alignment: .leading)
+                    Text(scale < 0.01 ? "Fit" : "\(Int(factor * 100))%").font(.system(size: 11).monospacedDigit()).frame(width: 36, alignment: .leading)
                 }
                 .foregroundStyle(MacTheme.dim).padding(.horizontal, 12).frame(height: 28)
                 .background(Color.black.opacity(0.45), in: Capsule()).padding(12)
             }
             .background(LinearGradient(colors: [Color(red: 0.09, green: 0.09, blue: 0.11), Color(red: 0.043, green: 0.043, blue: 0.055)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct RawLightMacApp: App {
     @State private var model = LibraryModel()
     init() {
+        installVisionSegmenter()   // Object taps, Subject, Background and mask-by-word run through MobileSAM, Vision and OWL-ViT
         // Headless check of every flow, with no window and no screen: see SelfTest.swift.
         if let report = ProcessInfo.processInfo.environment["RAWLIGHT_SELFTEST"] {
             NSApplication.shared.setActivationPolicy(.prohibited)
