@@ -1,0 +1,118 @@
+# Desktop test builds of the Rust app in apps/lightcraft (the egui UI): Windows x64, x86 and arm64, Linux x86_64 and aarch64.
+# Each is a plain archive with the app and the small bundled models (unsigned; nothing is published).
+# Runs on a push to macos-app and on demand (Actions > Desktop build > Run workflow). The SwiftUI RawLight is Apple-only.
+name: Desktop build
+
+on:
+  push:
+    branches: [macos-app]
+    paths: ["crates/**", "apps/**", "Cargo.toml", "Cargo.lock", ".github/workflows/desktop-build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # Pinned model sources: the OpenCV zoo commit and the darktable-ai release; every file is checked against its SHA-256.
+  ZOO: https://github.com/opencv/opencv_zoo/raw/25f423d0e04c31a17254620e58febd7386da523b/models
+  YUNET_SHA: 8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4
+  SFACE_SHA: 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79
+  RAWNIND_ZIP: https://github.com/darktable-org/darktable-ai/releases/download/release-5.6.0/rawdenoise-nind.dtmodel
+  RAWNIND_ZIP_SHA: d71b5f1e727c85a359e6f74dca9e2016c9d8fc3e2f7ac3e9b347d80ceca969af
+  RAWNIND_SHA: da27509dab6a2915da67e988acd86cf71f9d5bbc8d1aa0ed32933578a887b901
+
+jobs:
+  windows:
+    name: Windows ${{ matrix.arch }}
+    runs-on: windows-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: x86, target: i686-pc-windows-msvc }
+          - { arch: arm64, target: aarch64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-windows-${{ matrix.arch }}
+      - name: Build
+        shell: pwsh
+        run: cargo build --release --locked -p lightcraft --target ${{ matrix.target }}
+      - name: Check the binary
+        shell: pwsh
+        run: |
+          $exe = "target/${{ matrix.target }}/release/lightcraft.exe"
+          if (-not (Test-Path $exe)) { throw "missing $exe" }
+          Get-Item $exe | Format-List Name, Length
+      - name: Package with the bundled models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/RawLight/models
+          cp "target/${{ matrix.target }}/release/lightcraft.exe" dist/RawLight/RawLight.exe
+          fetch() { curl -fsSL -o "$2" "$1"; echo "$3  $2" | sha256sum -c -; }
+          fetch "$ZOO/face_detection_yunet/face_detection_yunet_2023mar.onnx" dist/RawLight/models/yunet.onnx "$YUNET_SHA"
+          fetch "$ZOO/face_recognition_sface/face_recognition_sface_2021dec.onnx" dist/RawLight/models/sface.onnx "$SFACE_SHA"
+          fetch "$RAWNIND_ZIP" rawnind.dtmodel "$RAWNIND_ZIP_SHA"
+          unzip -o -q rawnind.dtmodel rawdenoise-nind/model_bayer.onnx
+          mv rawdenoise-nind/model_bayer.onnx dist/RawLight/models/rawnind.onnx
+          echo "$RAWNIND_SHA  dist/RawLight/models/rawnind.onnx" | sha256sum -c -
+          cd dist && 7z a -tzip "../RawLight-windows-${{ matrix.arch }}.zip" RawLight > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RawLight-windows-${{ matrix.arch }}
+          path: RawLight-windows-${{ matrix.arch }}.zip
+
+  linux:
+    name: Linux ${{ matrix.arch }}
+    # The oldest GitHub-hosted images, so the binaries only need glibc 2.35 (Ubuntu 22.04+, Debian 12+, Fedora 36+).
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-22.04 }
+          - { arch: aarch64, runner: ubuntu-22.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-linux-${{ matrix.arch }}
+      - name: Build
+        run: cargo build --release --locked -p lightcraft
+      - name: Check the binary
+        run: |
+          ls -l target/release/lightcraft
+          ldd target/release/lightcraft | head -30
+          target/release/lightcraft --version
+      - name: Package with the bundled models
+        run: |
+          set -euo pipefail
+          mkdir -p dist/RawLight/models
+          cp target/release/lightcraft dist/RawLight/RawLight
+          fetch() { curl -fsSL -o "$2" "$1"; echo "$3  $2" | sha256sum -c -; }
+          fetch "$ZOO/face_detection_yunet/face_detection_yunet_2023mar.onnx" dist/RawLight/models/yunet.onnx "$YUNET_SHA"
+          fetch "$ZOO/face_recognition_sface/face_recognition_sface_2021dec.onnx" dist/RawLight/models/sface.onnx "$SFACE_SHA"
+          fetch "$RAWNIND_ZIP" rawnind.dtmodel "$RAWNIND_ZIP_SHA"
+          unzip -o -q rawnind.dtmodel rawdenoise-nind/model_bayer.onnx
+          mv rawdenoise-nind/model_bayer.onnx dist/RawLight/models/rawnind.onnx
+          echo "$RAWNIND_SHA  dist/RawLight/models/rawnind.onnx" | sha256sum -c -
+          tar -C dist -czf "RawLight-linux-${{ matrix.arch }}.tar.gz" RawLight
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RawLight-linux-${{ matrix.arch }}
+          path: RawLight-linux-${{ matrix.arch }}.tar.gz
