@@ -1,0 +1,46 @@
+name: RawLightMac
+options:
+  bundleIdPrefix: com.kislay
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+targets:
+  RawLightMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: RawLightMac
+    settings:
+      base:
+        PRODUCT_NAME: RawLight
+        PRODUCT_BUNDLE_IDENTIFIER: com.kislay.rawlight.mac
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: NO
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: RawLight
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
+        INFOPLIST_KEY_NSHumanReadableCopyright: "RawLight"
+        SWIFT_OBJC_BRIDGING_HEADER: RawLightMac/RawLight-Bridging-Header.h
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/../../crates/bridge/include"
+        LIBRARY_SEARCH_PATHS: "$(inherited) $(PROJECT_DIR)/build"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-force_load"
+          - "$(PROJECT_DIR)/build/liblightcraft_bridge.a"
+          - "-framework"
+          - Metal
+          - "-framework"
+          - Accelerate
+    preBuildScripts:
+      - name: Build Rust bridge
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:$PATH"
+          ROOT="${PROJECT_DIR}/../.."
+          mkdir -p "${PROJECT_DIR}/build"
+          (cd "$ROOT" && cargo build -p lightcraft-bridge --target aarch64-apple-darwin --release)
+          cp "$ROOT/target/aarch64-apple-darwin/release/liblightcraft_bridge.a" "${PROJECT_DIR}/build/liblightcraft_bridge.a"

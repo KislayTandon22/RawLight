@@ -26,3 +26,5 @@ platforms/ios/target/
 platforms/ios/RawLight/Models/*.dtmodel
 # iOS: MobileSAM weights are fetched by platforms/ios/scripts/fetch-models.sh
 platforms/ios/RawLight/Models/MobileSAM/
+platforms/macos/build/
+platforms/macos/*.xcodeproj
